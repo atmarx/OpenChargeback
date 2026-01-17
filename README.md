@@ -115,11 +115,10 @@ Then open http://localhost:8000 and log in with the credentials in `config.yaml`
 
 | Document | Description |
 |----------|-------------|
-| [Operations Guide](docs/OPERATIONS.md) | CLI commands, configuration, web interface |
-| [HPC/Slurm Export Guide](docs/hpc-slurm-isilon-export-guide.md) | Export Slurm accounting data to FOCUS format |
-| [Azure VM Export Guide](docs/azure-local-vm-export-guide.md) | Export Azure usage for local VMs |
-| [Qumulo Storage Guide](docs/qumulo-storage-export-guide.md) | Export Qumulo storage billing |
-| [Implementation Guide Template](docs/IMPLEMENTATION-GUIDE-TEMPLATE.md) | Write your own export guide for a new source |
+| [Executive Summary](docs/EXECSUMMARY.md) | High-level overview for finance and leadership |
+| [Operations Guide](docs/operations/) | CLI commands, configuration, web interface |
+| [Implementation Guides](docs/implementation/) | Export guides for AWS, Azure, HPC, storage sources |
+| [Upgrade Guides](docs/upgrades/) | Dependency management and versioning |
 
 ---
 
@@ -129,7 +128,7 @@ Not every billing source has a native FOCUS export. That's okay—the FOCUS form
 
 **To add a new data source:**
 
-1. Read the [Implementation Guide Template](docs/IMPLEMENTATION-GUIDE-TEMPLATE.md)
+1. Read the [Implementation Guide Template](docs/implementation/TEMPLATE.md)
 2. Copy it and fill in the details for your source
 3. Use the guide with Claude, ChatGPT, or your preferred AI to generate an export script
 4. Run the script, import the CSV, done
@@ -177,6 +176,6 @@ MIT
 
 ## Contributing
 
-Issues and pull requests welcome at [github.com/your-org/openchargeback](https://github.com/your-org/openchargeback).
+Issues and pull requests welcome at [github.com/atmarx/OpenChargeback](https://github.com/atmarx/OpenChargeback).
 
 If you've written an export guide for a data source we don't cover, we'd love to include it.

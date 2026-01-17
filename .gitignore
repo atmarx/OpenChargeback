@@ -53,6 +53,9 @@ logs/
 # Config with secrets
 config.yaml
 
+# Planning/internal docs (not published)
+planning/
+
 # OS files
 .DS_Store
 Thumbs.db
