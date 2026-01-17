@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}{{ project_id }} - Projects - OpenChargeback{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">{{ project_id }}</h1>
+        <p class="page-subtitle">
+            <a href="/charges?pi={{ pi_email }}{% if current_period_id %}&period={{ current_period_id }}{% endif %}" style="color: var(--accent);">{{ pi_email }}</a>
+            {% if current_period %}&bull; {{ current_period.period }}{% endif %}
+        </p>
+    </div>
+    <div class="btn-group">
+        <a href="/projects{% if current_period_id %}?period={{ current_period_id }}{% endif %}" class="btn btn-outline">
+            &larr; Back to Projects
+        </a>
+    </div>
+</div>
+
+<!-- Summary Stats -->
+<div class="stats-grid" style="grid-template-columns: repeat(3, 1fr);">
+    <div class="stat-card">
+        <div class="label">Total Cost</div>
+        <div class="value">{{ total_cost | currency }}</div>
+        <div class="change">{% if current_period %}{{ current_period.period }}{% else %}All periods{% endif %}</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Charges</div>
+        <div class="value">{{ charges | length }}</div>
+        <div class="change">line items</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Fund/Org</div>
+        <div class="value" style="font-size: 24px;">{{ fund_org or 'N/A' }}</div>
+        <div class="change">billing code</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Charges</h3>
+        {% if charges %}
+        <form method="get" action="/projects/{{ project_id }}">
+            <select name="period" class="filter-dropdown" onchange="this.form.submit()">
+                <option value="">All Periods</option>
+                {% for p in periods %}
+                <option value="{{ p.id }}" {% if current_period_id == p.id %}selected{% endif %}>
+                    {{ p.period }} ({{ p.status }})
+                </option>
+                {% endfor %}
+            </select>
+        </form>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        {% if charges %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Resource</th>
+                        <th>Service</th>
+                        <th class="text-right">List Cost</th>
+                        <th class="text-right">Billed Cost</th>
+                        <th class="text-right">Discount</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for charge in charges %}
+                    <tr>
+                        <td>
+                            <a href="/charges/{{ charge.id }}" style="color: var(--accent);">
+                                <div>{{ charge.resource_id or 'N/A' }}</div>
+                                {% if charge.resource_name %}
+                                <div class="text-muted" style="font-size: 12px;">{{ charge.resource_name }}</div>
+                                {% endif %}
+                            </a>
+                        </td>
+                        <td>{{ charge.service_name or 'N/A' }}</td>
+                        <td class="text-right font-mono text-muted">
+                            {% if charge.list_cost %}{{ charge.list_cost | currency }}{% else %}-{% endif %}
+                        </td>
+                        <td class="text-right font-mono">{{ charge.billed_cost | currency }}</td>
+                        <td class="text-right font-mono">
+                            {% if charge.discount_percent > 0 %}
+                            <span style="color: var(--success);">{{ "%.1f" | format(charge.discount_percent) }}%</span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if charge.needs_review %}
+                            <span class="status status-flagged"><span class="status-dot"></span>Flagged</span>
+                            {% else %}
+                            <span class="status status-open"><span class="status-dot"></span>OK</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr style="font-weight: 600; border-top: 2px solid var(--border);">
+                        <td colspan="2">Total</td>
+                        <td class="text-right font-mono text-muted">
+                            {% set total_list = charges | map(attribute='list_cost') | select('number') | sum %}
+                            {% if total_list > 0 %}{{ total_list | currency }}{% else %}-{% endif %}
+                        </td>
+                        <td class="text-right font-mono">{{ total_cost | currency }}</td>
+                        <td class="text-right font-mono">
+                            {% if total_list > 0 %}
+                            <span style="color: var(--success);">{{ "%.1f" | format(((total_list - total_cost) / total_list) * 100) }}%</span>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="icon">&#128193;</div>
+            <h3>No charges found</h3>
+            <p>No charges found for this project in the selected period.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

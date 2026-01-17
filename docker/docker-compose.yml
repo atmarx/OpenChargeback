@@ -1,0 +1,49 @@
+# OpenChargeback Docker Compose Configuration
+# Usage: scripts/service.sh --start [--env dev|prod]
+
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: openchargeback
+    ports:
+      - "${WEB_PORT:-8000}:8000"
+    volumes:
+      - ../config.yaml:/app/config.yaml:ro
+      - ../data:/app/data
+      - ../output:/app/output
+    environment:
+      - CONFIG_PATH=/app/config.yaml
+      - WEB_SECRET_KEY=${WEB_SECRET_KEY:-}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/login')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Optional PostgreSQL database for production
+  # Uncomment to use instead of SQLite
+  # db:
+  #   image: postgres:16-alpine
+  #   container_name: openchargeback-db
+  #   environment:
+  #     POSTGRES_DB: openchargeback
+  #     POSTGRES_USER: ${DB_USER:-openchargeback}
+  #     POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-openchargeback}"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+volumes:
+  postgres_data:

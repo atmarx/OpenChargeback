@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Import: {{ import_record.filename }} - OpenChargeback{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">{{ import_record.filename }}</h1>
+        <p class="page-subtitle">
+            Imported {{ import_record.imported_at[:16] if import_record.imported_at else 'Unknown' }}
+        </p>
+    </div>
+    <div class="btn-group">
+        <a href="/imports" class="btn btn-outline">
+            &larr; Back to Imports
+        </a>
+    </div>
+</div>
+
+<!-- Summary Stats -->
+<div class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
+    <div class="stat-card">
+        <div class="label">Source</div>
+        <div class="value" style="font-size: 24px;">{{ source.name if source else 'Unknown' }}</div>
+        <div class="change">
+            <a href="/sources" style="color: var(--accent);">data source</a>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Billing Period</div>
+        <div class="value" style="font-size: 24px;">{{ period.period if period else 'N/A' }}</div>
+        <div class="change">
+            <a href="/periods/{{ period.id }}" style="color: var(--accent);">view period &rarr;</a>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Rows Imported</div>
+        <div class="value">{{ import_record.row_count }}</div>
+        <div class="change">charge records</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Total Cost</div>
+        <div class="value">{{ import_record.total_cost | currency }}</div>
+        <div class="change">billed amount</div>
+    </div>
+</div>
+
+{% if import_record.flagged_rows > 0 %}
+<div class="alert-banner">
+    <span class="icon">&#9888;</span>
+    <div class="message">
+        <strong>{{ import_record.flagged_rows }} rows flagged for review</strong>
+        Total flagged amount: {{ import_record.flagged_cost | currency }}
+    </div>
+    <a href="/review?period={{ period.id }}" class="btn btn-sm btn-outline">Review Now</a>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Import Details</h3>
+    </div>
+    <div class="card-body">
+        <table>
+            <tbody>
+                <tr>
+                    <td style="width: 200px; font-weight: 500;">Import ID</td>
+                    <td>{{ import_record.id }}</td>
+                </tr>
+                <tr>
+                    <td style="font-weight: 500;">Filename</td>
+                    <td class="font-mono">{{ import_record.filename }}</td>
+                </tr>
+                <tr>
+                    <td style="font-weight: 500;">Data Source</td>
+                    <td>
+                        {% if source %}
+                        <a href="/sources" style="color: var(--accent);">{{ source.display_name or source.name }}</a>
+                        {% else %}
+                        Unknown
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="font-weight: 500;">Billing Period</td>
+                    <td>
+                        {% if period %}
+                        <a href="/periods/{{ period.id }}" style="color: var(--accent);">{{ period.period }}</a>
+                        ({{ period.status }})
+                        {% else %}
+                        N/A
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="font-weight: 500;">Imported At</td>
+                    <td>{{ import_record.imported_at if import_record.imported_at else 'N/A' }}</td>
+                </tr>
+                <tr>
+                    <td style="font-weight: 500;">Row Count</td>
+                    <td>{{ import_record.row_count }}</td>
+                </tr>
+                <tr>
+                    <td style="font-weight: 500;">Total Cost</td>
+                    <td class="font-mono">{{ import_record.total_cost | currency }}</td>
+                </tr>
+                <tr>
+                    <td style="font-weight: 500;">Flagged Rows</td>
+                    <td>
+                        {% if import_record.flagged_rows > 0 %}
+                        <span style="color: var(--warning);">{{ import_record.flagged_rows }}</span>
+                        ({{ import_record.flagged_cost | currency }})
+                        {% else %}
+                        <span style="color: var(--success);">0</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card" style="margin-top: 20px;">
+    <div class="card-header">
+        <h3 class="card-title">Related Data</h3>
+    </div>
+    <div class="card-body">
+        <div class="btn-group" style="gap: 10px;">
+            <a href="/charges?period={{ period.id }}&source={{ source.id }}" class="btn btn-primary">
+                View Charges from this Import
+            </a>
+            {% if import_record.flagged_rows > 0 %}
+            <a href="/review?period={{ period.id }}" class="btn btn-outline">
+                Review Flagged Charges
+            </a>
+            {% endif %}
+            <a href="/projects?period={{ period.id }}" class="btn btn-outline">
+                View Projects for {{ period.period if period else 'this period' }}
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

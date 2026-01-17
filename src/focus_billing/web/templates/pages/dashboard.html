@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - OpenChargeback{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Dashboard</h1>
+        {% if current_period %}
+        <p class="page-subtitle">Billing period: <a href="/periods" style="color: var(--accent); text-decoration: none;">{{ current_period.period }}</a></p>
+        {% else %}
+        <p class="page-subtitle">No billing periods found</p>
+        {% endif %}
+    </div>
+    <div class="btn-group">
+        <button class="btn btn-success" onclick="openImportModal()">
+            <span>&#8593;</span> Import CSV
+        </button>
+        <a href="/statements/generate" class="btn btn-outline">
+            <span>&#9889;</span> Generate Statements
+        </a>
+    </div>
+</div>
+
+{% if stats and stats.flagged_count > 0 %}
+<div class="alert-banner">
+    <span class="icon">&#9888;</span>
+    <div class="message">
+        <strong>{{ stats.flagged_count }} charge{{ 's' if stats.flagged_count != 1 else '' }} require{{ '' if stats.flagged_count != 1 else 's' }} review</strong>
+        Charges with missing tags or period mismatches need approval before statement generation.
+    </div>
+    <a href="/review" class="btn btn-sm btn-outline">Review Now</a>
+</div>
+{% endif %}
+
+{% if stats %}
+<div class="stats-grid">
+    <a href="/charges?period={{ current_period.id }}" class="stat-card" style="text-decoration: none; color: inherit;">
+        <div class="label">Total Charges</div>
+        <div class="value">{{ stats.total_charges | currency }}</div>
+        <div class="change" style="color: var(--accent);">{{ stats.charge_count }} line items &rarr;</div>
+    </a>
+    <a href="/periods/{{ current_period.id }}" class="stat-card" style="text-decoration: none; color: inherit;">
+        <div class="label">Active PIs</div>
+        <div class="value">{{ stats.pi_count }}</div>
+        <div class="change" style="color: var(--accent);">this period &rarr;</div>
+    </a>
+    <a href="/charges?period={{ current_period.id }}" class="stat-card" style="text-decoration: none; color: inherit;">
+        <div class="label">Projects</div>
+        <div class="value">{{ stats.project_count }}</div>
+        <div class="change" style="color: var(--accent);">across all PIs &rarr;</div>
+    </a>
+    {% if stats.flagged_count > 0 %}
+    <a href="/review?period={{ current_period.id }}" class="stat-card" style="text-decoration: none; color: inherit;">
+        <div class="label">Pending Review</div>
+        <div class="value" style="color: var(--warning)">{{ stats.flagged_count }}</div>
+        <div class="change negative">{{ stats.flagged_cost | currency }} flagged &rarr;</div>
+    </a>
+    {% else %}
+    <div class="stat-card">
+        <div class="label">Pending Review</div>
+        <div class="value">{{ stats.flagged_count }}</div>
+        <div class="change positive">All charges approved</div>
+    </div>
+    {% endif %}
+</div>
+{% else %}
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="label">Total Charges</div>
+        <div class="value">$0.00</div>
+        <div class="change text-muted">No data yet</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Active PIs</div>
+        <div class="value">0</div>
+        <div class="change text-muted">No data yet</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Projects</div>
+        <div class="value">0</div>
+        <div class="change text-muted">No data yet</div>
+    </div>
+    <div class="stat-card">
+        <div class="label">Pending Review</div>
+        <div class="value">0</div>
+        <div class="change text-muted">No data yet</div>
+    </div>
+</div>
+{% endif %}
+
+<div class="grid-2">
+    <!-- Recent Imports -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Recent Imports</h3>
+            <a href="/imports" class="btn btn-sm btn-outline">View All</a>
+        </div>
+        <div class="card-body">
+            {% if recent_imports %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Source</th>
+                        <th>Period</th>
+                        <th class="text-right">Rows</th>
+                        <th class="text-right">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for import in recent_imports %}
+                    <tr>
+                        <td>{{ import.source_name }}</td>
+                        <td class="text-muted">{{ import.period }}</td>
+                        <td class="text-right">{{ import.row_count | default(0) }}</td>
+                        <td class="text-right font-mono">{{ import.total_cost | currency }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">
+                <div class="icon">&#128196;</div>
+                <h3>No imports yet</h3>
+                <p>Import a FOCUS CSV file to get started.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Top PIs by Spend -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Top PIs by Spend</h3>
+            <a href="/charges" class="btn btn-sm btn-outline">View All</a>
+        </div>
+        <div class="card-body">
+            {% if top_pis %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>PI</th>
+                        <th>Projects</th>
+                        <th class="text-right">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pi in top_pis %}
+                    <tr>
+                        <td><a href="/charges?pi={{ pi.pi_email }}{% if current_period %}&period={{ current_period.id }}{% endif %}" style="color: var(--accent);">{{ pi.pi_email }}</a></td>
+                        <td class="text-muted">{{ pi.project_count }} project{{ 's' if pi.project_count != 1 else '' }}</td>
+                        <td class="text-right font-mono">{{ pi.total_cost | currency }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty-state">
+                <div class="icon">&#128100;</div>
+                <h3>No charges yet</h3>
+                <p>Import billing data to see PI spending.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Billing Periods -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Billing Periods</h3>
+        <a href="/periods/new" class="btn btn-sm btn-outline">+ New Period</a>
+    </div>
+    <div class="card-body">
+        {% if periods %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Period</th>
+                    <th>Status</th>
+                    <th>Opened</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for period in periods[:5] %}
+                <tr>
+                    <td><strong>{{ period.period }}</strong></td>
+                    <td>
+                        {% if period.status == 'open' %}
+                        <span class="status status-open"><span class="status-dot"></span>Open</span>
+                        {% elif period.status == 'closed' %}
+                        <span class="status status-closed"><span class="status-dot"></span>Closed</span>
+                        {% else %}
+                        <span class="status status-finalized"><span class="status-dot"></span>Finalized</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-muted">{{ period.opened_at[:10] if period.opened_at else 'N/A' }}</td>
+                    <td>
+                        <a href="/periods/{{ period.id }}" class="btn btn-sm btn-outline">View</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if periods | length > 5 %}
+        <div style="text-align: center; padding-top: 15px;">
+            <a href="/periods" class="btn btn-sm btn-outline">View All {{ periods | length }} Periods</a>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="empty-state">
+            <div class="icon">&#128197;</div>
+            <h3>No billing periods</h3>
+            <p>Create a billing period to start tracking charges.</p>
+            <a href="/periods/new" class="btn btn-primary" style="margin-top: 15px;">Create Period</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% include "components/import_modal.html" %}
+{% endblock %}

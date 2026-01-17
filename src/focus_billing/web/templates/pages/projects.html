@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Projects - OpenChargeback{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Projects</h1>
+        <p class="page-subtitle">
+            {{ total }} project{{ 's' if total != 1 else '' }}
+            {% if current_period %}in {{ current_period.period }}{% endif %}
+            {% if selected_pi %}for {{ selected_pi }}{% endif %}
+        </p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <!-- Filter Bar -->
+        <form method="get" action="/projects" class="filter-bar">
+            <select name="period" class="filter-dropdown" onchange="this.form.submit()">
+                <option value="">All Periods</option>
+                {% for p in periods %}
+                <option value="{{ p.id }}" {% if current_period_id == p.id %}selected{% endif %}>
+                    {{ p.period }} ({{ p.status }})
+                </option>
+                {% endfor %}
+            </select>
+            <select name="pi" class="filter-dropdown" onchange="this.form.submit()">
+                <option value="">All PIs</option>
+                {% for pi in pis %}
+                <option value="{{ pi }}" {% if selected_pi == pi %}selected{% endif %}>
+                    {{ pi }}
+                </option>
+                {% endfor %}
+            </select>
+            {% if selected_pi %}
+            <a href="/projects{% if current_period_id %}?period={{ current_period_id }}{% endif %}" class="btn btn-outline btn-sm">Clear Filter</a>
+            {% endif %}
+        </form>
+
+        {% if projects %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Project ID</th>
+                        <th>PI</th>
+                        <th>Fund/Org</th>
+                        <th class="text-right">Charges</th>
+                        <th class="text-right">Total Cost</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for project in projects %}
+                    <tr>
+                        <td>
+                            <a href="/projects/{{ project.project_id }}{% if current_period_id %}?period={{ current_period_id }}{% endif %}" style="color: var(--accent); text-decoration: none; font-weight: 500;">
+                                {{ project.project_id }}
+                            </a>
+                        </td>
+                        <td>
+                            <a href="/projects?pi={{ project.pi_email }}{% if current_period_id %}&period={{ current_period_id }}{% endif %}" style="color: var(--text-primary); text-decoration: none;">
+                                {{ project.pi_email }}
+                            </a>
+                        </td>
+                        <td class="text-muted">{{ project.fund_org or '-' }}</td>
+                        <td class="text-right">{{ project.charge_count }}</td>
+                        <td class="text-right font-mono">{{ project.total_cost | currency }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if total_pages > 1 %}
+        <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 20px; border-top: 1px solid var(--border); margin-top: 20px;">
+            <span class="text-muted">
+                Showing {{ (page - 1) * 25 + 1 }}-{{ [page * 25, total] | min }} of {{ total }}
+            </span>
+            <div class="btn-group">
+                {% if page > 1 %}
+                <a href="/projects?page={{ page - 1 }}{% if current_period_id %}&period={{ current_period_id }}{% endif %}{% if selected_pi %}&pi={{ selected_pi }}{% endif %}" class="btn btn-sm btn-outline">
+                    &larr; Previous
+                </a>
+                {% endif %}
+
+                {% for p in range(1, total_pages + 1) %}
+                    {% if p == page %}
+                    <span class="btn btn-sm btn-primary">{{ p }}</span>
+                    {% elif p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
+                    <a href="/projects?page={{ p }}{% if current_period_id %}&period={{ current_period_id }}{% endif %}{% if selected_pi %}&pi={{ selected_pi }}{% endif %}" class="btn btn-sm btn-outline">
+                        {{ p }}
+                    </a>
+                    {% elif p == page - 3 or p == page + 3 %}
+                    <span class="text-muted">&hellip;</span>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page < total_pages %}
+                <a href="/projects?page={{ page + 1 }}{% if current_period_id %}&period={{ current_period_id }}{% endif %}{% if selected_pi %}&pi={{ selected_pi }}{% endif %}" class="btn btn-sm btn-outline">
+                    Next &rarr;
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% else %}
+        <div class="empty-state">
+            <div class="icon">&#128193;</div>
+            <h3>No projects found</h3>
+            {% if selected_pi %}
+            <p>No projects found for this PI in the selected period.</p>
+            <a href="/projects{% if current_period_id %}?period={{ current_period_id }}{% endif %}" class="btn btn-outline" style="margin-top: 15px;">Clear Filter</a>
+            {% else %}
+            <p>Import billing data to see projects here.</p>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

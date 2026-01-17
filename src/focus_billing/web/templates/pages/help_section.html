@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}{{ section.title }} - Help - OpenChargeback{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <a href="/help" class="back-link">&larr; Back to Help</a>
+        <h1 class="page-title">
+            <span class="help-section-icon">{{ section.icon | safe }}</span>
+            {{ section.title }}
+        </h1>
+    </div>
+</div>
+
+<div class="grid-help">
+    <!-- Sidebar Navigation -->
+    <div class="help-nav">
+        <div class="card">
+            <div class="card-body" style="padding: 10px;">
+                {% for key, s in sections.items() %}
+                <a href="/help/{{ key }}" class="help-nav-item {% if key == section_key %}active{% endif %}">
+                    <span>{{ s.icon | safe }}</span>
+                    {{ s.title }}
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Content -->
+    <div class="help-content">
+        <div class="card">
+            <div class="card-body help-body">
+                {{ section.content | markdown | safe }}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.back-link {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 14px;
+    display: inline-block;
+    margin-bottom: 10px;
+}
+
+.back-link:hover {
+    text-decoration: underline;
+}
+
+.help-section-icon {
+    font-size: 28px;
+    margin-right: 10px;
+    vertical-align: middle;
+}
+
+.grid-help {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 20px;
+}
+
+@media (max-width: 900px) {
+    .grid-help {
+        grid-template-columns: 1fr;
+    }
+    .help-nav {
+        display: none;
+    }
+}
+
+.help-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 15px;
+    color: var(--text);
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: background 0.15s;
+}
+
+.help-nav-item:hover {
+    background: var(--bg);
+}
+
+.help-nav-item.active {
+    background: var(--accent);
+    color: white;
+}
+
+.help-body {
+    font-size: 15px;
+    line-height: 1.7;
+}
+
+.help-body h2 {
+    margin-top: 0;
+}
+
+.help-body p {
+    margin-bottom: 15px;
+}
+
+.help-body strong {
+    color: var(--text);
+}
+
+.help-body ul, .help-body ol {
+    margin-bottom: 15px;
+    padding-left: 25px;
+}
+
+.help-body li {
+    margin-bottom: 8px;
+}
+
+.help-body code {
+    background: var(--bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 13px;
+}
+
+.dark .help-body code {
+    background: var(--primary-light);
+}
+</style>
+{% endblock %}

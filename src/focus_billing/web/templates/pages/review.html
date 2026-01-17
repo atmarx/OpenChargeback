@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block title %}Review Charges - OpenChargeback{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Review Charges</h1>
+        <p class="page-subtitle">
+            {{ total }} charge{{ 's' if total != 1 else '' }} need{{ 's' if total == 1 else '' }} review
+            {% if current_period_name %}in {{ current_period_name }}{% endif %}
+        </p>
+    </div>
+    {% if total > 0 and current_period_id %}
+    <form method="post" action="/review/approve-all" style="display: inline;">
+        <input type="hidden" name="period" value="{{ current_period_id }}">
+        <button type="submit" class="btn btn-success" onclick="return confirm('Approve all {{ total }} flagged charges?')">
+            Approve All ({{ total }})
+        </button>
+    </form>
+    {% endif %}
+</div>
+
+{% if total > 0 %}
+<div class="card">
+    <div class="card-body">
+        <!-- Filter Bar -->
+        <form method="get" action="/review" class="filter-bar">
+            <input
+                type="text"
+                name="search"
+                class="search-input"
+                placeholder="Search by PI, resource, or project..."
+                value="{{ search }}"
+            >
+            <select name="period" class="filter-dropdown" onchange="this.form.submit()">
+                <option value="">All Periods</option>
+                {% for p in periods %}
+                <option value="{{ p.id }}" {% if current_period_id == p.id %}selected{% endif %}>
+                    {{ p.period }}
+                </option>
+                {% endfor %}
+            </select>
+            <select name="source" class="filter-dropdown" onchange="this.form.submit()">
+                <option value="">All Sources</option>
+                {% for s in sources %}
+                <option value="{{ s.id }}" {% if current_source == s.id %}selected{% endif %}>
+                    {{ s.name }}
+                </option>
+                {% endfor %}
+            </select>
+            <select name="reason" class="filter-dropdown" onchange="this.form.submit()">
+                <option value="">All Reasons</option>
+                {% for r in reasons %}
+                <option value="{{ r }}" {% if current_reason == r %}selected{% endif %}>
+                    {{ r }}
+                </option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-outline btn-sm">Search</button>
+            {% if search or current_source or current_reason %}
+            <a href="/review{% if current_period_id %}?period={{ current_period_id }}{% endif %}" class="btn btn-outline btn-sm">Clear</a>
+            {% endif %}
+        </form>
+
+        <form id="bulk-form" method="post">
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 40px;">
+                                <input type="checkbox" id="select-all" onclick="toggleAll(this)">
+                            </th>
+                            <th>PI</th>
+                            <th>Resource</th>
+                            <th>Service</th>
+                            <th>Reason</th>
+                            <th class="text-right">Cost</th>
+                            <th style="width: 120px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="review-table-body">
+                        {% for charge in charges %}
+                        <tr id="charge-row-{{ charge.id }}">
+                            <td>
+                                <input type="checkbox" name="charge_ids" value="{{ charge.id }}" class="charge-checkbox" onchange="updateSelectedCount()">
+                            </td>
+                            <td>{{ charge.pi_email }}</td>
+                            <td>
+                                <a href="/charges/{{ charge.id }}">
+                                    <div>{{ charge.resource_id or 'N/A' }}</div>
+                                    {% if charge.resource_name %}
+                                    <div class="text-muted" style="font-size: 12px;">{{ charge.resource_name }}</div>
+                                    {% endif %}
+                                </a>
+                            </td>
+                            <td>{{ charge.service_name or 'N/A' }}</td>
+                            <td>
+                                <span class="status status-flagged">
+                                    <span class="status-dot"></span>{{ charge.review_reason or 'Unknown' }}
+                                </span>
+                            </td>
+                            <td class="text-right font-mono">{{ charge.billed_cost | currency }}</td>
+                            <td>
+                                <div class="btn-group">
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline"
+                                        style="padding: 4px 8px;"
+                                        hx-post="/review/{{ charge.id }}/approve"
+                                        hx-target="#charge-row-{{ charge.id }}"
+                                        hx-swap="outerHTML"
+                                        title="Approve"
+                                    >&#10003;</button>
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline"
+                                        style="padding: 4px 8px;"
+                                        hx-post="/review/{{ charge.id }}/reject"
+                                        hx-target="#charge-row-{{ charge.id }}"
+                                        hx-swap="outerHTML"
+                                        hx-confirm="Reject and delete this charge?"
+                                        title="Reject"
+                                    >&#10005;</button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="action-row">
+                <span class="selected-count" id="selected-count">0 selected</span>
+                <div class="btn-group">
+                    <button type="submit" formaction="/review/reject-selected" class="btn btn-sm btn-outline" id="reject-selected-btn" disabled onclick="return confirm('Reject and delete selected charges?')">
+                        Reject Selected
+                    </button>
+                    <button type="submit" formaction="/review/approve-selected" class="btn btn-sm btn-success" id="approve-selected-btn" disabled>
+                        Approve Selected
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function toggleAll(source) {
+    const checkboxes = document.querySelectorAll('.charge-checkbox');
+    checkboxes.forEach(cb => cb.checked = source.checked);
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    const checkboxes = document.querySelectorAll('.charge-checkbox:checked');
+    const count = checkboxes.length;
+    document.getElementById('selected-count').textContent = count + ' selected';
+    document.getElementById('approve-selected-btn').disabled = count === 0;
+    document.getElementById('reject-selected-btn').disabled = count === 0;
+
+    // Update select-all checkbox state
+    const allCheckboxes = document.querySelectorAll('.charge-checkbox');
+    const selectAll = document.getElementById('select-all');
+    if (allCheckboxes.length > 0) {
+        selectAll.checked = checkboxes.length === allCheckboxes.length;
+        selectAll.indeterminate = checkboxes.length > 0 && checkboxes.length < allCheckboxes.length;
+    }
+}
+
+// Listen for htmx events to update counts
+document.body.addEventListener('chargeApproved', function() {
+    updateSelectedCount();
+    updateTotalCount();
+});
+
+document.body.addEventListener('chargeRejected', function() {
+    updateSelectedCount();
+    updateTotalCount();
+});
+
+function updateTotalCount() {
+    const rows = document.querySelectorAll('#review-table-body tr');
+    const count = rows.length;
+    const subtitle = document.querySelector('.page-subtitle');
+    if (subtitle) {
+        const periodText = subtitle.textContent.includes('in ') ? subtitle.textContent.split('in ')[1] : '';
+        subtitle.textContent = count + ' charge' + (count !== 1 ? 's' : '') + ' need' + (count === 1 ? 's' : '') + ' review' + (periodText ? ' in ' + periodText : '');
+    }
+
+    // Show empty state if no more charges
+    if (count === 0) {
+        const tableBody = document.getElementById('review-table-body');
+        tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px;"><div class="icon">&#10003;</div><h3>All caught up!</h3><p class="text-muted">No more charges to review.</p></td></tr>';
+    }
+}
+</script>
+
+{% else %}
+<div class="card">
+    <div class="card-body">
+        <div class="empty-state">
+            <div class="icon">&#10003;</div>
+            <h3>All caught up!</h3>
+            <p>No charges need review{% if current_period_name %} for {{ current_period_name }}{% endif %}.</p>
+            <a href="/charges{% if current_period_id %}?period={{ current_period_id }}{% endif %}" class="btn btn-outline" style="margin-top: 15px;">View All Charges</a>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

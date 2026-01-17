@@ -1,0 +1,5 @@
+BillingPeriodStart,BillingPeriodEnd,ChargePeriodStart,ChargePeriodEnd,ListCost,ContractedCost,BilledCost,EffectiveCost,ResourceId,ResourceName,ServiceName,Tags
+2025-01-01,2025-01-31,2025-01-01,2025-01-31,320.00,272.00,272.00,272.00,vm-physics-sim-01,quantum-sim-vm,Azure Virtual Machines,"{""pi_email"": ""okonkwo.adaeze@example.edu"", ""project_id"": ""quantum-materials"", ""fund_org"": ""DOE-SC-2024""}"
+2025-01-01,2025-01-31,2025-01-01,2025-01-31,320.00,272.00,272.00,272.00,vm-physics-sim-02,quantum-sim-vm-2,Azure Virtual Machines,"{""pi_email"": ""okonkwo.adaeze@example.edu"", ""project_id"": ""quantum-materials"", ""fund_org"": ""DOE-SC-2024""}"
+2025-01-01,2025-01-31,2025-01-01,2025-01-31,45.00,38.25,38.25,38.25,blob-physics-data,physics-blob-storage,Azure Blob Storage,"{""pi_email"": ""okonkwo.adaeze@example.edu"", ""project_id"": ""quantum-materials"", ""fund_org"": ""DOE-SC-2024""}"
+2025-01-01,2025-01-31,2025-01-01,2025-01-31,180.00,153.00,153.00,153.00,cosmos-physics-db,physics-cosmosdb,Azure Cosmos DB,"{""pi_email"": ""okonkwo.adaeze@example.edu"", ""project_id"": ""quantum-materials"", ""fund_org"": ""DOE-SC-2024""}"

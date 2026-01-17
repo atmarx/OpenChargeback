@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+
+{% block title %}Charge {{ charge.id }} - OpenChargeback{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Charge #{{ charge.id }}</h1>
+        <p class="page-subtitle">
+            {{ charge.pi_email }} &middot; {{ period.period if period else 'Unknown period' }}
+        </p>
+    </div>
+    <div class="btn-group">
+        <a href="/charges?period={{ charge.billing_period_id }}" class="btn btn-outline">&larr; Back to Charges</a>
+        {% if charge.needs_review %}
+        <form method="post" action="/review/{{ charge.id }}/approve" style="display: inline;">
+            <button type="submit" class="btn btn-success">Approve</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+{% if charge.needs_review %}
+<div class="alert-banner">
+    <span class="icon">&#9888;</span>
+    <div class="message">
+        <strong>This charge is flagged for review</strong>
+        {{ charge.review_reason or 'Review required before including in statements.' }}
+    </div>
+</div>
+{% endif %}
+
+<div class="grid-2">
+    <!-- Main Details -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Charge Details</h3>
+        </div>
+        <div class="card-body">
+            <table style="width: 100%;">
+                <tbody>
+                    <tr>
+                        <td class="text-muted" style="width: 140px;">PI Email</td>
+                        <td><strong>{{ charge.pi_email }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Project ID</td>
+                        <td>{{ charge.project_id or '-' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Fund/Org</td>
+                        <td>{{ charge.fund_org or '-' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Resource ID</td>
+                        <td><code>{{ charge.resource_id or '-' }}</code></td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Resource Name</td>
+                        <td>{{ charge.resource_name or '-' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Service</td>
+                        <td>{{ charge.service_name or '-' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Source</td>
+                        <td>{{ source.name if source else 'Unknown' }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Cost Details -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Cost Breakdown</h3>
+        </div>
+        <div class="card-body">
+            <table style="width: 100%;">
+                <tbody>
+                    <tr>
+                        <td class="text-muted" style="width: 140px;">Billed Cost</td>
+                        <td class="font-mono"><strong>{{ charge.billed_cost | currency }}</strong></td>
+                    </tr>
+                    {% if charge.list_cost %}
+                    <tr>
+                        <td class="text-muted">List Cost</td>
+                        <td class="font-mono">{{ charge.list_cost | currency }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if charge.contracted_cost %}
+                    <tr>
+                        <td class="text-muted">Contracted Cost</td>
+                        <td class="font-mono">{{ charge.contracted_cost | currency }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if charge.effective_cost %}
+                    <tr>
+                        <td class="text-muted">Effective Cost</td>
+                        <td class="font-mono">{{ charge.effective_cost | currency }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if charge.list_cost and charge.discount_amount > 0 %}
+                    <tr>
+                        <td class="text-muted">Discount</td>
+                        <td>
+                            <span class="font-mono" style="color: var(--success);">
+                                -{{ charge.discount_amount | currency }}
+                            </span>
+                            <span class="text-muted">({{ "%.1f"|format(charge.discount_percent) }}%)</span>
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Period Details -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Period Information</h3>
+    </div>
+    <div class="card-body">
+        <div class="grid-2">
+            <table style="width: 100%;">
+                <tbody>
+                    <tr>
+                        <td class="text-muted" style="width: 140px;">Billing Period</td>
+                        <td>
+                            <a href="/periods/{{ period.id }}">{{ period.period if period else 'Unknown' }}</a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Period Status</td>
+                        <td>
+                            {% if period %}
+                                {% if period.status == 'open' %}
+                                <span class="status status-open"><span class="status-dot"></span>Open</span>
+                                {% elif period.status == 'closed' %}
+                                <span class="status status-closed"><span class="status-dot"></span>Closed</span>
+                                {% else %}
+                                <span class="status status-finalized"><span class="status-dot"></span>Finalized</span>
+                                {% endif %}
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <table style="width: 100%;">
+                <tbody>
+                    <tr>
+                        <td class="text-muted" style="width: 140px;">Charge Start</td>
+                        <td>{{ charge.charge_period_start[:10] if charge.charge_period_start else '-' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Charge End</td>
+                        <td>{{ charge.charge_period_end[:10] if charge.charge_period_end else '-' }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Review Status -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Review Status</h3>
+    </div>
+    <div class="card-body">
+        <table style="width: 100%;">
+            <tbody>
+                <tr>
+                    <td class="text-muted" style="width: 140px;">Status</td>
+                    <td>
+                        {% if charge.needs_review %}
+                        <span class="status status-flagged"><span class="status-dot"></span>Needs Review</span>
+                        {% else %}
+                        <span class="status status-open"><span class="status-dot"></span>Approved</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% if charge.review_reason %}
+                <tr>
+                    <td class="text-muted">Reason</td>
+                    <td>{{ charge.review_reason }}</td>
+                </tr>
+                {% endif %}
+                {% if charge.reviewed_at %}
+                <tr>
+                    <td class="text-muted">Reviewed At</td>
+                    <td>{{ charge.reviewed_at[:16] if charge.reviewed_at else '-' }}</td>
+                </tr>
+                {% endif %}
+                {% if charge.imported_at %}
+                <tr>
+                    <td class="text-muted">Imported At</td>
+                    <td>{{ charge.imported_at[:16] if charge.imported_at else '-' }}</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if charge.raw_tags %}
+<!-- Raw Tags -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Raw Tags</h3>
+    </div>
+    <div class="card-body">
+        <pre style="background: var(--bg); padding: 15px; border-radius: 6px; overflow-x: auto; font-size: 13px;">{{ charge.raw_tags | tojson(indent=2) }}</pre>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

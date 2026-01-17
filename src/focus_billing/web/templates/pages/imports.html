@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Import History - OpenChargeback{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Import History</h1>
+        <p class="page-subtitle">CSV file imports and data ingestion log</p>
+    </div>
+    <button class="btn btn-primary" onclick="openImportModal()">
+        <span>&#8593;</span> Import CSV
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-body" style="padding: 0;">
+        {% if imports %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>File</th>
+                        <th>Source</th>
+                        <th>Period</th>
+                        <th class="text-right">Rows</th>
+                        <th class="text-right">Total Cost</th>
+                        <th>Imported</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for import in imports %}
+                    <tr>
+                        <td>
+                            <a href="/imports/{{ import.id }}" style="color: var(--accent); text-decoration: none; font-weight: 500;">
+                                {{ import.filename }}
+                            </a>
+                        </td>
+                        <td>{{ import.source_name }}</td>
+                        <td>
+                            <a href="/periods?period={{ import.period }}">{{ import.period }}</a>
+                        </td>
+                        <td class="text-right">{{ import.row_count }}</td>
+                        <td class="text-right font-mono">{{ import.total_cost | currency }}</td>
+                        <td class="text-muted">{{ import.imported_at[:16] if import.imported_at else 'N/A' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="icon">&#128214;</div>
+            <h3>No imports yet</h3>
+            <p>Import FOCUS-format CSV files to start tracking billing data.</p>
+            <button class="btn btn-primary" style="margin-top: 15px;" onclick="openImportModal()">
+                Import CSV
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% include "components/import_modal.html" %}
+{% endblock %}

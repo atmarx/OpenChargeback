@@ -1,0 +1,66 @@
+<aside class="sidebar">
+    <div class="logo">
+        <div class="logo-icon">$</div>
+        <span>OpenChargeback</span>
+    </div>
+    <nav class="nav">
+        <div class="nav-section">
+            <div class="nav-section-title">Overview</div>
+        </div>
+        <a href="/" class="nav-item {{ 'active' if request.url.path == '/' else '' }}">
+            <span class="icon">&#9632;</span>
+            Dashboard
+        </a>
+
+        <div class="nav-section">
+            <div class="nav-section-title">Billing</div>
+        </div>
+        <a href="/periods" class="nav-item {{ 'active' if '/periods' in request.url.path else '' }}">
+            <span class="icon">&#8635;</span>
+            Periods
+        </a>
+        <a href="/sources" class="nav-item {{ 'active' if '/sources' in request.url.path else '' }}">
+            <span class="icon">&#9729;</span>
+            Sources
+        </a>
+        <a href="/charges" class="nav-item {{ 'active' if '/charges' in request.url.path else '' }}">
+            <span class="icon">&#9783;</span>
+            Charges
+        </a>
+        <a href="/projects" class="nav-item {{ 'active' if '/projects' in request.url.path else '' }}">
+            <span class="icon">&#128193;</span>
+            Projects
+        </a>
+        <a href="/review" class="nav-item {{ 'active' if '/review' in request.url.path else '' }}">
+            <span class="icon">&#9888;</span>
+            Review
+            {% if flagged_count is defined and flagged_count > 0 %}
+            <span class="badge">{{ flagged_count }}</span>
+            {% endif %}
+        </a>
+
+        <div class="nav-section">
+            <div class="nav-section-title">Output</div>
+        </div>
+        <a href="/statements" class="nav-item {{ 'active' if '/statements' in request.url.path else '' }}">
+            <span class="icon">&#128196;</span>
+            Statements
+        </a>
+        <a href="/journal" class="nav-item {{ 'active' if '/journal' in request.url.path else '' }}">
+            <span class="icon">&#128202;</span>
+            Journal Export
+        </a>
+
+        <div class="nav-section">
+            <div class="nav-section-title">System</div>
+        </div>
+        <a href="/settings" class="nav-item {{ 'active' if '/settings' in request.url.path else '' }}">
+            <span class="icon">&#9881;</span>
+            Settings
+        </a>
+        <a href="/imports" class="nav-item {{ 'active' if '/imports' in request.url.path else '' }}">
+            <span class="icon">&#128214;</span>
+            Import Log
+        </a>
+    </nav>
+</aside>

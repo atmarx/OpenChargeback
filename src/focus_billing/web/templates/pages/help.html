@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Help - OpenChargeback{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Help & Documentation</h1>
+        <p class="page-subtitle">Learn how to use OpenChargeback</p>
+    </div>
+</div>
+
+{% if error %}
+<div class="alert-banner" style="background: #ffebee; border-color: var(--danger);">
+    <span class="icon">&#9888;</span>
+    <div class="message">{{ error }}</div>
+</div>
+{% endif %}
+
+<div class="help-grid">
+    {% for key, section in sections.items() %}
+    <a href="/help/{{ key }}" class="help-card">
+        <div class="help-card-icon">{{ section.icon | safe }}</div>
+        <div class="help-card-content">
+            <h3>{{ section.title }}</h3>
+            <p>{{ section.content.split('\n\n')[0][:100] }}...</p>
+        </div>
+        <span class="help-card-arrow">&#8594;</span>
+    </a>
+    {% endfor %}
+</div>
+
+<style>
+.help-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+}
+
+.help-card {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 25px;
+    background: var(--card-bg);
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    text-decoration: none;
+    color: var(--text);
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.help-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+}
+
+.help-card-icon {
+    font-size: 32px;
+    width: 60px;
+    height: 60px;
+    background: var(--bg);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.help-card-content {
+    flex: 1;
+}
+
+.help-card-content h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.help-card-content p {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin: 0;
+}
+
+.help-card-arrow {
+    font-size: 20px;
+    color: var(--text-muted);
+}
+
+.dark .help-card-icon {
+    background: var(--primary-light);
+}
+</style>
+{% endblock %}

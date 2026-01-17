@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Statements - OpenChargeback{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Statements</h1>
+        <p class="page-subtitle">
+            {% if current_period %}
+            {{ statements | length }} statement{{ 's' if statements | length != 1 else '' }} for {{ current_period.period }}
+            {% else %}
+            Select a period to view statements
+            {% endif %}
+        </p>
+    </div>
+    <a href="/statements/generate{% if current_period_id %}?period={{ current_period_id }}{% endif %}" class="btn btn-primary">
+        <span>&#9889;</span> Generate Statements
+    </a>
+</div>
+
+<!-- Period Filter -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-body" style="padding: 15px 20px;">
+        <form method="get" action="/statements" class="filter-bar" style="margin-bottom: 0;">
+            <label style="display: flex; align-items: center; gap: 10px;">
+                <strong>Period:</strong>
+                <select name="period" class="filter-dropdown" onchange="this.form.submit()">
+                    <option value="">Select Period</option>
+                    {% for p in periods %}
+                    <option value="{{ p.id }}" {% if current_period_id == p.id %}selected{% endif %}>
+                        {{ p.period }} ({{ p.status }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </label>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body" style="padding: 0;">
+        {% if statements %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>PI</th>
+                        <th>Projects</th>
+                        <th class="text-right">Total Cost</th>
+                        <th>Generated</th>
+                        <th>Sent</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for stmt in statements %}
+                    <tr>
+                        <td><strong>{{ stmt.pi_email }}</strong></td>
+                        <td>
+                            <a href="/projects?pi={{ stmt.pi_email }}{% if current_period_id %}&period={{ current_period_id }}{% endif %}" style="color: var(--accent); text-decoration: none;">
+                                {{ stmt.project_count }} project{{ 's' if stmt.project_count != 1 else '' }}
+                            </a>
+                        </td>
+                        <td class="text-right font-mono">{{ stmt.total_cost | currency }}</td>
+                        <td class="text-muted">{{ stmt.generated_at[:10] if stmt.generated_at else 'N/A' }}</td>
+                        <td>
+                            {% if stmt.sent_at %}
+                            <span class="status status-finalized"><span class="status-dot"></span>Sent {{ stmt.sent_at[:10] }}</span>
+                            {% else %}
+                            <span class="text-muted">Not sent</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group">
+                                {% if stmt.pdf_path %}
+                                <a href="/statements/{{ stmt.id }}/download" class="btn btn-sm btn-outline">Download</a>
+                                {% endif %}
+                                {% if not stmt.sent_at %}
+                                <form method="post" action="/statements/{{ stmt.id }}/send" style="display: inline;">
+                                    <button type="submit" class="btn btn-sm btn-outline">Send</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Bulk Actions -->
+        <div style="padding: 15px 20px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+            <span class="text-muted">
+                {{ statements | selectattr('sent_at') | list | length }} of {{ statements | length }} sent
+            </span>
+            {% set unsent = statements | rejectattr('sent_at') | list | length %}
+            {% if unsent > 0 %}
+            <form method="post" action="/statements/send-all?period={{ current_period_id }}">
+                <button type="submit" class="btn btn-sm btn-primary" onclick="return confirm('Send {{ unsent }} unsent statement{{ 's' if unsent != 1 else '' }}?')">
+                    Send All Unsent ({{ unsent }})
+                </button>
+            </form>
+            {% endif %}
+        </div>
+
+        {% elif current_period %}
+        <div class="empty-state">
+            <div class="icon">&#128196;</div>
+            <h3>No statements generated</h3>
+            <p>Generate statements for {{ current_period.period }} to create PDFs for each PI.</p>
+            <a href="/statements/generate?period={{ current_period_id }}" class="btn btn-primary" style="margin-top: 15px;">
+                Generate Statements
+            </a>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="icon">&#128196;</div>
+            <h3>Select a Period</h3>
+            <p>Choose a billing period above to view or generate statements.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

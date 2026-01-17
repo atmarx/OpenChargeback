@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}New Billing Period - OpenChargeback{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">New Billing Period</h1>
+        <p class="page-subtitle">Create a new billing period to start tracking charges</p>
+    </div>
+</div>
+
+<div class="card" style="max-width: 600px;">
+    <div class="card-body">
+        <form method="post" action="/periods">
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label for="period" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                    Period (YYYY-MM)
+                </label>
+                <input
+                    type="text"
+                    id="period"
+                    name="period"
+                    value="{{ suggested_period }}"
+                    pattern="\d{4}-\d{2}"
+                    placeholder="2025-01"
+                    class="search-input"
+                    style="width: 100%; max-width: 200px;"
+                    required
+                >
+                <p class="text-muted" style="font-size: 13px; margin-top: 5px;">
+                    Use the format YYYY-MM (e.g., 2025-01 for January 2025)
+                </p>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label for="notes" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                    Notes (optional)
+                </label>
+                <textarea
+                    id="notes"
+                    name="notes"
+                    rows="3"
+                    class="search-input"
+                    style="width: 100%; resize: vertical;"
+                    placeholder="Any notes about this billing period..."
+                ></textarea>
+            </div>
+
+            <div class="btn-group">
+                <a href="/periods" class="btn btn-outline">Cancel</a>
+                <button type="submit" class="btn btn-primary">Create Period</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

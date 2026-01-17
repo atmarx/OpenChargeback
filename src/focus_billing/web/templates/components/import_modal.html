@@ -1,0 +1,556 @@
+<!-- Import Modal -->
+<div id="import-modal" class="modal" style="display: none;">
+    <div class="modal-backdrop" onclick="closeImportModal()"></div>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 class="modal-title">Import Billing Data</h2>
+            <button type="button" class="modal-close" onclick="closeImportModal()">&times;</button>
+        </div>
+        <form id="import-form" method="post" action="/imports/upload" enctype="multipart/form-data">
+            <div class="modal-body">
+                <!-- Source and Period Selection -->
+                <div class="form-row">
+                    <div class="form-group" style="flex: 1;">
+                        <label for="import-source">Data Source</label>
+                        <div class="source-input-wrapper">
+                            <input type="text" id="import-source" name="source" class="form-input"
+                                   list="known-sources" placeholder="Select or type source name" required
+                                   autocomplete="off">
+                            <datalist id="known-sources">
+                                {% if known_sources is defined %}
+                                {% for src in known_sources %}
+                                <option value="{{ src.name }}" data-pattern="{{ src.pattern }}">
+                                {% endfor %}
+                                {% else %}
+                                <option value="AWS" data-pattern="aws">
+                                <option value="Azure" data-pattern="azure">
+                                <option value="GCP" data-pattern="gcp">
+                                <option value="HPC" data-pattern="hpc">
+                                <option value="Storage" data-pattern="storage">
+                                {% endif %}
+                            </datalist>
+                        </div>
+                        <p class="form-help">Auto-detects from filename or select from list</p>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label for="import-period">Billing Period</label>
+                        <select id="import-period" name="period" class="form-input" required>
+                            {% for p in periods %}
+                            <option value="{{ p.period }}" {% if current_period and p.id == current_period.id %}selected{% endif %}>
+                                {{ p.period }} ({{ p.status }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <p class="form-help">Target billing period for these charges</p>
+                    </div>
+                </div>
+
+                <!-- Drop Zone -->
+                <div id="drop-zone" class="drop-zone" onclick="document.getElementById('file-input').click()">
+                    <input type="file" id="file-input" name="files" multiple accept=".csv" style="display: none;" onchange="handleFiles(this.files)">
+                    <div class="drop-zone-content">
+                        <div class="drop-zone-icon">&#128196;</div>
+                        <div class="drop-zone-text">
+                            <strong>Drop CSV files here</strong>
+                            <span>or click to browse</span>
+                        </div>
+                        <div class="drop-zone-hint">Accepts FOCUS-format CSV files</div>
+                    </div>
+                </div>
+
+                <!-- File List -->
+                <div id="file-list" class="file-list" style="display: none;">
+                    <div class="file-list-header">
+                        <strong>Selected Files</strong>
+                        <button type="button" class="btn btn-sm btn-outline" onclick="clearFiles()">Clear All</button>
+                    </div>
+                    <div id="file-list-items"></div>
+                </div>
+
+                <!-- Upload Progress -->
+                <div id="upload-progress" class="upload-progress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                    <div class="progress-text" id="progress-text">Uploading...</div>
+                </div>
+
+                <!-- Results -->
+                <div id="upload-results" class="upload-results" style="display: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeImportModal()">Cancel</button>
+                <button type="submit" id="upload-btn" class="btn btn-primary" disabled>
+                    <span>&#8593;</span> Upload Files
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+/* Modal Styles */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+    position: relative;
+    background: white;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+    padding: 20px 25px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--text-muted);
+    padding: 0;
+    line-height: 1;
+}
+
+.modal-close:hover {
+    color: var(--text);
+}
+
+.modal-body {
+    padding: 25px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.modal-footer {
+    padding: 20px 25px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* Form Styles */
+.form-row {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    font-weight: 500;
+    margin-bottom: 6px;
+    font-size: 14px;
+}
+
+.form-input {
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.form-help {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+/* Drop Zone */
+.drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--bg);
+}
+
+.drop-zone:hover,
+.drop-zone.drag-over {
+    border-color: var(--accent);
+    background: #f0f7ff;
+}
+
+.drop-zone-icon {
+    font-size: 48px;
+    margin-bottom: 15px;
+}
+
+.drop-zone-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.drop-zone-text strong {
+    font-size: 16px;
+}
+
+.drop-zone-text span {
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+.drop-zone-hint {
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* File List */
+.file-list {
+    margin-top: 20px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.file-list-header {
+    padding: 12px 15px;
+    background: var(--bg);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+}
+
+.file-list-items {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.file-item {
+    padding: 10px 15px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.file-item:last-child {
+    border-bottom: none;
+}
+
+.file-item-icon {
+    color: var(--accent);
+}
+
+.file-item-name {
+    flex: 1;
+    font-size: 14px;
+}
+
+.file-item-size {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.file-item-remove {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 18px;
+    padding: 0;
+}
+
+.file-item-remove:hover {
+    color: var(--danger);
+}
+
+/* Progress */
+.upload-progress {
+    margin-top: 20px;
+}
+
+.progress-bar {
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.3s;
+}
+
+.progress-text {
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+/* Results */
+.upload-results {
+    margin-top: 20px;
+}
+
+.result-item {
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.result-item.success {
+    background: #e8f5e9;
+    border: 1px solid #c8e6c9;
+}
+
+.result-item.error {
+    background: #ffebee;
+    border: 1px solid #ffcdd2;
+}
+
+.result-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.result-item-name {
+    font-weight: 500;
+}
+
+.result-item-stats {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+</style>
+
+<script>
+let selectedFiles = [];
+
+function openImportModal() {
+    document.getElementById('import-modal').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function closeImportModal() {
+    document.getElementById('import-modal').style.display = 'none';
+    document.body.style.overflow = '';
+    resetModal();
+}
+
+function resetModal() {
+    selectedFiles = [];
+    updateFileList();
+    document.getElementById('upload-progress').style.display = 'none';
+    document.getElementById('upload-results').style.display = 'none';
+    document.getElementById('upload-results').innerHTML = '';
+    document.getElementById('drop-zone').style.display = 'block';
+    document.getElementById('upload-btn').disabled = true;
+}
+
+function handleFiles(files) {
+    for (let file of files) {
+        if (file.name.endsWith('.csv') && !selectedFiles.find(f => f.name === file.name)) {
+            selectedFiles.push(file);
+        }
+    }
+    updateFileList();
+    autoDetectSource(files);
+}
+
+function autoDetectSource(files) {
+    const sourceInput = document.getElementById('import-source');
+    if (sourceInput.value) return; // Don't override if already set
+
+    const datalist = document.getElementById('known-sources');
+    const options = datalist.querySelectorAll('option');
+
+    for (let file of files) {
+        const filename = file.name.toLowerCase();
+        for (let option of options) {
+            const pattern = option.dataset.pattern;
+            if (pattern && filename.includes(pattern.toLowerCase())) {
+                sourceInput.value = option.value;
+                return;
+            }
+        }
+    }
+}
+
+function removeFile(index) {
+    selectedFiles.splice(index, 1);
+    updateFileList();
+}
+
+function clearFiles() {
+    selectedFiles = [];
+    updateFileList();
+}
+
+function updateFileList() {
+    const fileList = document.getElementById('file-list');
+    const fileListItems = document.getElementById('file-list-items');
+    const uploadBtn = document.getElementById('upload-btn');
+
+    if (selectedFiles.length === 0) {
+        fileList.style.display = 'none';
+        uploadBtn.disabled = true;
+        return;
+    }
+
+    fileList.style.display = 'block';
+    uploadBtn.disabled = false;
+
+    fileListItems.innerHTML = selectedFiles.map((file, index) => `
+        <div class="file-item">
+            <span class="file-item-icon">&#128196;</span>
+            <span class="file-item-name">${file.name}</span>
+            <span class="file-item-size">${formatFileSize(file.size)}</span>
+            <button type="button" class="file-item-remove" onclick="removeFile(${index})">&times;</button>
+        </div>
+    `).join('');
+}
+
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+// Drag and drop handlers
+const dropZone = document.getElementById('drop-zone');
+
+dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('drag-over');
+});
+
+dropZone.addEventListener('dragleave', () => {
+    dropZone.classList.remove('drag-over');
+});
+
+dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    handleFiles(e.dataTransfer.files);
+});
+
+// Form submission with progress
+document.getElementById('import-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const form = e.target;
+    const formData = new FormData();
+
+    formData.append('source', document.getElementById('import-source').value);
+    formData.append('period', document.getElementById('import-period').value);
+
+    for (let file of selectedFiles) {
+        formData.append('files', file);
+    }
+
+    // Show progress
+    document.getElementById('drop-zone').style.display = 'none';
+    document.getElementById('file-list').style.display = 'none';
+    document.getElementById('upload-progress').style.display = 'block';
+    document.getElementById('upload-btn').disabled = true;
+
+    try {
+        const response = await fetch('/imports/upload', {
+            method: 'POST',
+            body: formData,
+        });
+
+        const result = await response.json();
+        showResults(result);
+    } catch (error) {
+        showResults({ error: error.message });
+    }
+});
+
+function showResults(result) {
+    document.getElementById('upload-progress').style.display = 'none';
+    const resultsDiv = document.getElementById('upload-results');
+    resultsDiv.style.display = 'block';
+
+    if (result.error) {
+        resultsDiv.innerHTML = `
+            <div class="result-item error">
+                <div class="result-item-header">
+                    <span class="result-item-name">Upload Failed</span>
+                </div>
+                <div class="result-item-stats">${result.error}</div>
+            </div>
+        `;
+        return;
+    }
+
+    resultsDiv.innerHTML = result.results.map(r => `
+        <div class="result-item ${r.success ? 'success' : 'error'}">
+            <div class="result-item-header">
+                <span class="result-item-name">${r.filename}</span>
+                <span>${r.success ? '&#10003;' : '&#10005;'}</span>
+            </div>
+            <div class="result-item-stats">
+                ${r.success
+                    ? `${r.row_count} rows imported, ${r.flagged_rows} flagged, $${r.total_cost.toFixed(2)} total`
+                    : r.error
+                }
+            </div>
+        </div>
+    `).join('');
+
+    // Refresh page after short delay if successful
+    if (result.results.some(r => r.success)) {
+        setTimeout(() => {
+            window.location.reload();
+        }, 2000);
+    }
+}
+</script>

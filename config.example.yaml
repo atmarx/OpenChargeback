@@ -1,0 +1,62 @@
+# FOCUS Billing Configuration
+# Copy this file to config.yaml and customize for your environment
+
+database:
+  path: ./billing.db
+
+smtp:
+  host: smtp.example.edu
+  port: 587
+  use_tls: true
+  username: ${SMTP_USER}      # Set via environment variable
+  password: ${SMTP_PASSWORD}  # Set via environment variable
+
+email:
+  from_address: hpc-billing@example.edu
+  from_name: Research Computing Billing
+  subject_template: "Research Computing Charges - {billing_period}"
+
+# Map FOCUS tag names to internal fields
+# These are the tag keys in your cloud provider's FOCUS export
+tag_mapping:
+  pi_email: "pi_email"
+  project_id: "project"
+  fund_org: "fund_org"
+  cost_center: "cost_center"
+
+output:
+  pdf_dir: ./output/statements
+  journal_dir: ./output/journals
+
+logging:
+  level: INFO                     # INFO, WARN, ERROR
+  format: splunk                  # "splunk" (key=value) or "json"
+  file: ./logs/focus-billing.log  # Optional file output (also logs to stderr)
+
+# Web interface configuration
+web:
+  enabled: true
+  host: 127.0.0.1
+  port: 8000
+  secret_key: ${WEB_SECRET_KEY}  # Generate with: python -c "import secrets; print(secrets.token_hex(32))"
+  session_lifetime_hours: 8
+  users:
+    admin:
+      email: admin@example.edu
+      display_name: "Admin User"
+      # Generate hash with: python -c "import bcrypt; print(bcrypt.hashpw(b'yourpassword', bcrypt.gensalt()).decode())"
+      # Default password below is "admin123" - CHANGE THIS!
+      password_hash: "$2b$12$Fxu99zxFh4plt3a2FDyEnuFyg2Co/osXmQGGYw.HFl0/Id6V.Uvey"
+      role: admin
+
+# Future: API source credentials (secrets via env vars)
+# sources:
+#   aws:
+#     api_url: https://ce.us-east-1.amazonaws.com
+#     api_key: ${AWS_COST_EXPLORER_KEY}
+#     api_secret: ${AWS_COST_EXPLORER_SECRET}
+#   azure:
+#     api_url: https://management.azure.com
+#     tenant_id: ${AZURE_TENANT_ID}
+#     client_id: ${AZURE_CLIENT_ID}
+#     client_secret: ${AZURE_CLIENT_SECRET}

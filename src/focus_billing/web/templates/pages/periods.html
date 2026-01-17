@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Billing Periods - OpenChargeback{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Billing Periods</h1>
+        <p class="page-subtitle">Manage billing cycles and generate statements</p>
+    </div>
+    <a href="/periods/new" class="btn btn-primary">
+        <span>+</span> New Period
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-body" style="padding: 0;">
+        {% if periods %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Period</th>
+                        <th>Status</th>
+                        <th>Opened</th>
+                        <th class="text-right">Charges</th>
+                        <th class="text-right">Total Cost</th>
+                        <th class="text-right">PIs</th>
+                        <th class="text-right">Flagged</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for period in periods %}
+                    <tr>
+                        <td><strong><a href="/periods/{{ period.id }}">{{ period.period }}</a></strong></td>
+                        <td>
+                            {% if period.status == 'open' %}
+                            <span class="status status-open"><span class="status-dot"></span>Open</span>
+                            {% elif period.status == 'closed' %}
+                            <span class="status status-closed"><span class="status-dot"></span>Closed</span>
+                            {% else %}
+                            <span class="status status-finalized"><span class="status-dot"></span>Finalized</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted">{{ period.opened_at[:10] if period.opened_at else 'N/A' }}</td>
+                        <td class="text-right">{{ period.charge_count }}</td>
+                        <td class="text-right font-mono">{{ period.total_cost | currency }}</td>
+                        <td class="text-right">{{ period.pi_count }}</td>
+                        <td class="text-right">
+                            {% if period.flagged_count > 0 %}
+                            <span style="color: var(--warning)">{{ period.flagged_count }}</span>
+                            {% else %}
+                            <span class="text-muted">0</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group">
+                                <a href="/periods/{{ period.id }}" class="btn btn-sm btn-outline">View</a>
+                                {% if period.status == 'open' %}
+                                <form method="post" action="/periods/{{ period.id }}/close" style="display: inline;">
+                                    <button type="submit" class="btn btn-sm btn-outline">Close</button>
+                                </form>
+                                {% elif period.status == 'closed' %}
+                                <form method="post" action="/periods/{{ period.id }}/finalize" style="display: inline;">
+                                    <button type="submit" class="btn btn-sm btn-primary">Finalize</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="icon">&#128197;</div>
+            <h3>No billing periods</h3>
+            <p>Create your first billing period to start tracking charges.</p>
+            <a href="/periods/new" class="btn btn-primary" style="margin-top: 15px;">Create Period</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

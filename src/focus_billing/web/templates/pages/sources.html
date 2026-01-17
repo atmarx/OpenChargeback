@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Data Sources - OpenChargeback{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Data Sources</h1>
+        <p class="page-subtitle">Cloud providers and billing data sources</p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body" style="padding: 0;">
+        {% if sources %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Display Name</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Last Sync</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for source in sources %}
+                    <tr>
+                        <td><strong>{{ source.name }}</strong></td>
+                        <td>{{ source.display_name or source.name }}</td>
+                        <td>
+                            {% if source.source_type == 'file' %}
+                            <span class="status status-open"><span class="status-dot"></span>File Import</span>
+                            {% elif source.source_type == 'api' %}
+                            <span class="status status-finalized"><span class="status-dot"></span>API</span>
+                            {% else %}
+                            <span class="status">{{ source.source_type }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if source.enabled %}
+                            <span class="status status-open"><span class="status-dot"></span>Enabled</span>
+                            {% else %}
+                            <span class="status status-closed"><span class="status-dot"></span>Disabled</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted">
+                            {% if source.last_sync_at %}
+                            {{ source.last_sync_at[:10] }}
+                            {% if source.last_sync_status == 'success' %}
+                            <span style="color: var(--success);">&#10003;</span>
+                            {% elif source.last_sync_status == 'error' %}
+                            <span style="color: var(--danger);">&#10005;</span>
+                            {% endif %}
+                            {% else %}
+                            Never
+                            {% endif %}
+                        </td>
+                        <td class="text-muted">{{ source.created_at[:10] if source.created_at else 'N/A' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="icon">&#9729;</div>
+            <h3>No data sources</h3>
+            <p>Data sources are created automatically when you import billing data.</p>
+            <a href="/imports/upload" class="btn btn-primary" style="margin-top: 15px;">Import Data</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card" style="margin-top: 20px;">
+    <div class="card-header">
+        <h3 class="card-title">About Data Sources</h3>
+    </div>
+    <div class="card-body">
+        <p class="text-muted" style="line-height: 1.6;">
+            Data sources represent the origin of billing data. They are created automatically
+            when you import FOCUS-format CSV files. Each source tracks its sync status and
+            maintains a history of imports. Supported sources include AWS, Azure, GCP, and
+            other cloud providers that export billing data in FOCUS format.
+        </p>
+    </div>
+</div>
+{% endblock %}

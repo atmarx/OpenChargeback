@@ -1,0 +1,58 @@
+<header class="topbar">
+    <div class="breadcrumb">
+        {% block breadcrumb %}
+        Dashboard
+        {% endblock %}
+    </div>
+    <div class="topbar-actions">
+        {% if periods is defined and periods %}
+        <div class="period-selector">
+            <span>Period:</span>
+            <select name="period"
+                    hx-get="/set-period"
+                    hx-trigger="change"
+                    hx-swap="none"
+                    hx-on::after-request="location.reload()">
+                {% for period in periods %}
+                <option value="{{ period.id }}"
+                        {% if current_period and period.id == current_period.id %}selected{% endif %}>
+                    {{ period.period }} ({{ period.status | capitalize }})
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        <div class="user-menu-container">
+            <button type="button" class="user-menu-trigger" onclick="toggleUserMenu()">
+                <div class="avatar">{{ user.display_name[:2] | upper if user else 'U' }}</div>
+                <span class="user-name">{{ user.display_name if user else 'User' }}</span>
+                <span class="dropdown-arrow">&#9662;</span>
+            </button>
+            <div class="user-dropdown" id="userDropdown">
+                <div class="dropdown-header">
+                    <div class="avatar">{{ user.display_name[:2] | upper if user else 'U' }}</div>
+                    <div class="dropdown-user-info">
+                        <strong>{{ user.display_name if user else 'User' }}</strong>
+                        <span class="text-muted">{{ user.username if user else '' }}</span>
+                    </div>
+                </div>
+                <div class="dropdown-divider"></div>
+                <button type="button" class="dropdown-item" onclick="toggleTheme()">
+                    <span class="dropdown-icon" id="themeIcon">&#9790;</span>
+                    <span id="themeLabel">Dark Mode</span>
+                </button>
+                <a href="/help" class="dropdown-item">
+                    <span class="dropdown-icon">&#10067;</span>
+                    Help
+                </a>
+                <div class="dropdown-divider"></div>
+                <form action="/logout" method="post">
+                    <button type="submit" class="dropdown-item dropdown-item-danger">
+                        <span class="dropdown-icon">&#10140;</span>
+                        Logout
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</header>

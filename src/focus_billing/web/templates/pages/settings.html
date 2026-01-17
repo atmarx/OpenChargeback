@@ -1,0 +1,291 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - OpenChargeback{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Settings</h1>
+        <p class="page-subtitle">Configure review patterns and validation rules</p>
+    </div>
+</div>
+
+<div class="grid-2">
+    <!-- Review Flag Patterns -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Review Flag Patterns</h3>
+        </div>
+        <div class="card-body">
+            <form method="post" action="/settings/review-patterns" id="patterns-form">
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="flag_patterns" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                        Flag Patterns (one regex per line)
+                    </label>
+                    <textarea
+                        id="flag_patterns"
+                        name="flag_patterns"
+                        class="form-input"
+                        style="width: 100%; height: 150px; font-family: monospace; font-size: 13px;"
+                        placeholder=".*aws.*instance.*&#10;.*expensive-service.*&#10;^PROD-.*">{{ flag_patterns | join('\n') }}</textarea>
+                    <p class="form-help">
+                        Charges matching any of these patterns (in service name, resource ID, or resource name) will be flagged for review.
+                        Uses Python regex syntax.
+                    </p>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="fund_org_patterns" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                        Fund/Org Validation Patterns (one regex per line)
+                    </label>
+                    <textarea
+                        id="fund_org_patterns"
+                        name="fund_org_patterns"
+                        class="form-input"
+                        style="width: 100%; height: 150px; font-family: monospace; font-size: 13px;"
+                        placeholder="^\d{6}-\d{4}$&#10;^[A-Z]{2}\d{5}$">{{ fund_org_patterns | join('\n') }}</textarea>
+                    <p class="form-help">
+                        Fund/org codes that don't match ANY of these patterns will be flagged for review.
+                        Leave empty to skip validation.
+                    </p>
+                </div>
+
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary">
+                        Save Patterns
+                    </button>
+                    <button type="button" class="btn btn-outline" hx-get="/settings/test-patterns" hx-target="#test-results" hx-swap="innerHTML">
+                        Test Against Charges
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Pattern Help -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Regex Pattern Help</h3>
+        </div>
+        <div class="card-body">
+            <div style="display: flex; flex-direction: column; gap: 15px; font-size: 13px;">
+                <div>
+                    <h4 style="margin: 0 0 5px 0; font-size: 14px;">Sample Data Patterns</h4>
+                    <p class="text-muted" style="margin: 0 0 8px 0; font-size: 12px;">
+                        Examples matching your sample data format:
+                    </p>
+                    <table style="font-size: 13px;">
+                        <tr>
+                            <td class="font-mono">.*gpu.*</td>
+                            <td class="text-muted">Flag GPU instances for review</td>
+                        </tr>
+                        <tr>
+                            <td class="font-mono">.*training.*</td>
+                            <td class="text-muted">Flag ML training resources</td>
+                        </tr>
+                        <tr>
+                            <td class="font-mono">^[A-Z]+-.*-\d{4}$</td>
+                            <td class="text-muted">Fund/org: PREFIX-xxx-YEAR</td>
+                        </tr>
+                        <tr>
+                            <td class="font-mono">^(NIH|NSF|NASA)-</td>
+                            <td class="text-muted">Federal grant prefixes</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div>
+                    <h4 style="margin: 0 0 5px 0; font-size: 14px;">Common Patterns</h4>
+                    <table style="font-size: 13px;">
+                        <tr>
+                            <td class="font-mono">.*keyword.*</td>
+                            <td class="text-muted">Contains "keyword" anywhere</td>
+                        </tr>
+                        <tr>
+                            <td class="font-mono">^PREFIX-</td>
+                            <td class="text-muted">Starts with "PREFIX-"</td>
+                        </tr>
+                        <tr>
+                            <td class="font-mono">-suffix$</td>
+                            <td class="text-muted">Ends with "-suffix"</td>
+                        </tr>
+                        <tr>
+                            <td class="font-mono">^\d{6}$</td>
+                            <td class="text-muted">Exactly 6 digits</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div>
+                    <h4 style="margin: 0 0 5px 0; font-size: 14px;">Special Characters</h4>
+                    <table style="font-size: 13px;">
+                        <tr>
+                            <td class="font-mono">.</td>
+                            <td class="text-muted">Any character</td>
+                        </tr>
+                        <tr>
+                            <td class="font-mono">.*</td>
+                            <td class="text-muted">Any characters (0+)</td>
+                        </tr>
+                        <tr>
+                            <td class="font-mono">\d</td>
+                            <td class="text-muted">Any digit</td>
+                        </tr>
+                        <tr>
+                            <td class="font-mono">\w</td>
+                            <td class="text-muted">Any word character</td>
+                        </tr>
+                        <tr>
+                            <td class="font-mono">^</td>
+                            <td class="text-muted">Start of string</td>
+                        </tr>
+                        <tr>
+                            <td class="font-mono">$</td>
+                            <td class="text-muted">End of string</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="alert-banner" style="margin: 0;">
+                    <span class="icon">&#128161;</span>
+                    <div class="message" style="font-size: 13px;">
+                        Patterns are case-insensitive. They are applied during CSV import (CLI or web).
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Test Results -->
+<div id="test-results"></div>
+
+<!-- Current Tag Mapping -->
+<div class="card" style="margin-top: 20px;">
+    <div class="card-header">
+        <h3 class="card-title">Tag Mapping Configuration</h3>
+    </div>
+    <div class="card-body">
+        <p class="text-muted" style="margin-bottom: 15px;">
+            These settings map FOCUS CSV tag columns to internal fields. Edit <code>config.yaml</code> to change.
+        </p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Internal Field</th>
+                    <th>FOCUS Tag Name</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>PI Email</td>
+                    <td class="font-mono">{{ tag_mapping.pi_email }}</td>
+                </tr>
+                <tr>
+                    <td>Project ID</td>
+                    <td class="font-mono">{{ tag_mapping.project_id }}</td>
+                </tr>
+                <tr>
+                    <td>Fund/Org</td>
+                    <td class="font-mono">{{ tag_mapping.fund_org }}</td>
+                </tr>
+                <tr>
+                    <td>Cost Center</td>
+                    <td class="font-mono">{{ tag_mapping.cost_center }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Database Info -->
+<div class="card" style="margin-top: 20px;">
+    <div class="card-header">
+        <h3 class="card-title">System Information</h3>
+    </div>
+    <div class="card-body">
+        <table>
+            <tbody>
+                <tr>
+                    <td class="text-muted">Database Path</td>
+                    <td class="font-mono">{{ config.database.path }}</td>
+                </tr>
+                <tr>
+                    <td class="text-muted">PDF Output Directory</td>
+                    <td class="font-mono">{{ config.output.pdf_dir }}</td>
+                </tr>
+                <tr>
+                    <td class="text-muted">Journal Output Directory</td>
+                    <td class="font-mono">{{ config.output.journal_dir }}</td>
+                </tr>
+                {% if config.smtp %}
+                <tr>
+                    <td class="text-muted">SMTP Server</td>
+                    <td class="font-mono">{{ config.smtp.host }}:{{ config.smtp.port }}</td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <td class="text-muted">Dev Mode</td>
+                    <td>
+                        {% if config.dev_mode %}
+                        <span class="status status-open"><span class="status-dot"></span>Enabled</span>
+                        {% else %}
+                        <span class="text-muted">Disabled</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if config.dev_mode %}
+<!-- Dev Mode Reset Section -->
+<div class="card" style="margin-top: 20px; border: 2px solid var(--warning);">
+    <div class="card-header" style="background: rgba(255, 152, 0, 0.1);">
+        <h3 class="card-title" style="color: var(--warning);">&#9888; Dev Mode: Reset Data</h3>
+    </div>
+    <div class="card-body">
+        <div class="alert-banner" style="margin-bottom: 20px; background: #fff3e0; border-color: #ffcc80;">
+            <span class="icon">&#9888;</span>
+            <div class="message">
+                <strong>Warning:</strong> This will permanently delete selected data. This action cannot be undone.
+            </div>
+        </div>
+
+        <form method="post" action="/settings/reset" onsubmit="return confirm('Are you sure you want to reset the selected data? This cannot be undone.');">
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: var(--surface); border-radius: 6px;">
+                    <input type="checkbox" name="charges" value="true">
+                    <span>Charges</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: var(--surface); border-radius: 6px;">
+                    <input type="checkbox" name="imports" value="true">
+                    <span>Import Logs</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: var(--surface); border-radius: 6px;">
+                    <input type="checkbox" name="statements" value="true">
+                    <span>Statements</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: var(--surface); border-radius: 6px;">
+                    <input type="checkbox" name="email_logs" value="true">
+                    <span>Email Logs</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: var(--surface); border-radius: 6px;">
+                    <input type="checkbox" name="periods" value="true">
+                    <span>Billing Periods</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: var(--surface); border-radius: 6px;">
+                    <input type="checkbox" name="sources" value="true">
+                    <span>Data Sources</span>
+                </label>
+            </div>
+
+            <button type="submit" class="btn" style="background: var(--warning); color: black;">
+                Reset Selected Data
+            </button>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

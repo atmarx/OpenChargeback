@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}Generate Statements - OpenChargeback{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Generate Statements</h1>
+        <p class="page-subtitle">Create PDF statements for a billing period</p>
+    </div>
+</div>
+
+{% if current_period and current_period.status == 'open' %}
+<div class="alert-banner" style="background: #fff3e0; border-color: #ffcc80;">
+    <span class="icon" style="color: var(--warning);">&#9888;</span>
+    <div class="message">
+        <strong>Period {{ current_period.period }} is still open</strong>
+        Close the billing period before generating statements to ensure all charges are finalized.
+    </div>
+    <a href="/periods/{{ current_period_id }}" class="btn btn-sm btn-outline">View Period</a>
+</div>
+{% endif %}
+
+{% if period_flagged_count > 0 %}
+<div class="alert-banner" style="background: #ffebee; border-color: #ef9a9a;">
+    <span class="icon" style="color: var(--danger);">&#9888;</span>
+    <div class="message">
+        <strong>{{ period_flagged_count }} charge{{ 's' if period_flagged_count != 1 else '' }} need{{ '' if period_flagged_count != 1 else 's' }} review</strong>
+        You must review and approve all flagged charges before generating statements.
+    </div>
+    <a href="/review?period={{ current_period_id }}" class="btn btn-sm btn-outline">Review Now</a>
+</div>
+{% endif %}
+
+<div class="card" style="max-width: 700px;">
+    <div class="card-header">
+        <h3 class="card-title">Statement Options</h3>
+    </div>
+    <div class="card-body">
+        <form method="post" action="/statements/generate">
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label for="period_id" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                    Billing Period
+                </label>
+                <select id="period_id" name="period_id" class="form-input" style="width: 100%; max-width: 300px;" required>
+                    {% for p in periods %}
+                    <option value="{{ p.id }}" {% if current_period_id == p.id %}selected{% endif %}>
+                        {{ p.period }} ({{ p.status }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            {% if stats %}
+            <div class="card" style="background: var(--bg); margin-bottom: 20px;">
+                <div class="card-body" style="padding: 15px;">
+                    <h4 style="margin: 0 0 15px 0; font-size: 14px;">Period Summary</h4>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+                        <div>
+                            <div class="text-muted" style="font-size: 12px;">Total Cost</div>
+                            <div class="font-mono" style="font-size: 18px; font-weight: 600;">
+                                {{ stats.total_cost | currency }}
+                            </div>
+                        </div>
+                        <div>
+                            <div class="text-muted" style="font-size: 12px;">PIs</div>
+                            <div style="font-size: 18px; font-weight: 600;">
+                                {{ stats.pi_count }}
+                            </div>
+                        </div>
+                        <div>
+                            <div class="text-muted" style="font-size: 12px;">Charges</div>
+                            <div style="font-size: 18px; font-weight: 600;">
+                                {{ stats.charge_count }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                    <input type="checkbox" name="send_emails" value="true">
+                    <span>Send statements via email after generation</span>
+                </label>
+                <p class="form-help" style="margin-left: 26px;">
+                    Emails will be sent to each PI's email address with the PDF attached.
+                </p>
+            </div>
+
+            <div class="btn-group">
+                <a href="/statements{% if current_period_id %}?period={{ current_period_id }}{% endif %}" class="btn btn-outline">Cancel</a>
+                {% set is_disabled = (current_period and current_period.status == 'open') or period_flagged_count > 0 %}
+                {% set disabled_reason = 'Close the period first' if (current_period and current_period.status == 'open') else 'Review flagged charges first' %}
+                <button type="submit" class="btn btn-primary" {% if is_disabled %}disabled title="{{ disabled_reason }}"{% endif %}>
+                    <span>&#9889;</span> Generate {{ stats.pi_count if stats else '' }} Statement{{ 's' if not stats or stats.pi_count != 1 else '' }}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card" style="max-width: 700px; margin-top: 20px;">
+    <div class="card-header">
+        <h3 class="card-title">What happens when you generate?</h3>
+    </div>
+    <div class="card-body">
+        <ol style="padding-left: 20px; line-height: 1.8; color: var(--text-muted);">
+            <li>All approved charges for the period are grouped by PI</li>
+            <li>A PDF statement is generated for each PI showing their charges</li>
+            <li>PDFs are saved to the configured output directory</li>
+            <li>If email is enabled, statements are sent to each PI</li>
+            <li>The period can then be finalized to prevent further changes</li>
+        </ol>
+    </div>
+</div>
+{% endblock %}
