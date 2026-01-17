@@ -117,8 +117,10 @@ Then open http://localhost:8000 and log in with the credentials in `config.yaml`
 |----------|-------------|
 | [Executive Summary](docs/EXECSUMMARY.md) | High-level overview for finance and leadership |
 | [Operations Guide](docs/operations/) | CLI commands, configuration, web interface |
+| [Technology Stack](docs/TECHNOLOGY.md) | Frameworks, libraries, and architecture decisions |
 | [Implementation Guides](docs/implementation/) | Export guides for AWS, Azure, HPC, storage sources |
 | [Upgrade Guides](docs/upgrades/) | Dependency management and versioning |
+| [SBOM](sbom.json) | Software Bill of Materials (CycloneDX 1.6) |
 
 ---
 
