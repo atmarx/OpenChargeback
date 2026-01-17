@@ -119,7 +119,7 @@ review:
   fund_org_patterns:
     - "^\\d{6}-\\d{4}$"   # Valid fund/org format
 
-# Known import sources (for web UI suggestions)
+# Known import sources (for web UI auto-detection)
 imports:
   known_sources:
     - name: AWS
@@ -130,9 +130,50 @@ imports:
       pattern: gcp
     - name: HPC
       pattern: hpc
+    - name: IT Storage
+      pattern: it_storage
     - name: Storage
       pattern: storage
 ```
+
+### Import Auto-Detection
+
+When uploading files via the web interface, OpenChargeback auto-detects the source and billing period from filenames.
+
+**Source Detection**: Filenames are matched against the `pattern` values in `known_sources`. Patterns are matched case-insensitively and checked longest-first for specificity.
+
+```
+# Example filename matching:
+aws_billing_2025-01.csv      → matches "aws"      → AWS
+it_storage_2025-01.csv       → matches "it_storage" (first, longer) → IT Storage
+storage_report_2025-01.csv   → matches "storage"  → Storage
+```
+
+**Period Detection**: The importer looks for date patterns in filenames:
+
+| Pattern | Example | Detected Period |
+|---------|---------|-----------------|
+| `YYYY-MM` | `aws_2025-01.csv` | 2025-01 |
+| `YYYY_MM` | `hpc_2025_01.csv` | 2025-01 |
+| `YYYYMM` | `billing_202501.csv` | 2025-01 |
+| `YYYY-Q#` | `report_2025-Q1.csv` | 2025-01 |
+
+**Multi-file Uploads**: When dropping multiple files, each file shows its own detected source and period. Users can override any auto-detected value before uploading.
+
+**Configuring Sources**: Add sources with unique, non-overlapping patterns:
+
+```yaml
+imports:
+  known_sources:
+    - name: IT Storage        # More specific - list first or use distinct pattern
+      pattern: it_storage
+    - name: Research Storage
+      pattern: research_storage
+    - name: Storage           # Generic - will match if others don't
+      pattern: storage
+```
+
+Since patterns are matched longest-first, "it_storage" will match before "storage" regardless of list order. However, using distinct patterns (like `it_storage` vs `research_storage` vs `general_storage`) is clearer.
 
 ---
 

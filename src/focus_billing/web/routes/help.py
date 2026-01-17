@@ -1,9 +1,10 @@
 """Help routes for documentation."""
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 
-from focus_billing.web.deps import get_db, get_current_user, templates
+from focus_billing.web.auth import User
+from focus_billing.web.deps import get_current_user, get_flash_messages
 
 
 router = APIRouter(prefix="/help", tags=["help"])
@@ -172,16 +173,19 @@ When dev_mode is enabled, you can selectively clear data for testing.
 @router.get("", response_class=HTMLResponse)
 async def help_index(
     request: Request,
-    user=get_current_user,
-    db=get_db
+    user: User = Depends(get_current_user),
 ):
     """Help index page."""
+    templates = request.app.state.templates
+    flash_messages = get_flash_messages(request)
     return templates.TemplateResponse(
         "pages/help.html",
         {
             "request": request,
             "user": user,
-            "sections": HELP_SECTIONS
+            "flash_messages": flash_messages,
+            "sections": HELP_SECTIONS,
+            "page_title": "Help",
         }
     )
 
@@ -190,18 +194,22 @@ async def help_index(
 async def help_section(
     request: Request,
     section: str,
-    user=get_current_user,
-    db=get_db
+    user: User = Depends(get_current_user),
 ):
     """Help section detail page."""
+    templates = request.app.state.templates
+    flash_messages = get_flash_messages(request)
+
     if section not in HELP_SECTIONS:
         return templates.TemplateResponse(
             "pages/help.html",
             {
                 "request": request,
                 "user": user,
+                "flash_messages": flash_messages,
                 "sections": HELP_SECTIONS,
-                "error": f"Unknown help section: {section}"
+                "error": f"Unknown help section: {section}",
+                "page_title": "Help",
             }
         )
 
@@ -210,8 +218,10 @@ async def help_section(
         {
             "request": request,
             "user": user,
+            "flash_messages": flash_messages,
             "section_key": section,
             "section": HELP_SECTIONS[section],
-            "sections": HELP_SECTIONS
+            "sections": HELP_SECTIONS,
+            "page_title": f"Help: {HELP_SECTIONS[section]['title']}",
         }
     )

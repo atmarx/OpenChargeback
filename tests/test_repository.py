@@ -9,6 +9,7 @@ from focus_billing.db.repository import (
     Charge,
     Statement,
     Import,
+    EmailLog,
 )
 
 
@@ -273,8 +274,8 @@ class TestChargeOperations:
             needs_review=False,
         )
 
-        count = db.insert_charges([charge])
-        assert count == 1
+        counts = db.insert_charges([charge])
+        assert counts["inserted"] == 1
 
         charges = db.get_charges_for_period(period.id, include_flagged=True)
         assert len(charges) == 1
@@ -304,8 +305,8 @@ class TestChargeOperations:
             for i in range(1, 6)
         ]
 
-        count = db.insert_charges(charges)
-        assert count == 5
+        counts = db.insert_charges(charges)
+        assert counts["inserted"] == 5
 
     def test_upsert_updates_existing(self, db, period, source):
         """Upsert updates existing charge with same key."""
@@ -734,3 +735,343 @@ class TestTransactions:
         # Should not persist
         period = db.get_period("2025-07")
         assert period is None
+
+
+class TestEmailLogOperations:
+    """Tests for email log operations."""
+
+    @pytest.fixture
+    def db(self, temp_db):
+        """Create initialized database."""
+        database = Database(temp_db)
+        database.initialize()
+        return database
+
+    @pytest.fixture
+    def period(self, db):
+        """Create a billing period."""
+        return db.get_or_create_period("2025-01")
+
+    @pytest.fixture
+    def statement(self, db, period):
+        """Create a statement."""
+        stmt = Statement(
+            id=None,
+            billing_period_id=period.id,
+            pi_email="researcher@example.edu",
+            total_cost=500.00,
+            project_count=3,
+            pdf_path="/output/statement.pdf",
+        )
+        stmt_id = db.upsert_statement(stmt)
+        return db.get_statement_by_id(stmt_id)
+
+    def test_log_email_success(self, db):
+        """Log a successful email send."""
+        email_id = db.log_email(
+            recipient="test@example.edu",
+            subject="Test Subject",
+            status="success",
+            sent_by="admin",
+        )
+        assert email_id > 0
+
+    def test_log_email_dev_mode(self, db):
+        """Log a dev mode email (file output)."""
+        email_id = db.log_email(
+            recipient="test@example.edu",
+            subject="Test Subject",
+            status="dev_mode",
+            sent_by="admin",
+        )
+
+        logs = db.get_email_logs()
+        assert len(logs) == 1
+        assert logs[0].status == "dev_mode"
+
+    def test_log_email_error(self, db):
+        """Log a failed email with error message."""
+        email_id = db.log_email(
+            recipient="test@example.edu",
+            subject="Test Subject",
+            status="error",
+            sent_by="admin",
+            error_message="SMTP connection refused",
+        )
+
+        logs = db.get_email_logs()
+        assert len(logs) == 1
+        assert logs[0].status == "error"
+        assert logs[0].error_message == "SMTP connection refused"
+
+    def test_log_email_with_statement(self, db, statement):
+        """Log email with associated statement."""
+        email_id = db.log_email(
+            recipient="researcher@example.edu",
+            subject="Billing Statement",
+            status="success",
+            sent_by="admin",
+            statement_id=statement.id,
+        )
+
+        logs = db.get_email_logs()
+        assert len(logs) == 1
+        assert logs[0].statement_id == statement.id
+
+    def test_get_email_logs_empty(self, db):
+        """Get email logs when none exist."""
+        logs = db.get_email_logs()
+        assert logs == []
+
+    def test_get_email_logs_multiple(self, db):
+        """Get multiple email logs in descending order."""
+        for i in range(5):
+            db.log_email(
+                recipient=f"user{i}@example.edu",
+                subject=f"Subject {i}",
+                status="success",
+                sent_by="admin",
+            )
+
+        logs = db.get_email_logs()
+        assert len(logs) == 5
+
+    def test_get_email_logs_filter_by_recipient(self, db):
+        """Filter email logs by recipient."""
+        for i in range(3):
+            db.log_email(
+                recipient="user1@example.edu",
+                subject=f"Subject {i}",
+                status="success",
+                sent_by="admin",
+            )
+        for i in range(2):
+            db.log_email(
+                recipient="user2@example.edu",
+                subject=f"Subject {i}",
+                status="success",
+                sent_by="admin",
+            )
+
+        logs = db.get_email_logs(recipient="user1@example.edu")
+        assert len(logs) == 3
+
+    def test_get_email_logs_limit(self, db):
+        """Limit email logs returned."""
+        for i in range(10):
+            db.log_email(
+                recipient=f"user{i}@example.edu",
+                subject=f"Subject {i}",
+                status="success",
+                sent_by="admin",
+            )
+
+        logs = db.get_email_logs(limit=5)
+        assert len(logs) == 5
+
+    def test_clear_email_logs(self, db):
+        """Clear all email logs."""
+        for i in range(5):
+            db.log_email(
+                recipient=f"user{i}@example.edu",
+                subject=f"Subject {i}",
+                status="success",
+                sent_by="admin",
+            )
+
+        count = db.clear_email_logs()
+        assert count == 5
+
+        logs = db.get_email_logs()
+        assert len(logs) == 0
+
+
+class TestStatementByIdOperations:
+    """Tests for get_statement_by_id operation."""
+
+    @pytest.fixture
+    def db(self, temp_db):
+        """Create initialized database."""
+        database = Database(temp_db)
+        database.initialize()
+        return database
+
+    @pytest.fixture
+    def period(self, db):
+        """Create a billing period."""
+        return db.get_or_create_period("2025-01")
+
+    def test_get_statement_by_id_existing(self, db, period):
+        """Get existing statement by ID."""
+        statement = Statement(
+            id=None,
+            billing_period_id=period.id,
+            pi_email="researcher@example.edu",
+            total_cost=500.00,
+            project_count=3,
+            pdf_path="/output/statement.pdf",
+        )
+        statement_id = db.upsert_statement(statement)
+
+        result = db.get_statement_by_id(statement_id)
+
+        assert result is not None
+        assert result.id == statement_id
+        assert result.pi_email == "researcher@example.edu"
+        assert result.total_cost == pytest.approx(500.00)
+        assert result.pdf_path == "/output/statement.pdf"
+
+    def test_get_statement_by_id_nonexistent(self, db):
+        """Get nonexistent statement returns None."""
+        result = db.get_statement_by_id(99999)
+        assert result is None
+
+    def test_get_statement_by_id_includes_sent_at(self, db, period):
+        """Get statement includes sent_at timestamp."""
+        statement = Statement(
+            id=None,
+            billing_period_id=period.id,
+            pi_email="researcher@example.edu",
+            total_cost=500.00,
+            project_count=3,
+        )
+        statement_id = db.upsert_statement(statement)
+
+        # Initially not sent
+        result = db.get_statement_by_id(statement_id)
+        assert result.sent_at is None
+
+        # Mark as sent
+        db.mark_statement_sent(statement_id)
+
+        # Should now have sent_at
+        result = db.get_statement_by_id(statement_id)
+        assert result.sent_at is not None
+
+
+class TestJournalExportOperations:
+    """Tests for journal export logging operations."""
+
+    @pytest.fixture
+    def db(self, temp_db):
+        """Create initialized database."""
+        database = Database(temp_db)
+        database.initialize()
+        return database
+
+    @pytest.fixture
+    def period(self, db):
+        """Create a billing period."""
+        return db.get_or_create_period("2025-01")
+
+    def test_log_journal_export(self, db, period):
+        """Log a journal export."""
+        export_id = db.log_journal_export(
+            billing_period_id=period.id,
+            format="standard",
+            include_flagged=False,
+            row_count=100,
+            total_cost=5000.00,
+            exported_by="admin",
+            filename="journal_2025-01_standard_20250117.csv",
+        )
+
+        assert export_id > 0
+
+    def test_get_journal_exports_empty(self, db):
+        """Get exports when none exist."""
+        exports = db.get_journal_exports()
+        assert len(exports) == 0
+
+    def test_get_journal_exports(self, db, period):
+        """Get journal exports."""
+        db.log_journal_export(
+            billing_period_id=period.id,
+            format="standard",
+            include_flagged=False,
+            row_count=100,
+            total_cost=5000.00,
+            exported_by="admin",
+        )
+
+        exports = db.get_journal_exports()
+
+        assert len(exports) == 1
+        assert exports[0].format == "standard"
+        assert exports[0].row_count == 100
+        assert exports[0].total_cost == pytest.approx(5000.00)
+        assert exports[0].exported_by == "admin"
+        assert exports[0].period == "2025-01"
+
+    def test_get_journal_exports_multiple(self, db, period):
+        """Get multiple journal exports."""
+        db.log_journal_export(
+            billing_period_id=period.id,
+            format="standard",
+            include_flagged=False,
+            row_count=100,
+            total_cost=5000.00,
+        )
+        db.log_journal_export(
+            billing_period_id=period.id,
+            format="summary",
+            include_flagged=True,
+            row_count=25,
+            total_cost=5000.00,
+        )
+        db.log_journal_export(
+            billing_period_id=period.id,
+            format="gl",
+            include_flagged=False,
+            row_count=10,
+            total_cost=5000.00,
+        )
+
+        exports = db.get_journal_exports()
+
+        assert len(exports) == 3
+
+    def test_get_journal_exports_limit(self, db, period):
+        """Test limit on journal exports."""
+        for i in range(5):
+            db.log_journal_export(
+                billing_period_id=period.id,
+                format="standard",
+                include_flagged=False,
+                row_count=i + 1,
+                total_cost=100.00 * (i + 1),
+            )
+
+        exports = db.get_journal_exports(limit=3)
+        assert len(exports) == 3
+
+    def test_clear_journal_exports(self, db, period):
+        """Clear all journal exports."""
+        for i in range(5):
+            db.log_journal_export(
+                billing_period_id=period.id,
+                format="standard",
+                include_flagged=False,
+                row_count=10,
+                total_cost=100.00,
+            )
+
+        count = db.clear_journal_exports()
+        assert count == 5
+
+        exports = db.get_journal_exports()
+        assert len(exports) == 0
+
+    def test_journal_export_include_flagged(self, db, period):
+        """Test include_flagged flag is stored correctly."""
+        db.log_journal_export(
+            billing_period_id=period.id,
+            format="standard",
+            include_flagged=True,
+            row_count=50,
+            total_cost=2500.00,
+        )
+
+        exports = db.get_journal_exports()
+        assert len(exports) == 1
+        assert exports[0].include_flagged is True

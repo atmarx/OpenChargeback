@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse
 
+from focus_billing import audit
 from focus_billing.db import Database
 from focus_billing.web.auth import User
 from focus_billing.web.deps import (
@@ -76,63 +77,131 @@ async def list_imports(
 @router.post("/upload")
 async def upload_files(
     request: Request,
-    source: str = Form(...),
-    period: str = Form(...),
     files: list[UploadFile] = File(...),
+    source: str = Form(None),
+    period: str = Form(None),
+    files_metadata: str = Form(None),
     user: User = Depends(get_current_user),
     db: Database = Depends(get_db),
 ):
-    """Handle CSV file uploads."""
-    from focus_billing.config import load_config
-    from focus_billing.processing.ingest import IngestProcessor
+    """Handle CSV file uploads.
 
-    config = request.app.state.config
-    results = []
+    Supports two modes:
+    - Single file: source and period from form fields
+    - Multi-file: files_metadata JSON with per-file source/period
+    """
+    import json
+    import traceback
+    from focus_billing.ingest.focus import ingest_focus_file
 
-    for file in files:
-        if not file.filename.endswith(".csv"):
-            results.append({
-                "filename": file.filename,
-                "success": False,
-                "error": "Not a CSV file",
-            })
-            continue
+    try:
+        config = request.app.state.config
+        results = []
 
-        try:
-            # Save uploaded file to temp location
-            with tempfile.NamedTemporaryFile(mode="wb", suffix=".csv", delete=False) as tmp:
-                content = await file.read()
-                tmp.write(content)
-                tmp_path = Path(tmp.name)
+        # Parse per-file metadata if provided
+        per_file_meta = None
+        if files_metadata:
+            try:
+                per_file_meta = json.loads(files_metadata)
+            except json.JSONDecodeError:
+                return JSONResponse({"error": "Invalid files_metadata JSON"}, status_code=400)
 
-            # Process the file using the existing ingest processor
-            processor = IngestProcessor(db, config)
-            result = processor.process_file(
-                file_path=tmp_path,
-                source_name=source,
-                period_override=period,
-            )
+        for i, file in enumerate(files):
+            if not file.filename.endswith(".csv"):
+                results.append({
+                    "filename": file.filename,
+                    "success": False,
+                    "error": "Not a CSV file",
+                })
+                continue
 
-            # Clean up temp file
-            tmp_path.unlink()
+            # Get source/period for this file
+            if per_file_meta and i < len(per_file_meta):
+                file_source = per_file_meta[i].get("source")
+                file_period = per_file_meta[i].get("period")
+            else:
+                file_source = source
+                file_period = period
 
-            results.append({
-                "filename": file.filename,
-                "success": True,
-                "row_count": result.get("row_count", 0),
-                "total_cost": result.get("total_cost", 0.0),
-                "flagged_rows": result.get("flagged_rows", 0),
-                "flagged_cost": result.get("flagged_cost", 0.0),
-            })
+            if not file_source:
+                results.append({
+                    "filename": file.filename,
+                    "success": False,
+                    "error": "No data source specified",
+                })
+                continue
 
-        except Exception as e:
-            results.append({
-                "filename": file.filename,
-                "success": False,
-                "error": str(e),
-            })
+            if not file_period:
+                results.append({
+                    "filename": file.filename,
+                    "success": False,
+                    "error": "No billing period specified",
+                })
+                continue
 
-    return JSONResponse({"results": results})
+            try:
+                # Save uploaded file to temp location
+                with tempfile.NamedTemporaryFile(mode="wb", suffix=".csv", delete=False) as tmp:
+                    content = await file.read()
+                    tmp.write(content)
+                    tmp_path = Path(tmp.name)
+
+                # Process the file using the FOCUS ingester
+                result = ingest_focus_file(
+                    file_path=tmp_path,
+                    source_name=file_source,
+                    expected_period=file_period,
+                    config=config,
+                    db=db,
+                    dry_run=False,
+                    original_filename=file.filename,
+                )
+
+                # Clean up temp file
+                tmp_path.unlink()
+
+                # Check for errors
+                if result.errors:
+                    results.append({
+                        "filename": file.filename,
+                        "success": False,
+                        "error": "; ".join(result.errors[:3]),  # First 3 errors
+                    })
+                else:
+                    # Log successful import for audit trail
+                    audit.log_import(
+                        filename=file.filename,
+                        source=file_source,
+                        period=file_period,
+                        row_count=result.total_rows,
+                        total_cost=result.total_cost,
+                        flagged_count=result.flagged_rows,
+                        user=user.display_name,
+                    )
+                    results.append({
+                        "filename": file.filename,
+                        "success": True,
+                        "row_count": result.total_rows,
+                        "total_cost": result.total_cost,
+                        "flagged_rows": result.flagged_rows,
+                        "flagged_cost": result.flagged_cost,
+                        "inserted_rows": result.inserted_rows,
+                        "updated_rows": result.updated_rows,
+                        "skipped_rows": result.skipped_rows,
+                    })
+
+            except Exception as e:
+                results.append({
+                    "filename": file.filename,
+                    "success": False,
+                    "error": str(e),
+                })
+
+        return JSONResponse({"results": results})
+
+    except Exception as e:
+        traceback.print_exc()
+        return JSONResponse({"error": f"Server error: {str(e)}"}, status_code=500)
 
 
 @router.get("/{import_id}", response_class=HTMLResponse)

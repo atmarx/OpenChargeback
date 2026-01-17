@@ -33,7 +33,7 @@
                 <tbody>
                     {% for period in periods %}
                     <tr>
-                        <td><strong><a href="/periods/{{ period.id }}">{{ period.period }}</a></strong></td>
+                        <td><strong><a href="/periods/{{ period.period }}">{{ period.period }}</a></strong></td>
                         <td>
                             {% if period.status == 'open' %}
                             <span class="status status-open"><span class="status-dot"></span>Open</span>
@@ -56,13 +56,13 @@
                         </td>
                         <td>
                             <div class="btn-group">
-                                <a href="/periods/{{ period.id }}" class="btn btn-sm btn-outline">View</a>
+                                <a href="/periods/{{ period.period }}" class="btn btn-sm btn-outline">View</a>
                                 {% if period.status == 'open' %}
-                                <form method="post" action="/periods/{{ period.id }}/close" style="display: inline;">
+                                <form method="post" action="/periods/{{ period.period }}/close" style="display: inline;">
                                     <button type="submit" class="btn btn-sm btn-outline">Close</button>
                                 </form>
                                 {% elif period.status == 'closed' %}
-                                <form method="post" action="/periods/{{ period.id }}/finalize" style="display: inline;">
+                                <form method="post" action="/periods/{{ period.period }}/finalize" style="display: inline;">
                                     <button type="submit" class="btn btn-sm btn-primary">Finalize</button>
                                 </form>
                                 {% endif %}

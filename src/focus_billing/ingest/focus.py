@@ -141,6 +141,7 @@ class FocusIngester(BaseIngester):
         file_path: Path,
         source_name: str,
         expected_period: str | None = None,
+        original_filename: str | None = None,
     ) -> IngestResult:
         """Ingest FOCUS CSV file.
 
@@ -148,10 +149,13 @@ class FocusIngester(BaseIngester):
             file_path: Path to FOCUS CSV file.
             source_name: Name of the data source.
             expected_period: Expected billing period for validation.
+            original_filename: Original filename (for display, if file_path is a temp file).
 
         Returns:
             IngestResult with statistics and errors.
         """
+        # Use original filename for display, fallback to file_path name
+        display_filename = original_filename or file_path.name
         result = IngestResult()
 
         # Read CSV file
@@ -323,8 +327,11 @@ class FocusIngester(BaseIngester):
                 for charge in charges:
                     charge.billing_period_id = billing_period.id
 
-                # Insert charges
-                self.db.insert_charges(charges)
+                # Insert charges and track counts
+                counts = self.db.insert_charges(charges)
+                result.inserted_rows += counts["inserted"]
+                result.updated_rows += counts["updated"]
+                result.skipped_rows += counts["skipped"]
 
                 # Log import
                 period_total = sum(c.billed_cost for c in charges)
@@ -333,7 +340,7 @@ class FocusIngester(BaseIngester):
 
                 import_record = Import(
                     id=None,
-                    filename=str(file_path),
+                    filename=display_filename,
                     source_id=source.id,
                     billing_period_id=billing_period.id,
                     row_count=len(charges),
@@ -359,6 +366,7 @@ def ingest_focus_file(
     config: Config,
     db: Database | None,
     dry_run: bool = False,
+    original_filename: str | None = None,
 ) -> IngestResult:
     """Convenience function to ingest a FOCUS file.
 
@@ -369,9 +377,10 @@ def ingest_focus_file(
         config: Application configuration.
         db: Database connection.
         dry_run: If True, don't commit to database.
+        original_filename: Original filename (for display, if file_path is a temp file).
 
     Returns:
         IngestResult with statistics and errors.
     """
     ingester = FocusIngester(config, db, dry_run)
-    return ingester.ingest(file_path, source_name, expected_period)
+    return ingester.ingest(file_path, source_name, expected_period, original_filename)

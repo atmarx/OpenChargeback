@@ -17,6 +17,7 @@ from .tables import (
     charges,
     email_logs,
     imports,
+    journal_exports,
     sources,
     statements,
 )
@@ -137,6 +138,23 @@ class EmailLog:
     sent_by: str | None
     status: str  # success, error, dev_mode
     error_message: str | None = None
+
+
+@dataclass
+class JournalExport:
+    """Journal export log record."""
+
+    id: int | None
+    billing_period_id: int
+    format: str  # standard, summary, gl
+    include_flagged: bool
+    row_count: int
+    total_cost: float
+    exported_at: str | None
+    exported_by: str | None
+    filename: str | None
+    # Joined fields
+    period: str | None = None
 
 
 @dataclass
@@ -443,11 +461,28 @@ class Database:
 
     # Charge operations
 
-    def insert_charges(self, charge_list: list[Charge]) -> int:
-        """Insert multiple charges using upsert logic."""
+    def insert_charges(self, charge_list: list[Charge]) -> dict[str, int]:
+        """Insert multiple charges using upsert logic.
+
+        Returns:
+            Dict with counts: inserted, updated, skipped
+        """
+        counts = {"inserted": 0, "updated": 0, "skipped": 0}
+
         with self.engine.begin() as conn:
             for charge in charge_list:
                 raw_tags_json = json.dumps(charge.raw_tags) if charge.raw_tags else None
+
+                # Check if charge already exists
+                existing = conn.execute(
+                    select(charges).where(
+                        charges.c.billing_period_id == charge.billing_period_id,
+                        charges.c.source_id == charge.source_id,
+                        charges.c.resource_id == charge.resource_id,
+                        charges.c.charge_period_start == charge.charge_period_start,
+                    )
+                ).first()
+
                 values = {
                     "billing_period_id": charge.billing_period_id,
                     "source_id": charge.source_id,
@@ -467,6 +502,28 @@ class Database:
                     "needs_review": charge.needs_review,
                     "review_reason": charge.review_reason,
                 }
+
+                if existing:
+                    # Check if any updateable values differ
+                    existing_dict = _row_to_dict(existing)
+                    has_changes = False
+                    for col in ["list_cost", "contracted_cost", "billed_cost", "effective_cost",
+                                "resource_name", "service_name", "pi_email", "project_id",
+                                "fund_org", "raw_tags", "needs_review", "review_reason"]:
+                        new_val = values.get(col)
+                        old_val = existing_dict.get(col)
+                        if new_val != old_val:
+                            has_changes = True
+                            break
+
+                    if has_changes:
+                        counts["updated"] += 1
+                    else:
+                        counts["skipped"] += 1
+                else:
+                    counts["inserted"] += 1
+
+                # Execute the upsert regardless (it's idempotent)
                 stmt = self._upsert(
                     charges,
                     values,
@@ -492,7 +549,8 @@ class Database:
                     ],
                 )
                 conn.execute(stmt)
-            return len(charge_list)
+
+            return counts
 
     def _charge_from_row(self, row) -> Charge:
         """Convert a database row to a Charge object."""
@@ -599,6 +657,18 @@ class Database:
                 row_dict["sent_at"] = _format_datetime(row_dict["sent_at"])
                 result.append(Statement(**row_dict))
             return result
+
+    def get_statement_by_id(self, statement_id: int) -> Statement | None:
+        """Get a statement by its ID."""
+        with self.engine.connect() as conn:
+            stmt = select(statements).where(statements.c.id == statement_id)
+            row = conn.execute(stmt).fetchone()
+            if row:
+                row_dict = _row_to_dict(row)
+                row_dict["generated_at"] = _format_datetime(row_dict["generated_at"])
+                row_dict["sent_at"] = _format_datetime(row_dict["sent_at"])
+                return Statement(**row_dict)
+            return None
 
     def mark_statement_sent(self, statement_id: int) -> None:
         """Mark a statement as sent."""
@@ -1017,6 +1087,77 @@ class Database:
         """Clear all email logs. Returns count of deleted rows."""
         with self.engine.begin() as conn:
             result = conn.execute(delete(email_logs))
+            return result.rowcount
+
+    def log_journal_export(
+        self,
+        billing_period_id: int,
+        format: str,
+        include_flagged: bool,
+        row_count: int,
+        total_cost: float,
+        exported_by: str | None = None,
+        filename: str | None = None,
+    ) -> int:
+        """Log a journal export event. Returns the new log ID."""
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                journal_exports.insert().values(
+                    billing_period_id=billing_period_id,
+                    format=format,
+                    include_flagged=include_flagged,
+                    row_count=row_count,
+                    total_cost=total_cost,
+                    exported_by=exported_by,
+                    filename=filename,
+                )
+            )
+            return result.lastrowid
+
+    def get_journal_exports(
+        self,
+        billing_period_id: int | None = None,
+        limit: int = 100,
+    ) -> list[JournalExport]:
+        """Get journal export logs, optionally filtered by period."""
+        with self.engine.connect() as conn:
+            stmt = (
+                select(journal_exports, billing_periods.c.period)
+                .select_from(
+                    journal_exports.join(
+                        billing_periods,
+                        journal_exports.c.billing_period_id == billing_periods.c.id,
+                    )
+                )
+                .order_by(journal_exports.c.exported_at.desc())
+            )
+
+            if billing_period_id:
+                stmt = stmt.where(journal_exports.c.billing_period_id == billing_period_id)
+
+            stmt = stmt.limit(limit)
+
+            rows = conn.execute(stmt).fetchall()
+            return [
+                JournalExport(
+                    id=row.id,
+                    billing_period_id=row.billing_period_id,
+                    format=row.format,
+                    include_flagged=row.include_flagged,
+                    row_count=row.row_count,
+                    total_cost=row.total_cost,
+                    exported_at=_format_datetime(row.exported_at),
+                    exported_by=row.exported_by,
+                    filename=row.filename,
+                    period=row.period,
+                )
+                for row in rows
+            ]
+
+    def clear_journal_exports(self) -> int:
+        """Clear all journal export logs. Returns count of deleted rows."""
+        with self.engine.begin() as conn:
+            result = conn.execute(delete(journal_exports))
             return result.rowcount
 
     def clear_periods(self) -> int:

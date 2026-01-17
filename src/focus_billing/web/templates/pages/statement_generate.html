@@ -17,7 +17,7 @@
         <strong>Period {{ current_period.period }} is still open</strong>
         Close the billing period before generating statements to ensure all charges are finalized.
     </div>
-    <a href="/periods/{{ current_period_id }}" class="btn btn-sm btn-outline">View Period</a>
+    <a href="/periods/{{ current_period.period }}" class="btn btn-sm btn-outline">View Period</a>
 </div>
 {% endif %}
 
@@ -115,4 +115,102 @@
         </ol>
     </div>
 </div>
+
+<!-- Loading Overlay -->
+<div id="loading-overlay" class="loading-overlay" style="display: none;">
+    <div class="loading-content">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Generating statements...</div>
+        <div class="loading-subtext">This may take a moment</div>
+    </div>
+</div>
+
+<style>
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.95);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.loading-content {
+    text-align: center;
+}
+
+.loading-spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 20px auto;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.loading-text {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 8px;
+}
+
+.loading-subtext {
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+.btn-spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form[action="/statements/generate"]');
+    const overlay = document.getElementById('loading-overlay');
+    const loadingText = overlay.querySelector('.loading-text');
+
+    if (form && overlay) {
+        form.addEventListener('submit', function(e) {
+            // Check if button is disabled (shouldn't submit anyway, but extra safety)
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn.disabled) {
+                e.preventDefault();
+                return;
+            }
+
+            // Show loading overlay
+            overlay.style.display = 'flex';
+
+            // Update text if sending emails
+            const sendEmails = form.querySelector('input[name="send_emails"]');
+            if (sendEmails && sendEmails.checked) {
+                loadingText.textContent = 'Generating and sending statements...';
+            }
+
+            // Disable submit button to prevent double-submit
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="btn-spinner"></span> Generating...';
+        });
+    }
+});
+</script>
 {% endblock %}

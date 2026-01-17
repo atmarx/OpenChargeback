@@ -72,6 +72,7 @@ class OutputConfig(BaseModel):
 class LoggingConfig(BaseModel):
     """Logging configuration."""
 
+    enabled: bool = True
     level: Literal["DEBUG", "INFO", "WARN", "WARNING", "ERROR"] = "INFO"
     format: Literal["splunk", "json"] = "splunk"
     file: Path | None = None

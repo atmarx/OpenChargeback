@@ -55,6 +55,18 @@ class PeriodService:
         stats = self.db.get_period_stats(period_id)
         return PeriodWithStats(period, stats)
 
+    def get_period_with_stats_by_slug(self, period_slug: str) -> PeriodWithStats | None:
+        """Get a single period by slug (e.g., '2025-01') with its statistics."""
+        period = self.db.get_period(period_slug)
+        if not period:
+            return None
+        stats = self.db.get_period_stats(period.id)
+        return PeriodWithStats(period, stats)
+
+    def get_period_by_slug(self, period_slug: str) -> BillingPeriod | None:
+        """Get a period by its slug (e.g., '2025-01')."""
+        return self.db.get_period(period_slug)
+
     def create_period(self, period_str: str, notes: str | None = None) -> BillingPeriod:
         """Create a new billing period."""
         period = self.db.get_or_create_period(period_str)

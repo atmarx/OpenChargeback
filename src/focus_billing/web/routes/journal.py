@@ -7,6 +7,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 
+from focus_billing import audit
 from focus_billing.db import Database
 from focus_billing.web.auth import User
 from focus_billing.web.deps import (
@@ -44,6 +45,9 @@ async def journal_form(
 
     flagged_count = get_global_flagged_count(db, period_id)
 
+    # Get recent exports
+    recent_exports = db.get_journal_exports(limit=10)
+
     return templates.TemplateResponse(
         "pages/journal.html",
         {
@@ -55,6 +59,7 @@ async def journal_form(
             "current_period": current_period,
             "stats": stats,
             "flagged_count": flagged_count,
+            "recent_exports": recent_exports,
             "page_title": "Journal Export",
         },
     )
@@ -174,6 +179,30 @@ async def export_journal(
 
     output.seek(0)
     filename = f"journal_{period.period}_{format}_{datetime.now().strftime('%Y%m%d')}.csv"
+
+    # Calculate total cost for logging
+    total_cost = sum(c.billed_cost for c in charges)
+
+    # Log the export to database
+    db.log_journal_export(
+        billing_period_id=period_id,
+        format=format,
+        include_flagged=include_flagged,
+        row_count=len(charges),
+        total_cost=total_cost,
+        exported_by=user.display_name,
+        filename=filename,
+    )
+
+    # Emit audit log event
+    audit.log_journal_export(
+        period=period.period,
+        format=format,
+        row_count=len(charges),
+        total_cost=total_cost,
+        include_flagged=include_flagged,
+        user=user.display_name,
+    )
 
     return StreamingResponse(
         iter([output.getvalue()]),

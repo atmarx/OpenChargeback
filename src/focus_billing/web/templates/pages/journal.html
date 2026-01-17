@@ -119,6 +119,58 @@
     </div>
 </div>
 
+<!-- Recent Exports -->
+<div class="card" style="max-width: 700px; margin-top: 20px;">
+    <div class="card-header">
+        <h3 class="card-title">Recent Exports</h3>
+    </div>
+    <div class="card-body">
+        {% if recent_exports %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Period</th>
+                    <th>Format</th>
+                    <th class="text-right">Rows</th>
+                    <th class="text-right">Total</th>
+                    <th>Exported</th>
+                    <th>By</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for export in recent_exports %}
+                <tr>
+                    <td><a href="/periods/{{ export.period }}">{{ export.period }}</a></td>
+                    <td>
+                        {% if export.format == 'standard' %}
+                        <span class="text-muted">Detail</span>
+                        {% elif export.format == 'summary' %}
+                        <span class="text-muted">Summary</span>
+                        {% elif export.format == 'gl' %}
+                        <span class="text-muted">GL</span>
+                        {% else %}
+                        <span class="text-muted">{{ export.format }}</span>
+                        {% endif %}
+                        {% if export.include_flagged %}
+                        <span style="color: var(--warning);" title="Included flagged charges">*</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-right">{{ export.row_count }}</td>
+                    <td class="text-right font-mono">{{ export.total_cost | currency }}</td>
+                    <td class="text-muted">{{ export.exported_at[:10] if export.exported_at else 'N/A' }}</td>
+                    <td class="text-muted">{{ export.exported_by or 'N/A' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="text-muted" style="text-align: center; padding: 20px;">
+            No exports yet. Export a journal to see it logged here.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
 <div class="card" style="max-width: 700px; margin-top: 20px;">
     <div class="card-header">
         <h3 class="card-title">Export Formats Explained</h3>

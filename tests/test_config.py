@@ -169,6 +169,16 @@ class TestOutputConfig:
 class TestLoggingConfig:
     """Tests for LoggingConfig model."""
 
+    def test_default_enabled(self):
+        """Default enabled is True."""
+        config = LoggingConfig()
+        assert config.enabled is True
+
+    def test_enabled_can_be_disabled(self):
+        """Enabled can be set to False."""
+        config = LoggingConfig(enabled=False)
+        assert config.enabled is False
+
     def test_default_level(self):
         """Default level is INFO."""
         config = LoggingConfig()

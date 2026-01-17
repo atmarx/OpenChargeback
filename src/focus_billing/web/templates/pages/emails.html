@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Email Logs - OpenChargeback{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Email Logs</h1>
+        <p class="page-subtitle">
+            Sent email history and delivery status
+            {% if dev_mode %}
+            <span class="status status-open" style="margin-left: 10px;"><span class="status-dot"></span>Dev Mode - emails saved to files</span>
+            {% endif %}
+        </p>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-body" style="padding: 15px;">
+        <form method="get" action="/emails" style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <label for="recipient" style="font-weight: 500; white-space: nowrap;">Recipient:</label>
+                <select name="recipient" id="recipient" class="form-input" style="width: auto; min-width: 200px;">
+                    <option value="">All recipients</option>
+                    {% for r in recipients %}
+                    <option value="{{ r }}" {% if r == selected_recipient %}selected{% endif %}>{{ r }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <label for="status" style="font-weight: 500; white-space: nowrap;">Status:</label>
+                <select name="status" id="status" class="form-input" style="width: auto; min-width: 120px;">
+                    <option value="">All</option>
+                    <option value="success" {% if selected_status == 'success' %}selected{% endif %}>Success</option>
+                    <option value="error" {% if selected_status == 'error' %}selected{% endif %}>Failed</option>
+                    <option value="dev_mode" {% if selected_status == 'dev_mode' %}selected{% endif %}>Dev Mode</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-outline">Filter</button>
+            {% if selected_recipient or selected_status %}
+            <a href="/emails" class="btn btn-outline">Clear</a>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body" style="padding: 0;">
+        {% if email_logs %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Status</th>
+                        <th>Recipient</th>
+                        <th>Subject</th>
+                        <th>Sent By</th>
+                        <th>Sent At</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for email in email_logs %}
+                    <tr>
+                        <td>
+                            {% if email.status == 'success' %}
+                            <span class="status status-finalized"><span class="status-dot"></span>Sent</span>
+                            {% elif email.status == 'dev_mode' %}
+                            <span class="status status-open"><span class="status-dot"></span>File</span>
+                            {% else %}
+                            <span class="status status-closed"><span class="status-dot"></span>Failed</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="/charges?search={{ email.recipient }}" style="color: var(--accent); text-decoration: none;">
+                                {{ email.recipient }}
+                            </a>
+                        </td>
+                        <td class="text-muted">{{ email.subject or 'N/A' }}</td>
+                        <td>{{ email.sent_by or 'System' }}</td>
+                        <td class="text-muted">{{ email.sent_at[:16] if email.sent_at else 'N/A' }}</td>
+                        <td class="text-right">
+                            {% if email.status == 'error' and email.statement_id %}
+                            <button
+                                class="btn btn-outline btn-sm"
+                                hx-post="/emails/{{ email.id }}/resend"
+                                hx-swap="none"
+                                hx-confirm="Resend this email to {{ email.recipient }}?"
+                                onclick="this.disabled=true; this.innerHTML='Sending...';"
+                            >
+                                Resend
+                            </button>
+                            {% elif email.status == 'error' %}
+                            <span class="text-muted" title="{{ email.error_message }}">&#9888; {{ email.error_message[:30] }}...</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if total_pages > 1 %}
+        <div style="padding: 15px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+            <span class="text-muted">Showing {{ ((page - 1) * 25) + 1 }}-{{ [page * 25, total] | min }} of {{ total }} emails</span>
+            <div style="display: flex; gap: 8px;">
+                {% if page > 1 %}
+                <a href="/emails?page={{ page - 1 }}{% if selected_recipient %}&recipient={{ selected_recipient }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}" class="btn btn-outline btn-sm">&laquo; Prev</a>
+                {% endif %}
+                {% if page < total_pages %}
+                <a href="/emails?page={{ page + 1 }}{% if selected_recipient %}&recipient={{ selected_recipient }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}" class="btn btn-outline btn-sm">Next &raquo;</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="empty-state">
+            <div class="icon">&#128231;</div>
+            <h3>No emails sent yet</h3>
+            <p>Email logs will appear here after generating and sending statements.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

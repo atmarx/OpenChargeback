@@ -214,4 +214,27 @@ email_logs = Table(
 Index("idx_email_logs_recipient", email_logs.c.recipient)
 Index("idx_email_logs_sent_at", email_logs.c.sent_at)
 
-SCHEMA_VERSION = 4
+# Journal export logs for audit trail
+journal_exports = Table(
+    "journal_exports",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column(
+        "billing_period_id",
+        Integer,
+        ForeignKey("billing_periods.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column("format", String(20), nullable=False),  # standard, summary, gl
+    Column("include_flagged", Boolean, default=False),
+    Column("row_count", Integer, default=0),
+    Column("total_cost", Float, default=0.0),
+    Column("exported_at", DateTime, server_default=func.now()),
+    Column("exported_by", String(200)),  # User who triggered the export
+    Column("filename", String(500)),
+)
+
+Index("idx_journal_exports_period", journal_exports.c.billing_period_id)
+Index("idx_journal_exports_exported_at", journal_exports.c.exported_at)
+
+SCHEMA_VERSION = 5

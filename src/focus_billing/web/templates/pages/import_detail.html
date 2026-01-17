@@ -30,7 +30,7 @@
         <div class="label">Billing Period</div>
         <div class="value" style="font-size: 24px;">{{ period.period if period else 'N/A' }}</div>
         <div class="change">
-            <a href="/periods/{{ period.id }}" style="color: var(--accent);">view period &rarr;</a>
+            <a href="/periods/{{ period.period }}" style="color: var(--accent);">view period &rarr;</a>
         </div>
     </div>
     <div class="stat-card">
@@ -85,7 +85,7 @@
                     <td style="font-weight: 500;">Billing Period</td>
                     <td>
                         {% if period %}
-                        <a href="/periods/{{ period.id }}" style="color: var(--accent);">{{ period.period }}</a>
+                        <a href="/periods/{{ period.period }}" style="color: var(--accent);">{{ period.period }}</a>
                         ({{ period.status }})
                         {% else %}
                         N/A

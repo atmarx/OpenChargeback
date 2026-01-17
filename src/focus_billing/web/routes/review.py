@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
+from focus_billing import audit
 from focus_billing.db import Database
 from focus_billing.web.auth import User
 from focus_billing.web.deps import (
@@ -102,7 +103,21 @@ async def approve_charge(
     db: Database = Depends(get_db),
 ):
     """Approve a single flagged charge."""
+    # Get charge details for audit log before approval
+    charge = db.get_charge_by_id(charge_id)
+    period = db.get_period_by_id(charge.billing_period_id) if charge else None
+
     db.approve_charge(charge_id, performed_by=user.display_name)
+
+    # Emit audit log
+    if charge and period:
+        audit.log_charge_approved(
+            charge_id=charge_id,
+            period=period.period,
+            pi_email=charge.pi_email,
+            amount=charge.billed_cost,
+            user=user.display_name,
+        )
 
     # Check if this is an htmx request
     if request.headers.get("HX-Request"):
@@ -124,7 +139,21 @@ async def reject_charge(
     db: Database = Depends(get_db),
 ):
     """Reject (delete) a flagged charge."""
+    # Get charge details for audit log before rejection
+    charge = db.get_charge_by_id(charge_id)
+    period = db.get_period_by_id(charge.billing_period_id) if charge else None
+
     db.reject_charge(charge_id, performed_by=user.display_name)
+
+    # Emit audit log
+    if charge and period:
+        audit.log_charge_rejected(
+            charge_id=charge_id,
+            period=period.period,
+            pi_email=charge.pi_email,
+            amount=charge.billed_cost,
+            user=user.display_name,
+        )
 
     # Check if this is an htmx request
     if request.headers.get("HX-Request"):
@@ -146,7 +175,22 @@ async def approve_all_charges(
     db: Database = Depends(get_db),
 ):
     """Approve all flagged charges for a period."""
+    # Get flagged charges before approval for total amount
+    flagged = db.get_flagged_charges(period)
+    total_amount = sum(c.billed_cost for c in flagged)
+
     count = db.approve_all_charges(period, performed_by=user.display_name)
+
+    # Emit audit log
+    period_obj = db.get_period_by_id(period)
+    if period_obj and count > 0:
+        audit.log_charges_bulk_approved(
+            period=period_obj.period,
+            count=count,
+            total_amount=total_amount,
+            user=user.display_name,
+        )
+
     add_flash_message(request, "success", f"Approved {count} charge{'s' if count != 1 else ''}.")
     return RedirectResponse(url=f"/review?period={period}", status_code=303)
 

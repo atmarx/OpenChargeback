@@ -5,6 +5,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
+from focus_billing import audit
 from focus_billing.db import Database
 from focus_billing.web.auth import User
 from focus_billing.web.deps import (
@@ -104,14 +105,15 @@ async def create_period(
 
     # Create the period
     new_period = service.create_period(period, notes)
+    audit.log_period_created(period=period, user=user.display_name)
     add_flash_message(request, "success", f"Period {period} created successfully.")
-    return RedirectResponse(url=f"/periods/{new_period.id}", status_code=303)
+    return RedirectResponse(url=f"/periods/{new_period.period}", status_code=303)
 
 
-@router.get("/{period_id}", response_class=HTMLResponse)
+@router.get("/{period_slug}", response_class=HTMLResponse)
 async def view_period(
     request: Request,
-    period_id: int,
+    period_slug: str,
     user: User = Depends(get_current_user),
     db: Database = Depends(get_db),
 ):
@@ -120,15 +122,15 @@ async def view_period(
     flash_messages = get_flash_messages(request)
     service = PeriodService(db)
 
-    period = service.get_period_with_stats(period_id)
+    period = service.get_period_with_stats_by_slug(period_slug)
     if not period:
         add_flash_message(request, "error", "Period not found.")
         return RedirectResponse(url="/periods", status_code=303)
 
     # Get additional data
-    imports = service.get_period_imports(period_id)
-    statements = service.get_period_statements(period_id)
-    top_pis = db.get_top_pis(period_id, limit=10)
+    imports = service.get_period_imports(period.id)
+    statements = service.get_period_statements(period.id)
+    top_pis = db.get_top_pis(period.id, limit=10)
 
     current_period_id = get_current_period_id(request)
     flagged_count = get_global_flagged_count(db, current_period_id)
@@ -149,32 +151,45 @@ async def view_period(
     )
 
 
-@router.post("/{period_id}/close")
+@router.post("/{period_slug}/close")
 async def close_period(
     request: Request,
-    period_id: int,
+    period_slug: str,
     user: User = Depends(get_current_user),
     db: Database = Depends(get_db),
 ):
     """Close a billing period."""
     service = PeriodService(db)
-    period = service.close_period(period_id, performed_by=user.display_name)
+    period_obj = service.get_period_by_slug(period_slug)
+    if not period_obj:
+        add_flash_message(request, "error", "Period not found.")
+        return RedirectResponse(url="/periods", status_code=303)
+
+    period = service.close_period(period_obj.id, performed_by=user.display_name)
 
     if period:
+        # Get stats for audit log
+        stats = db.get_period_stats(period_obj.id)
+        audit.log_period_closed(
+            period=period.period,
+            total_cost=stats.get("total_cost", 0),
+            charge_count=stats.get("charge_count", 0),
+            user=user.display_name,
+        )
         add_flash_message(request, "success", f"Period {period.period} closed.")
     else:
-        add_flash_message(request, "error", "Period not found.")
+        add_flash_message(request, "error", "Failed to close period.")
 
     # Check if this is an htmx request
     if request.headers.get("HX-Request"):
-        return RedirectResponse(url=f"/periods/{period_id}", status_code=303)
+        return RedirectResponse(url=f"/periods/{period_slug}", status_code=303)
     return RedirectResponse(url="/periods", status_code=303)
 
 
-@router.post("/{period_id}/reopen")
+@router.post("/{period_slug}/reopen")
 async def reopen_period(
     request: Request,
-    period_id: int,
+    period_slug: str,
     reason: str = Form(""),
     user: User = Depends(get_current_user),
     db: Database = Depends(get_db),
@@ -182,52 +197,70 @@ async def reopen_period(
     """Reopen a closed billing period with a required reason."""
     if not reason.strip():
         add_flash_message(request, "error", "A reason is required to reopen a period.")
-        return RedirectResponse(url=f"/periods/{period_id}", status_code=303)
+        return RedirectResponse(url=f"/periods/{period_slug}", status_code=303)
 
     service = PeriodService(db)
+    period_obj = service.get_period_by_slug(period_slug)
+    if not period_obj:
+        add_flash_message(request, "error", "Period not found.")
+        return RedirectResponse(url="/periods", status_code=303)
+
     period = service.reopen_period(
-        period_id, reason=reason.strip(), performed_by=user.display_name
+        period_obj.id, reason=reason.strip(), performed_by=user.display_name
     )
 
     if period:
         add_flash_message(request, "success", f"Period {period.period} reopened.")
     else:
         add_flash_message(
-            request, "error", "Period not found or is finalized (cannot be reopened)."
+            request, "error", "Period is finalized and cannot be reopened."
         )
 
     if request.headers.get("HX-Request"):
-        return RedirectResponse(url=f"/periods/{period_id}", status_code=303)
+        return RedirectResponse(url=f"/periods/{period_slug}", status_code=303)
     return RedirectResponse(url="/periods", status_code=303)
 
 
-@router.post("/{period_id}/finalize")
+@router.post("/{period_slug}/finalize")
 async def finalize_period(
     request: Request,
-    period_id: int,
+    period_slug: str,
     user: User = Depends(get_current_user),
     db: Database = Depends(get_db),
 ):
     """Finalize a billing period."""
     service = PeriodService(db)
+    period_obj = service.get_period_by_slug(period_slug)
+    if not period_obj:
+        add_flash_message(request, "error", "Period not found.")
+        return RedirectResponse(url="/periods", status_code=303)
 
     # Check for flagged charges first
-    flagged_count = service.get_flagged_charges_count(period_id)
+    flagged_count = service.get_flagged_charges_count(period_obj.id)
     if flagged_count > 0:
         add_flash_message(
             request,
             "error",
             f"Cannot finalize: {flagged_count} charges still need review.",
         )
-        return RedirectResponse(url=f"/periods/{period_id}", status_code=303)
+        return RedirectResponse(url=f"/periods/{period_slug}", status_code=303)
 
-    period = service.finalize_period(period_id, performed_by=user.display_name)
+    period = service.finalize_period(period_obj.id, performed_by=user.display_name)
 
     if period:
+        # Get stats for audit log
+        stats = db.get_period_stats(period_obj.id)
+        statement_count = len(db.get_statements_for_period(period_obj.id))
+        audit.log_period_finalized(
+            period=period.period,
+            total_cost=stats.get("total_cost", 0),
+            statement_count=statement_count,
+            user=user.display_name,
+        )
         add_flash_message(request, "success", f"Period {period.period} finalized.")
     else:
-        add_flash_message(request, "error", "Period not found.")
+        add_flash_message(request, "error", "Failed to finalize period.")
 
     if request.headers.get("HX-Request"):
-        return RedirectResponse(url=f"/periods/{period_id}", status_code=303)
+        return RedirectResponse(url=f"/periods/{period_slug}", status_code=303)
     return RedirectResponse(url="/periods", status_code=303)

@@ -198,6 +198,35 @@
     </div>
 </div>
 
+<!-- Known Import Sources -->
+<div class="card" style="margin-top: 20px;">
+    <div class="card-header">
+        <h3 class="card-title">Known Import Sources</h3>
+    </div>
+    <div class="card-body">
+        <p class="text-muted" style="margin-bottom: 15px;">
+            Data sources available in the import modal. Edit <code>config.yaml</code> to change.
+            Filenames containing the pattern will auto-select that source.
+        </p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Source Name</th>
+                    <th>Filename Pattern</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for source in config.imports.known_sources %}
+                <tr>
+                    <td>{{ source.name }}</td>
+                    <td class="font-mono text-muted">{{ source.pattern if source.pattern else '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <!-- Database Info -->
 <div class="card" style="margin-top: 20px;">
     <div class="card-header">
@@ -253,38 +282,56 @@
             </div>
         </div>
 
-        <form method="post" action="/settings/reset" onsubmit="return confirm('Are you sure you want to reset the selected data? This cannot be undone.');">
+        <form id="reset-form" method="post" action="/settings/reset" onsubmit="return confirm('Are you sure you want to reset the selected data? This cannot be undone.');">
             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;">
                 <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: var(--surface); border-radius: 6px;">
-                    <input type="checkbox" name="charges" value="true">
+                    <input type="checkbox" name="charges" value="true" class="reset-checkbox">
                     <span>Charges</span>
                 </label>
                 <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: var(--surface); border-radius: 6px;">
-                    <input type="checkbox" name="imports" value="true">
+                    <input type="checkbox" name="imports" value="true" class="reset-checkbox">
                     <span>Import Logs</span>
                 </label>
                 <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: var(--surface); border-radius: 6px;">
-                    <input type="checkbox" name="statements" value="true">
+                    <input type="checkbox" name="statements" value="true" class="reset-checkbox">
                     <span>Statements</span>
                 </label>
                 <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: var(--surface); border-radius: 6px;">
-                    <input type="checkbox" name="email_logs" value="true">
+                    <input type="checkbox" name="email_logs" value="true" class="reset-checkbox">
                     <span>Email Logs</span>
                 </label>
                 <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: var(--surface); border-radius: 6px;">
-                    <input type="checkbox" name="periods" value="true">
+                    <input type="checkbox" name="journal_exports" value="true" class="reset-checkbox">
+                    <span>Journal Export Logs</span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: var(--surface); border-radius: 6px;">
+                    <input type="checkbox" name="periods" value="true" class="reset-checkbox">
                     <span>Billing Periods</span>
                 </label>
                 <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 10px; background: var(--surface); border-radius: 6px;">
-                    <input type="checkbox" name="sources" value="true">
+                    <input type="checkbox" name="sources" value="true" class="reset-checkbox">
                     <span>Data Sources</span>
                 </label>
             </div>
 
-            <button type="submit" class="btn" style="background: var(--warning); color: black;">
-                Reset Selected Data
-            </button>
+            <div style="display: flex; gap: 10px;">
+                <button type="button" class="btn btn-outline" onclick="toggleAllReset()">
+                    Select All
+                </button>
+                <button type="submit" class="btn" style="background: var(--warning); color: black;">
+                    Reset Selected Data
+                </button>
+            </div>
         </form>
+        <script>
+        function toggleAllReset() {
+            var checkboxes = document.querySelectorAll('.reset-checkbox');
+            var allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            checkboxes.forEach(cb => cb.checked = !allChecked);
+            var btn = event.target;
+            btn.textContent = allChecked ? 'Select All' : 'Deselect All';
+        }
+        </script>
     </div>
 </div>
 {% endif %}

@@ -40,7 +40,7 @@
         <div class="value">{{ stats.total_charges | currency }}</div>
         <div class="change" style="color: var(--accent);">{{ stats.charge_count }} line items &rarr;</div>
     </a>
-    <a href="/periods/{{ current_period.id }}" class="stat-card" style="text-decoration: none; color: inherit;">
+    <a href="/periods/{{ current_period.period }}" class="stat-card" style="text-decoration: none; color: inherit;">
         <div class="label">Active PIs</div>
         <div class="value">{{ stats.pi_count }}</div>
         <div class="change" style="color: var(--accent);">this period &rarr;</div>
@@ -197,7 +197,7 @@
                     </td>
                     <td class="text-muted">{{ period.opened_at[:10] if period.opened_at else 'N/A' }}</td>
                     <td>
-                        <a href="/periods/{{ period.id }}" class="btn btn-sm btn-outline">View</a>
+                        <a href="/periods/{{ period.period }}" class="btn btn-sm btn-outline">View</a>
                     </td>
                 </tr>
                 {% endfor %}

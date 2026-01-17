@@ -19,7 +19,7 @@
     </div>
     <div class="btn-group">
         {% if period.status == 'open' %}
-        <form method="post" action="/periods/{{ period.id }}/close" style="display: inline;">
+        <form method="post" action="/periods/{{ period.period }}/close" style="display: inline;">
             <button type="submit" class="btn btn-outline">Close Period</button>
         </form>
         <a href="/statements/generate?period={{ period.id }}" class="btn btn-primary">
@@ -27,7 +27,7 @@
         </a>
         {% elif period.status == 'closed' %}
         <button type="button" class="btn btn-outline" onclick="document.getElementById('reopenModal').style.display='flex'">Reopen</button>
-        <form method="post" action="/periods/{{ period.id }}/finalize" style="display: inline;">
+        <form method="post" action="/periods/{{ period.period }}/finalize" style="display: inline;">
             <button type="submit" class="btn btn-primary">Finalize</button>
         </form>
         {% else %}
@@ -102,7 +102,7 @@
                 <tbody>
                     {% for import in imports %}
                     <tr>
-                        <td>{{ import.filename }}</td>
+                        <td><a href="/imports/{{ import.id }}">{{ import.filename }}</a></td>
                         <td class="text-muted">{{ import.imported_at[:10] if import.imported_at else 'N/A' }}</td>
                         <td class="text-right">{{ import.row_count }}</td>
                         <td class="text-right font-mono">{{ import.total_cost | currency }}</td>
@@ -139,7 +139,7 @@
                 <tbody>
                     {% for pi in top_pis %}
                     <tr>
-                        <td>{{ pi.pi_email }}</td>
+                        <td><a href="/projects?period={{ period.id }}&pi={{ pi.pi_email | urlencode }}">{{ pi.pi_email }}</a></td>
                         <td class="text-muted">{{ pi.project_count }} project{{ 's' if pi.project_count != 1 else '' }}</td>
                         <td class="text-right font-mono">{{ pi.total_cost | currency }}</td>
                     </tr>
@@ -280,7 +280,7 @@
             <h3 class="card-title">Reopen Period</h3>
         </div>
         <div class="card-body">
-            <form method="post" action="/periods/{{ period.id }}/reopen">
+            <form method="post" action="/periods/{{ period.period }}/reopen">
                 <div class="form-group" style="margin-bottom: 20px;">
                     <label for="reason" style="display: block; margin-bottom: 8px; font-weight: 500;">
                         Reason for Reopening <span style="color: var(--danger);">*</span>

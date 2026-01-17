@@ -334,6 +334,7 @@ async def reset_data(
     imports: bool = Form(False),
     statements: bool = Form(False),
     email_logs: bool = Form(False),
+    journal_exports: bool = Form(False),
     periods: bool = Form(False),
     sources: bool = Form(False),
     user: User = Depends(get_current_user),
@@ -357,6 +358,10 @@ async def reset_data(
     if email_logs:
         count = db.clear_email_logs()
         results.append(f"Deleted {count} email log(s)")
+
+    if journal_exports:
+        count = db.clear_journal_exports()
+        results.append(f"Deleted {count} journal export log(s)")
 
     if charges:
         count = db.clear_charges()

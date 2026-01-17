@@ -18,6 +18,10 @@ class IngestResult:
     flagged_rows: int = 0
     flagged_cost: float = 0.0
     errors: list[str] = field(default_factory=list)
+    # Detailed upsert tracking
+    inserted_rows: int = 0
+    updated_rows: int = 0
+    skipped_rows: int = 0
 
 
 class BaseIngester(ABC):

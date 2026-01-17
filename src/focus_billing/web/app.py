@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
+from focus_billing import audit
 from focus_billing.config import Config, load_config
 
 
@@ -62,6 +63,9 @@ def create_app(config_path: Path | None = None) -> FastAPI:
     # Load configuration
     config = load_config(config_path)
 
+    # Configure audit logging
+    audit.configure(enabled=config.logging.enabled)
+
     # Create FastAPI app
     app = FastAPI(
         title="OpenChargeback",
@@ -108,6 +112,7 @@ def create_app(config_path: Path | None = None) -> FastAPI:
         auth_routes,
         charges,
         dashboard,
+        emails,
         help,
         imports,
         journal,
@@ -129,6 +134,7 @@ def create_app(config_path: Path | None = None) -> FastAPI:
     app.include_router(imports.router)
     app.include_router(statements.router)
     app.include_router(journal.router)
+    app.include_router(emails.router)
     app.include_router(settings.router)
     app.include_router(help.router)
 

@@ -1,7 +1,7 @@
 # OpenChargeback Dockerfile
 # Multi-stage build for smaller production image
 
-FROM python:3.12-slim as builder
+FROM python:3.12-slim AS builder
 
 WORKDIR /app
 

@@ -8,13 +8,13 @@
         </div>
         <form id="import-form" method="post" action="/imports/upload" enctype="multipart/form-data">
             <div class="modal-body">
-                <!-- Source and Period Selection -->
-                <div class="form-row">
+                <!-- Source and Period Selection (single file mode) -->
+                <div id="single-file-options" class="form-row">
                     <div class="form-group" style="flex: 1;">
                         <label for="import-source">Data Source</label>
                         <div class="source-input-wrapper">
                             <input type="text" id="import-source" name="source" class="form-input"
-                                   list="known-sources" placeholder="Select or type source name" required
+                                   list="known-sources" placeholder="Select or type source name"
                                    autocomplete="off">
                             <datalist id="known-sources">
                                 {% if known_sources is defined %}
@@ -34,7 +34,8 @@
                     </div>
                     <div class="form-group" style="flex: 1;">
                         <label for="import-period">Billing Period</label>
-                        <select id="import-period" name="period" class="form-input" required>
+                        <select id="import-period" name="period" class="form-input">
+                            <option value="">Auto-detect from filename</option>
                             {% for p in periods %}
                             <option value="{{ p.period }}" {% if current_period and p.id == current_period.id %}selected{% endif %}>
                                 {{ p.period }} ({{ p.status }})
@@ -43,6 +44,12 @@
                         </select>
                         <p class="form-help">Target billing period for these charges</p>
                     </div>
+                </div>
+
+                <!-- Multi-file notice -->
+                <div id="multi-file-notice" class="multi-file-notice" style="display: none;">
+                    <span class="icon">&#128196;</span>
+                    <span>Source and period will be auto-detected from each filename</span>
                 </div>
 
                 <!-- Drop Zone -->
@@ -64,7 +71,7 @@
                         <strong>Selected Files</strong>
                         <button type="button" class="btn btn-sm btn-outline" onclick="clearFiles()">Clear All</button>
                     </div>
-                    <div id="file-list-items"></div>
+                    <div id="file-list-items" tabindex="0"></div>
                 </div>
 
                 <!-- Upload Progress -->
@@ -118,7 +125,6 @@
     width: 90%;
     max-width: 600px;
     max-height: 90vh;
-    overflow: hidden;
     display: flex;
     flex-direction: column;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
@@ -155,7 +161,9 @@
 .modal-body {
     padding: 25px;
     overflow-y: auto;
+    overflow-x: hidden;
     flex: 1;
+    overscroll-behavior: contain;
 }
 
 .modal-footer {
@@ -206,11 +214,29 @@
 .drop-zone {
     border: 2px dashed var(--border);
     border-radius: 12px;
-    padding: 40px;
+    padding: 30px 20px;
     text-align: center;
     cursor: pointer;
     transition: all 0.2s;
     background: var(--bg);
+}
+
+.drop-zone.compact {
+    padding: 15px;
+}
+
+.drop-zone.compact .drop-zone-icon {
+    font-size: 24px;
+    margin-bottom: 8px;
+}
+
+.drop-zone.compact .drop-zone-text {
+    flex-direction: row;
+    gap: 8px;
+}
+
+.drop-zone.compact .drop-zone-hint {
+    display: none;
 }
 
 .drop-zone:hover,
@@ -247,10 +273,12 @@
 
 /* File List */
 .file-list {
-    margin-top: 20px;
+    margin-top: 15px;
     border: 1px solid var(--border);
     border-radius: 8px;
-    overflow: hidden;
+    max-height: 220px;
+    display: flex;
+    flex-direction: column;
 }
 
 .file-list-header {
@@ -260,27 +288,43 @@
     justify-content: space-between;
     align-items: center;
     border-bottom: 1px solid var(--border);
+    border-radius: 8px 8px 0 0;
+    flex-shrink: 0;
 }
 
 .file-list-items {
-    max-height: 200px;
+    flex: 1;
     overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 0 0 8px 8px;
+    background: white;
+}
+
+.file-list-items:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
 }
 
 .file-item {
     padding: 10px 15px;
     display: flex;
-    align-items: center;
-    gap: 12px;
+    align-items: flex-start;
+    gap: 10px;
     border-bottom: 1px solid var(--border);
+}
+
+.file-item-icon {
+    padding-top: 2px;
 }
 
 .file-item:last-child {
     border-bottom: none;
 }
 
-.file-item-icon {
+.file-item > .file-item-icon {
     color: var(--accent);
+    flex-shrink: 0;
 }
 
 .file-item-name {
@@ -291,6 +335,8 @@
 .file-item-size {
     color: var(--text-muted);
     font-size: 12px;
+    flex-shrink: 0;
+    padding-top: 2px;
 }
 
 .file-item-remove {
@@ -304,6 +350,86 @@
 
 .file-item-remove:hover {
     color: var(--danger);
+}
+
+.file-item-meta {
+    display: flex;
+    gap: 8px;
+    font-size: 11px;
+}
+
+.file-item-tag {
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--text-muted);
+}
+
+.file-item-tag.detected {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.file-item-tag.warning {
+    background: #fff3e0;
+    color: #e65100;
+}
+
+.file-item-select {
+    padding: 2px 4px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    font-size: 11px;
+    background: white;
+    cursor: pointer;
+    min-width: 80px;
+}
+
+.file-item-select.detected {
+    background: #e3f2fd;
+    border-color: #90caf9;
+    color: #1976d2;
+}
+
+.file-item-select.warning {
+    background: #fff3e0;
+    border-color: #ffcc80;
+    color: #e65100;
+}
+
+.file-item-select.new-period {
+    background: #e8f5e9;
+    border-color: #a5d6a7;
+    color: #388e3c;
+}
+
+.file-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.file-item-name {
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Multi-file notice */
+.multi-file-notice {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 15px;
+    background: #e3f2fd;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    color: #1976d2;
+}
+
+.multi-file-notice .icon {
+    font-size: 18px;
 }
 
 /* Progress */
@@ -335,6 +461,9 @@
 /* Results */
 .upload-results {
     margin-top: 20px;
+    max-height: 300px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
 .result-item {
@@ -372,13 +501,25 @@
 
 <script>
 let selectedFiles = [];
+let fileMetadata = []; // Stores {file, source, period} for each file
 
 function openImportModal() {
     document.getElementById('import-modal').style.display = 'flex';
     document.body.style.overflow = 'hidden';
 }
 
-function closeImportModal() {
+function hasUnsavedChanges() {
+    // Check if files are selected but not yet uploaded
+    return selectedFiles.length > 0 &&
+           document.getElementById('upload-results').style.display === 'none';
+}
+
+function closeImportModal(force) {
+    if (!force && hasUnsavedChanges()) {
+        if (!confirm('You have selected files that haven\'t been uploaded. Close anyway?')) {
+            return;
+        }
+    }
     document.getElementById('import-modal').style.display = 'none';
     document.body.style.overflow = '';
     resetModal();
@@ -386,50 +527,99 @@ function closeImportModal() {
 
 function resetModal() {
     selectedFiles = [];
+    fileMetadata = [];
     updateFileList();
     document.getElementById('upload-progress').style.display = 'none';
     document.getElementById('upload-results').style.display = 'none';
     document.getElementById('upload-results').innerHTML = '';
     document.getElementById('drop-zone').style.display = 'block';
-    document.getElementById('upload-btn').disabled = true;
+    document.getElementById('drop-zone').classList.remove('compact');
+
+    // Reset upload button to initial state
+    const uploadBtn = document.getElementById('upload-btn');
+    uploadBtn.disabled = true;
+    uploadBtn.innerHTML = '<span>&#8593;</span> Upload Files';
+    uploadBtn.type = 'submit';
+    uploadBtn.onclick = null;
+
+    // Reset cancel button
+    const cancelBtn = uploadBtn.previousElementSibling;
+    cancelBtn.style.display = '';
+    cancelBtn.textContent = 'Cancel';
+
+    document.getElementById('import-source').value = '';
+    document.getElementById('import-period').selectedIndex = 0;
+}
+
+function detectSourceFromFilename(filename) {
+    const datalist = document.getElementById('known-sources');
+    const options = Array.from(datalist.querySelectorAll('option'));
+    const lowerFilename = filename.toLowerCase();
+
+    // Sort by pattern length descending (longer/more specific patterns first)
+    // This ensures "it_storage" matches before "storage"
+    const sortedOptions = options
+        .filter(opt => opt.dataset.pattern)
+        .sort((a, b) => (b.dataset.pattern?.length || 0) - (a.dataset.pattern?.length || 0));
+
+    for (let option of sortedOptions) {
+        const pattern = option.dataset.pattern.toLowerCase();
+        if (lowerFilename.includes(pattern)) {
+            return option.value;
+        }
+    }
+    return null;
+}
+
+function detectPeriodFromFilename(filename) {
+    // Try to match patterns like: 2025-01, 2025_01, 202501, 2025-Q1
+    const patterns = [
+        /(\d{4})[-_](\d{2})(?:[^0-9]|$)/,  // 2025-01 or 2025_01
+        /(\d{4})(\d{2})(?:[^0-9]|$)/,       // 202501
+        /(\d{4})[-_]?Q([1-4])/i,            // 2025-Q1 or 2025Q1
+    ];
+
+    for (let pattern of patterns) {
+        const match = filename.match(pattern);
+        if (match) {
+            const year = match[1];
+            let month = match[2];
+
+            // Handle quarters
+            if (month.length === 1) {
+                const quarter = parseInt(month);
+                month = String((quarter - 1) * 3 + 1).padStart(2, '0');
+            }
+
+            return `${year}-${month}`;
+        }
+    }
+    return null;
 }
 
 function handleFiles(files) {
     for (let file of files) {
         if (file.name.endsWith('.csv') && !selectedFiles.find(f => f.name === file.name)) {
             selectedFiles.push(file);
+
+            // Detect source and period for this file
+            const source = detectSourceFromFilename(file.name);
+            const period = detectPeriodFromFilename(file.name);
+            fileMetadata.push({ file, source, period });
         }
     }
     updateFileList();
-    autoDetectSource(files);
-}
-
-function autoDetectSource(files) {
-    const sourceInput = document.getElementById('import-source');
-    if (sourceInput.value) return; // Don't override if already set
-
-    const datalist = document.getElementById('known-sources');
-    const options = datalist.querySelectorAll('option');
-
-    for (let file of files) {
-        const filename = file.name.toLowerCase();
-        for (let option of options) {
-            const pattern = option.dataset.pattern;
-            if (pattern && filename.includes(pattern.toLowerCase())) {
-                sourceInput.value = option.value;
-                return;
-            }
-        }
-    }
 }
 
 function removeFile(index) {
     selectedFiles.splice(index, 1);
+    fileMetadata.splice(index, 1);
     updateFileList();
 }
 
 function clearFiles() {
     selectedFiles = [];
+    fileMetadata = [];
     updateFileList();
 }
 
@@ -437,24 +627,105 @@ function updateFileList() {
     const fileList = document.getElementById('file-list');
     const fileListItems = document.getElementById('file-list-items');
     const uploadBtn = document.getElementById('upload-btn');
+    const dropZone = document.getElementById('drop-zone');
+    const singleFileOptions = document.getElementById('single-file-options');
+    const multiFileNotice = document.getElementById('multi-file-notice');
 
     if (selectedFiles.length === 0) {
         fileList.style.display = 'none';
         uploadBtn.disabled = true;
+        dropZone.classList.remove('compact');
+        singleFileOptions.style.display = 'flex';
+        multiFileNotice.style.display = 'none';
         return;
     }
 
-    fileList.style.display = 'block';
+    fileList.style.display = 'flex';
     uploadBtn.disabled = false;
+    dropZone.classList.add('compact');
 
-    fileListItems.innerHTML = selectedFiles.map((file, index) => `
-        <div class="file-item">
-            <span class="file-item-icon">&#128196;</span>
-            <span class="file-item-name">${file.name}</span>
-            <span class="file-item-size">${formatFileSize(file.size)}</span>
-            <button type="button" class="file-item-remove" onclick="removeFile(${index})">&times;</button>
-        </div>
-    `).join('');
+    // Show/hide options based on file count
+    const isMultiFile = selectedFiles.length > 1;
+    singleFileOptions.style.display = isMultiFile ? 'none' : 'flex';
+    multiFileNotice.style.display = isMultiFile ? 'flex' : 'none';
+
+    // For single file, auto-populate the inputs
+    if (!isMultiFile && fileMetadata[0]) {
+        const sourceInput = document.getElementById('import-source');
+        const periodSelect = document.getElementById('import-period');
+
+        if (!sourceInput.value && fileMetadata[0].source) {
+            sourceInput.value = fileMetadata[0].source;
+        }
+        if (fileMetadata[0].period) {
+            // Try to select the detected period
+            for (let option of periodSelect.options) {
+                if (option.value === fileMetadata[0].period) {
+                    option.selected = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    // Build source options from datalist
+    const sourceOptions = Array.from(document.getElementById('known-sources').options)
+        .map(opt => opt.value);
+
+    // Build period options from select
+    const periodSelect = document.getElementById('import-period');
+    const periodOptions = Array.from(periodSelect.options)
+        .filter(opt => opt.value)
+        .map(opt => opt.value);
+
+    fileListItems.innerHTML = fileMetadata.map((meta, index) => {
+        // Source dropdown
+        const sourceSelectHtml = `
+            <select class="file-item-select ${meta.source ? 'detected' : 'warning'}"
+                    onchange="updateFileMeta(${index}, 'source', this.value)">
+                <option value="">Select source</option>
+                ${sourceOptions.map(s => `<option value="${s}" ${meta.source === s ? 'selected' : ''}>${s}</option>`).join('')}
+            </select>`;
+
+        // Period dropdown
+        const periodSelectHtml = `
+            <select class="file-item-select ${meta.period && periodOptions.includes(meta.period) ? 'detected' : (meta.period ? 'new-period' : 'warning')}"
+                    onchange="updateFileMeta(${index}, 'period', this.value)">
+                <option value="">Select period</option>
+                ${meta.period && !periodOptions.includes(meta.period)
+                    ? `<option value="${meta.period}" selected>${meta.period} (new)</option>`
+                    : ''}
+                ${periodOptions.map(p => `<option value="${p}" ${meta.period === p ? 'selected' : ''}>${p}</option>`).join('')}
+            </select>`;
+
+        return `
+            <div class="file-item">
+                <span class="file-item-icon">&#128196;</span>
+                <div class="file-item-info">
+                    <div class="file-item-name" title="${meta.file.name}">${meta.file.name}</div>
+                    <div class="file-item-meta">${sourceSelectHtml}${periodSelectHtml}</div>
+                </div>
+                <span class="file-item-size">${formatFileSize(meta.file.size)}</span>
+                <button type="button" class="file-item-remove" onclick="removeFile(${index})">&times;</button>
+            </div>
+        `;
+    }).join('');
+
+    // Update upload button state - require all files to have source and period
+    const allValid = fileMetadata.every(m => m.source && m.period);
+    uploadBtn.disabled = !allValid;
+
+    // Update button text with file count
+    const count = selectedFiles.length;
+    uploadBtn.innerHTML = count === 1
+        ? '<span>&#8593;</span> Upload File'
+        : `<span>&#8593;</span> Upload ${count} Files`;
+}
+
+function updateFileMeta(index, field, value) {
+    fileMetadata[index][field] = value;
+    // Re-render to update validation state
+    updateFileList();
 }
 
 function formatFileSize(bytes) {
@@ -464,32 +735,83 @@ function formatFileSize(bytes) {
 }
 
 // Drag and drop handlers
-const dropZone = document.getElementById('drop-zone');
+function setupDropZone() {
+    const dropZone = document.getElementById('drop-zone');
+    if (!dropZone) return;
 
-dropZone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    dropZone.classList.add('drag-over');
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.add('drag-over');
+    });
+
+    dropZone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.remove('drag-over');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZone.classList.remove('drag-over');
+        handleFiles(e.dataTransfer.files);
+    });
+}
+
+// Prevent browser from opening dropped files (Firefox issue)
+document.addEventListener('dragover', (e) => {
+    // Only prevent if modal is open
+    const modal = document.getElementById('import-modal');
+    if (modal && modal.style.display !== 'none') {
+        e.preventDefault();
+    }
 });
 
-dropZone.addEventListener('dragleave', () => {
-    dropZone.classList.remove('drag-over');
+document.addEventListener('drop', (e) => {
+    // Only prevent if modal is open
+    const modal = document.getElementById('import-modal');
+    if (modal && modal.style.display !== 'none') {
+        e.preventDefault();
+    }
 });
 
-dropZone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    dropZone.classList.remove('drag-over');
-    handleFiles(e.dataTransfer.files);
+// Initialize drop zone when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupDropZone);
+} else {
+    setupDropZone();
+}
+
+// Close modal on Escape key
+document.addEventListener('keydown', (e) => {
+    const modal = document.getElementById('import-modal');
+    if (e.key === 'Escape' && modal && modal.style.display !== 'none') {
+        closeImportModal();
+    }
 });
 
 // Form submission with progress
 document.getElementById('import-form').addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const form = e.target;
     const formData = new FormData();
+    const isMultiFile = selectedFiles.length > 1;
 
-    formData.append('source', document.getElementById('import-source').value);
-    formData.append('period', document.getElementById('import-period').value);
+    if (isMultiFile) {
+        // Multi-file mode: send per-file metadata as JSON
+        const filesData = fileMetadata.map(m => ({
+            source: m.source,
+            period: m.period
+        }));
+        formData.append('files_metadata', JSON.stringify(filesData));
+    } else {
+        // Single file mode: use the form inputs (or detected values)
+        const source = document.getElementById('import-source').value || fileMetadata[0]?.source;
+        const period = document.getElementById('import-period').value || fileMetadata[0]?.period;
+        formData.append('source', source);
+        formData.append('period', period);
+    }
 
     for (let file of selectedFiles) {
         formData.append('files', file);
@@ -507,9 +829,23 @@ document.getElementById('import-form').addEventListener('submit', async (e) => {
             body: formData,
         });
 
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            console.error('Non-JSON response:', text);
+            showResults({ error: `Server error (${response.status}): ${text.substring(0, 200)}` });
+            return;
+        }
+
         const result = await response.json();
+        if (!response.ok) {
+            showResults({ error: result.detail || result.error || `Server error (${response.status})` });
+            return;
+        }
         showResults(result);
     } catch (error) {
+        console.error('Upload error:', error);
         showResults({ error: error.message });
     }
 });
@@ -519,13 +855,15 @@ function showResults(result) {
     const resultsDiv = document.getElementById('upload-results');
     resultsDiv.style.display = 'block';
 
-    if (result.error) {
+    // Handle error responses
+    if (result.error || !result.results) {
+        const errorMsg = result.error || result.detail || 'Unknown error occurred';
         resultsDiv.innerHTML = `
             <div class="result-item error">
                 <div class="result-item-header">
                     <span class="result-item-name">Upload Failed</span>
                 </div>
-                <div class="result-item-stats">${result.error}</div>
+                <div class="result-item-stats">${errorMsg}</div>
             </div>
         `;
         return;
@@ -539,18 +877,36 @@ function showResults(result) {
             </div>
             <div class="result-item-stats">
                 ${r.success
-                    ? `${r.row_count} rows imported, ${r.flagged_rows} flagged, $${r.total_cost.toFixed(2)} total`
+                    ? `${r.inserted_rows} new, ${r.updated_rows} updated, ${r.skipped_rows} unchanged` +
+                      (r.flagged_rows ? `, ${r.flagged_rows} flagged` : '') +
+                      ` — $${r.total_cost.toFixed(2)} total`
                     : r.error
                 }
             </div>
         </div>
     `).join('');
 
-    // Refresh page after short delay if successful
-    if (result.results.some(r => r.success)) {
-        setTimeout(() => {
-            window.location.reload();
-        }, 2000);
+    // Change footer buttons to show "Done" that refreshes the page
+    const hasSuccess = result.results.some(r => r.success);
+    const uploadBtn = document.getElementById('upload-btn');
+    const cancelBtn = uploadBtn.previousElementSibling;
+
+    if (hasSuccess) {
+        cancelBtn.style.display = 'none';
+        uploadBtn.disabled = false;
+        uploadBtn.innerHTML = 'Done';
+        uploadBtn.onclick = () => window.location.reload();
+        uploadBtn.type = 'button';  // Prevent form submission
+    } else {
+        // On error, allow trying again
+        cancelBtn.textContent = 'Close';
+        uploadBtn.innerHTML = 'Try Again';
+        uploadBtn.disabled = false;
+        uploadBtn.onclick = () => {
+            resetModal();
+            document.getElementById('drop-zone').style.display = 'block';
+        };
+        uploadBtn.type = 'button';
     }
 }
 </script>

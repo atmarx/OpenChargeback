@@ -153,7 +153,7 @@ def generate_statements(
     """
     from ..output.pdf import generate_pdf_statement
     from ..output.email import generate_email_html
-    from ..delivery.smtp import send_email
+    from ..delivery.smtp import send_email_with_logging
 
     result = GenerateResult()
 
@@ -215,19 +215,19 @@ def generate_statements(
 
             # Send email if requested
             if send_emails and config.smtp and config.email:
-                try:
-                    send_email(
-                        to_email=pi_email,
-                        subject=config.email.subject_template.format(billing_period=period),
-                        html_body=email_html,
-                        attachments=pdf_paths,
-                        config=config,
-                    )
+                success = send_email_with_logging(
+                    to_email=pi_email,
+                    subject=config.email.subject_template.format(billing_period=period),
+                    html_body=email_html,
+                    attachments=pdf_paths,
+                    config=config,
+                    db=db,
+                    sent_by="system",
+                    statement_id=statement_id,
+                )
+                if success:
                     db.mark_statement_sent(statement_id)
                     result.emails_sent += 1
-                except Exception as e:
-                    # Log error but continue with other emails
-                    print(f"Failed to send email to {pi_email}: {e}")
         else:
             result.statements_generated += 1
 

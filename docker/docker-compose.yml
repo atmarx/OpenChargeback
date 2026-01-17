@@ -1,8 +1,6 @@
 # OpenChargeback Docker Compose Configuration
 # Usage: scripts/service.sh --start [--env dev|prod]
 
-version: '3.8'
-
 services:
   app:
     build:
