@@ -43,17 +43,23 @@ grep -r "0.3.0" --include="*.py" --include="*.toml" .
 
 Should show exactly three matches (plus any in `.venv/` which can be ignored).
 
-### 3. Run Tests
+### 3. Regenerate SBOM
 
 ```bash
 source .venv/bin/activate
+cyclonedx-py environment --output-format json -o sbom.json
+```
+
+### 4. Run Tests
+
+```bash
 python -m pytest tests/ -v
 ```
 
-### 4. Commit and Tag
+### 5. Commit and Tag
 
 ```bash
-git add pyproject.toml src/focus_billing/__init__.py src/focus_billing/web/app.py
+git add pyproject.toml src/focus_billing/__init__.py src/focus_billing/web/app.py sbom.json
 git commit -m "Bump version to 0.3.0"
 git tag v0.3.0
 git push origin main --tags
