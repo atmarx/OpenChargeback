@@ -146,6 +146,29 @@ class TestBillingPeriodOperations:
 
         assert period.notes == "Closed for review"
 
+    def test_reopen_closed_period(self, db):
+        """Reopen a closed period."""
+        period = db.get_or_create_period("2025-01")
+        db.update_period_status("2025-01", "closed")
+
+        reopened = db.reopen_period(period.id, "Need more imports")
+
+        assert reopened is not None
+        assert reopened.status == "open"
+        assert reopened.reopen_reason == "Need more imports"
+
+    def test_reopen_finalized_period_fails(self, db):
+        """Cannot reopen a finalized period - finalization is permanent."""
+        period = db.get_or_create_period("2025-01")
+        db.update_period_status("2025-01", "finalized")
+
+        result = db.reopen_period(period.id, "Trying to reopen")
+
+        assert result is None
+        # Verify period is still finalized
+        period = db.get_period_by_id(period.id)
+        assert period.status == "finalized"
+
 
 class TestSourceOperations:
     """Tests for source operations."""

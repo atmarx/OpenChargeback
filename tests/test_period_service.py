@@ -178,6 +178,20 @@ class TestPeriodServiceStatusChanges:
         assert reopened is not None
         assert reopened.status == "open"
 
+    def test_reopen_finalized_period_fails(self, db, service):
+        """Cannot reopen a finalized period - finalization is permanent."""
+        db.get_or_create_period("2025-01")
+        period = service.get_period_by_slug("2025-01")
+        service.close_period(period.id)
+        service.finalize_period(period.id, performed_by="admin")
+
+        result = service.reopen_period(period.id, reason="Trying to reopen")
+
+        assert result is None
+        # Verify period is still finalized
+        period = service.get_period_by_slug("2025-01")
+        assert period.status == "finalized"
+
 
 class TestPeriodServiceRelatedData:
     """Tests for getting period-related data."""

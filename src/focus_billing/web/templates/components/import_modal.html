@@ -6,7 +6,7 @@
             <h2 class="modal-title">Import Billing Data</h2>
             <button type="button" class="modal-close" onclick="closeImportModal()">&times;</button>
         </div>
-        <form id="import-form" method="post" action="/imports/upload" enctype="multipart/form-data">
+        <form id="import-form" method="post" action="/imports/upload" enctype="multipart/form-data" onsubmit="return false;">
             <div class="modal-body">
                 <!-- Source and Period Selection (single file mode) -->
                 <div id="single-file-options" class="form-row">
@@ -37,8 +37,11 @@
                         <select id="import-period" name="period" class="form-input">
                             <option value="">Auto-detect from filename</option>
                             {% for p in periods %}
-                            <option value="{{ p.period }}" {% if current_period and p.id == current_period.id %}selected{% endif %}>
-                                {{ p.period }} ({{ p.status }})
+                            <option value="{{ p.period }}"
+                                    {% if current_period and p.id == current_period.id and p.status != 'finalized' %}selected{% endif %}
+                                    {% if p.status == 'finalized' %}disabled{% endif %}
+                                    data-status="{{ p.status }}">
+                                {{ p.period }} ({{ p.status }}){% if p.status == 'finalized' %} - locked{% endif %}
                             </option>
                             {% endfor %}
                         </select>
@@ -403,6 +406,12 @@
     color: #388e3c;
 }
 
+.file-item-select.error {
+    background: #ffebee;
+    border-color: #ef9a9a;
+    color: #c62828;
+}
+
 .file-item-info {
     flex: 1;
     min-width: 0;
@@ -658,9 +667,9 @@ function updateFileList() {
             sourceInput.value = fileMetadata[0].source;
         }
         if (fileMetadata[0].period) {
-            // Try to select the detected period
+            // Try to select the detected period (but skip if finalized/disabled)
             for (let option of periodSelect.options) {
-                if (option.value === fileMetadata[0].period) {
+                if (option.value === fileMetadata[0].period && !option.disabled) {
                     option.selected = true;
                     break;
                 }
@@ -672,11 +681,14 @@ function updateFileList() {
     const sourceOptions = Array.from(document.getElementById('known-sources').options)
         .map(opt => opt.value);
 
-    // Build period options from select
+    // Build period options from select (excluding finalized periods)
     const periodSelect = document.getElementById('import-period');
-    const periodOptions = Array.from(periodSelect.options)
+    const allPeriodOptions = Array.from(periodSelect.options)
         .filter(opt => opt.value)
-        .map(opt => opt.value);
+        .map(opt => ({ value: opt.value, status: opt.dataset.status, disabled: opt.disabled }));
+    const periodOptions = allPeriodOptions.filter(p => !p.disabled);
+    const periodValues = periodOptions.map(p => p.value);
+    const finalizedPeriods = allPeriodOptions.filter(p => p.disabled).map(p => p.value);
 
     fileListItems.innerHTML = fileMetadata.map((meta, index) => {
         // Source dropdown
@@ -687,15 +699,26 @@ function updateFileList() {
                 ${sourceOptions.map(s => `<option value="${s}" ${meta.source === s ? 'selected' : ''}>${s}</option>`).join('')}
             </select>`;
 
-        // Period dropdown
+        // Period dropdown - show error for finalized periods
+        const isPeriodFinalized = meta.period && finalizedPeriods.includes(meta.period);
+        const isPeriodValid = meta.period && periodValues.includes(meta.period);
+        const isPeriodNew = meta.period && !isPeriodValid && !isPeriodFinalized;
+        let periodClass = 'warning';
+        if (isPeriodFinalized) periodClass = 'error';
+        else if (isPeriodValid) periodClass = 'detected';
+        else if (isPeriodNew) periodClass = 'new-period';
+
         const periodSelectHtml = `
-            <select class="file-item-select ${meta.period && periodOptions.includes(meta.period) ? 'detected' : (meta.period ? 'new-period' : 'warning')}"
+            <select class="file-item-select ${periodClass}"
                     onchange="updateFileMeta(${index}, 'period', this.value)">
                 <option value="">Select period</option>
-                ${meta.period && !periodOptions.includes(meta.period)
+                ${isPeriodFinalized
+                    ? `<option value="" selected>${meta.period} (finalized - locked)</option>`
+                    : ''}
+                ${isPeriodNew
                     ? `<option value="${meta.period}" selected>${meta.period} (new)</option>`
                     : ''}
-                ${periodOptions.map(p => `<option value="${p}" ${meta.period === p ? 'selected' : ''}>${p}</option>`).join('')}
+                ${periodOptions.map(p => `<option value="${p.value}" ${meta.period === p.value ? 'selected' : ''}>${p.value} (${p.status})</option>`).join('')}
             </select>`;
 
         return `
@@ -711,8 +734,13 @@ function updateFileList() {
         `;
     }).join('');
 
-    // Update upload button state - require all files to have source and period
-    const allValid = fileMetadata.every(m => m.source && m.period);
+    // Update upload button state - require all files to have source and valid (non-finalized) period
+    const allValid = fileMetadata.every(m => {
+        if (!m.source || !m.period) return false;
+        // Reject if period is finalized
+        if (finalizedPeriods.includes(m.period)) return false;
+        return true;
+    });
     uploadBtn.disabled = !allValid;
 
     // Update button text with file count
@@ -795,11 +823,23 @@ document.addEventListener('keydown', (e) => {
 document.getElementById('import-form').addEventListener('submit', async (e) => {
     e.preventDefault();
 
+    // Get finalized periods for validation
+    const periodSelect = document.getElementById('import-period');
+    const finalizedPeriods = Array.from(periodSelect.options)
+        .filter(opt => opt.disabled && opt.value)
+        .map(opt => opt.value);
+
     const formData = new FormData();
     const isMultiFile = selectedFiles.length > 1;
 
     if (isMultiFile) {
         // Multi-file mode: send per-file metadata as JSON
+        // Validate no finalized periods
+        const invalidFiles = fileMetadata.filter(m => finalizedPeriods.includes(m.period));
+        if (invalidFiles.length > 0) {
+            showResults({ error: 'Cannot upload to finalized periods. Please select a different period.' });
+            return;
+        }
         const filesData = fileMetadata.map(m => ({
             source: m.source,
             period: m.period
@@ -809,6 +849,13 @@ document.getElementById('import-form').addEventListener('submit', async (e) => {
         // Single file mode: use the form inputs (or detected values)
         const source = document.getElementById('import-source').value || fileMetadata[0]?.source;
         const period = document.getElementById('import-period').value || fileMetadata[0]?.period;
+
+        // Validate period is not finalized
+        if (finalizedPeriods.includes(period)) {
+            showResults({ error: `Period ${period} is finalized and cannot accept new imports.` });
+            return;
+        }
+
         formData.append('source', source);
         formData.append('period', period);
     }

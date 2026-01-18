@@ -27,9 +27,7 @@
         </a>
         {% elif period.status == 'closed' %}
         <button type="button" class="btn btn-outline" onclick="document.getElementById('reopenModal').style.display='flex'">Reopen</button>
-        <form method="post" action="/periods/{{ period.period }}/finalize" style="display: inline;">
-            <button type="submit" class="btn btn-primary">Finalize</button>
-        </form>
+        <button type="button" class="btn btn-primary" onclick="document.getElementById('finalizeModal').style.display='flex'">Finalize</button>
         {% else %}
         <a href="/statements?period={{ period.id }}" class="btn btn-outline">View Statements</a>
         {% endif %}
@@ -303,6 +301,43 @@
                     </button>
                     <button type="submit" class="btn btn-primary">
                         Reopen Period
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Finalize Modal -->
+<div id="finalizeModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="card" style="max-width: 500px; width: 90%; margin: 20px;">
+        <div class="card-header">
+            <h3 class="card-title">Finalize Period</h3>
+        </div>
+        <div class="card-body">
+            <div style="margin-bottom: 20px; padding: 15px; background: var(--warning-bg, #fff3cd); border-radius: 6px; border: 1px solid var(--warning-border, #ffc107);">
+                <p style="margin: 0; color: var(--warning-text, #856404);">
+                    <strong>&#9888; This action cannot be undone.</strong>
+                </p>
+                <p style="margin: 10px 0 0 0; font-size: 14px; color: var(--warning-text, #856404);">
+                    Once finalized, this period cannot be reopened and no further changes can be made. Use this only after journal entries have been sent to accounting.
+                </p>
+            </div>
+            <form method="post" action="/periods/{{ period.period }}/finalize" id="finalizeForm">
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer;">
+                        <input type="checkbox" id="confirmFinalize" style="margin-top: 3px;" required>
+                        <span style="font-size: 14px;">
+                            I understand that finalizing <strong>{{ period.period }}</strong> is permanent and the period cannot be reopened.
+                        </span>
+                    </label>
+                </div>
+                <div class="btn-group" style="justify-content: flex-end;">
+                    <button type="button" class="btn btn-outline" onclick="document.getElementById('finalizeModal').style.display='none'; document.getElementById('confirmFinalize').checked=false;">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-danger">
+                        Finalize Period
                     </button>
                 </div>
             </form>

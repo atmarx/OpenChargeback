@@ -139,6 +139,16 @@ async def upload_files(
                 })
                 continue
 
+            # Check if period is finalized (cannot accept new imports)
+            period_obj = db.get_period(file_period)
+            if period_obj and period_obj.status == "finalized":
+                results.append({
+                    "filename": file.filename,
+                    "success": False,
+                    "error": f"Period {file_period} is finalized and cannot accept new imports",
+                })
+                continue
+
             try:
                 # Save uploaded file to temp location
                 with tempfile.NamedTemporaryFile(mode="wb", suffix=".csv", delete=False) as tmp:

@@ -262,6 +262,8 @@ focus-billing ingest ./billing.csv --source aws --dry-run
 - Matches a configured `flag_patterns` regex
 - Fund/org doesn't match any `fund_org_patterns` regex
 
+> **Note:** Imports are rejected for finalized periods. Finalized periods are locked and cannot accept new data. See [Periods](#periods) for status details.
+
 ### Periods
 
 Manage billing periods and their lifecycle.
@@ -275,8 +277,10 @@ focus-billing periods finalize 2025-01 --notes "Sent to accounting Jan 15"
 
 Period statuses:
 - `open` - Accepting new imports
-- `closed` - No more imports, ready for statement generation
-- `finalized` - Statements sent, period complete
+- `closed` - No more imports, ready for statement generation (can be reopened)
+- `finalized` - **Permanent.** Cannot be reopened or modified. Imports are rejected.
+
+> **⚠️ Warning:** Finalization is irreversible. Use only after journal entries have been exported and sent to accounting. Once finalized, you cannot add, modify, or remove charges from the period.
 
 ### Sources
 
