@@ -241,6 +241,114 @@ $dailyCharge = [math]::Round($usageGB * $dailyRate, 2)
 
 ---
 
+## Discount Transparency
+
+OpenChargeback shows PIs both the **list price** (full cost) and **billed price** (what they actually pay). This transparency helps researchers understand the true value of subsidized storage—even "free" storage has a real cost that's covered by the university.
+
+**Key columns:**
+- `ListCost`: Full price at standard rates for all storage used
+- `BilledCost`: Actual amount charged after free allocations and credits
+
+**The discount percentage is calculated as:**
+```
+discount_percent = (ListCost - BilledCost) / ListCost × 100
+```
+
+### Common Scenarios
+
+#### Scenario: First X GB Free (University-Covered)
+University covers the first 500 GB of storage per project:
+- `ListCost` = full daily rate × total GB
+- `BilledCost` = full daily rate × (total GB - 500), minimum $0.00
+
+A project using 2,000 GB would show:
+- `ListCost` = $3.29 (2,000 GB × $0.001644/day)
+- `BilledCost` = $2.47 (1,500 billable GB × $0.001644/day)
+- Discount: 25% (500 GB free / 2,000 GB total)
+
+#### Scenario: Fully Subsidized Project Storage
+Some pilot projects or core facilities have fully covered storage:
+- `ListCost` = full rate (so leadership sees the true cost)
+- `BilledCost` = $0.00
+
+#### Scenario: Faculty Credits
+Some faculty have credits that offset storage costs (e.g., startup funds):
+- `ListCost` = full rate
+- `BilledCost` = max(0, full rate - daily credit amount)
+
+#### Scenario: Tiered Pricing
+Different rates for different usage tiers:
+- First 1 TB: $0.03/GB/month (subsidized)
+- Next 9 TB: $0.05/GB/month (standard)
+- Over 10 TB: $0.04/GB/month (volume discount)
+
+Calculate `ListCost` at standard rate, `BilledCost` at tiered rates.
+
+### Example Output with Discounts
+
+```csv
+BillingPeriodStart,BillingPeriodEnd,ChargePeriodStart,ChargePeriodEnd,ListCost,BilledCost,ResourceId,ResourceName,ServiceName,Tags
+2025-01-15,2025-01-15,2025-01-15,2025-01-15,3.29,2.47,climate-modeling,Climate Modeling (first 500GB free),Research Storage - Projects,"{""pi_email"": ""martinez@example.edu"", ""project_id"": ""climate-modeling"", ""fund_org"": ""NSF-ATM-2024""}"
+2025-01-15,2025-01-15,2025-01-15,2025-01-15,0.82,0.00,pilot-project,Pilot Project (fully subsidized),Research Storage - Projects,"{""pi_email"": ""jones@example.edu"", ""project_id"": ""pilot-project"", ""fund_org"": ""DEPT-PILOT""}"
+2025-01-15,2025-01-15,2025-01-15,2025-01-15,4.11,2.11,genomics-lab,Genomics Lab (faculty credits),Research Storage - Projects,"{""pi_email"": ""smith@example.edu"", ""project_id"": ""genomics-lab"", ""fund_org"": ""NIH-2024""}"
+```
+
+### Implementation Notes
+
+Track subsidies in the `.focus-billing.json` metadata file:
+
+```json
+{
+  "pi_email": "martinez@example.edu",
+  "project_id": "climate-modeling",
+  "fund_org": "NSF-ATM-2024",
+  "active": true,
+  "free_gb": 500,
+  "subsidy_percent": 0,
+  "daily_credit": 0.00,
+  "notes": "Standard allocation with 500GB free tier"
+}
+```
+
+Or for a subsidized project:
+
+```json
+{
+  "pi_email": "jones@example.edu",
+  "project_id": "pilot-project",
+  "fund_org": "DEPT-PILOT",
+  "active": true,
+  "free_gb": 0,
+  "subsidy_percent": 100,
+  "daily_credit": 0.00,
+  "notes": "Fully subsidized pilot - expires 2025-06-30"
+}
+```
+
+Calculate in your script:
+
+```powershell
+# Read subsidy settings from metadata
+$freeGB = if ($metadata.free_gb) { $metadata.free_gb } else { 500 }  # Default 500GB free
+$subsidyPercent = if ($metadata.subsidy_percent) { $metadata.subsidy_percent } else { 0 }
+$dailyCredit = if ($metadata.daily_credit) { $metadata.daily_credit } else { 0 }
+
+# Calculate costs
+$listCost = [math]::Round($usageGB * $dailyRate, 2)
+
+# Apply free allocation
+$billableGB = [math]::Max(0, $usageGB - $freeGB)
+$costAfterFree = $billableGB * $dailyRate
+
+# Apply subsidy percentage
+$costAfterSubsidy = $costAfterFree * (1 - ($subsidyPercent / 100))
+
+# Apply daily credits
+$billedCost = [math]::Max(0, [math]::Round($costAfterSubsidy - $dailyCredit, 2))
+```
+
+---
+
 ## Implementation Guidelines
 
 ### 1. Service Account Setup

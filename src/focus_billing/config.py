@@ -59,6 +59,7 @@ class TagMappingConfig(BaseModel):
     project_id: str = "project"
     fund_org: str = "fund_org"
     cost_center: str = "cost_center"
+    account_code: str = "account_code"  # Optional account code from charge tags
 
 
 class OutputConfig(BaseModel):
@@ -120,6 +121,31 @@ class KnownSourceConfig(BaseModel):
 
     name: str
     pattern: str = ""  # Optional filename pattern for auto-selection
+    fund_org: str = ""  # Fund/org code for journal credits (source receives funds)
+    account_code: str = ""  # Default account code for this source
+
+
+class JournalConfig(BaseModel):
+    """Configuration for journal/GL export."""
+
+    # Regex with named capture groups to parse fund_org into components
+    # Example: "^(?P<fund>\\d{6})-(?P<orgn>\\d{4})$" for "123456-1234"
+    # Example: "^(?P<orgn>[^-]+)-(?P<fund>.+)$" for "DEPT-PROJECT-2024"
+    fund_org_regex: str = "^(?P<orgn>[^-]+)-(?P<fund>.+)$"
+
+    # Regex to validate account codes (optional)
+    account_code_regex: str = ""
+
+    # Template file name (in templates/ directory)
+    template: str = "journal_gl.csv"
+
+    # Default account code if not specified on charge or source
+    default_account: str = ""
+
+    # Description template for journal entries
+    # Available variables: {source}, {period}, {fund_org}, {pi_email}, {project_id}
+    debit_description: str = "{source} {period} Research Computing Charges"
+    credit_description: str = "{source} {period} Research Computing Charges"
 
 
 class ImportConfig(BaseModel):
@@ -157,6 +183,7 @@ class Config(BaseModel):
     """Root configuration model."""
 
     dev_mode: bool = False  # When true, emails go to files instead of SMTP
+    currency: str = "$"  # Currency symbol for display (e.g., "$", "€", "£")
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     smtp: SmtpConfig | None = None
     email: EmailConfig | None = None
@@ -167,6 +194,7 @@ class Config(BaseModel):
     web: WebConfig = Field(default_factory=WebConfig)
     review: ReviewConfig = Field(default_factory=ReviewConfig)
     imports: ImportConfig = Field(default_factory=ImportConfig)
+    journal: JournalConfig = Field(default_factory=JournalConfig)
 
 
 def load_config(config_path: Path | None = None) -> Config:

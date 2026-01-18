@@ -70,7 +70,7 @@ def create_app(config_path: Path | None = None) -> FastAPI:
     app = FastAPI(
         title="OpenChargeback",
         description="Research Computing Chargeback System",
-        version="0.2.1",
+        version="0.3.0",
         docs_url=None,  # Disable Swagger UI in production
         redoc_url=None,  # Disable ReDoc in production
     )
@@ -101,7 +101,8 @@ def create_app(config_path: Path | None = None) -> FastAPI:
     templates = Jinja2Templates(directory=templates_dir)
 
     # Add custom template filters
-    templates.env.filters["currency"] = lambda v: f"${v:,.2f}" if v else "$0.00"
+    symbol = config.currency
+    templates.env.filters["currency"] = lambda v: f"{symbol}{v:,.2f}" if v else f"{symbol}0.00"
     templates.env.filters["markdown"] = simple_markdown
 
     # Store templates in app state for routes to use

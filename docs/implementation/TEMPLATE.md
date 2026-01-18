@@ -191,14 +191,16 @@ The billing system expects a CSV file with these columns:
 | `BillingPeriodEnd` | Yes | Last day of billing period (YYYY-MM-DD) |
 | `ChargePeriodStart` | Yes | Start of this specific charge |
 | `ChargePeriodEnd` | Yes | End of this specific charge |
-| `ListCost` | No | Retail/list price |
+| `ListCost` | Yes* | Full/retail price before subsidies (see Discount Transparency) |
 | `ContractedCost` | No | Contracted price |
-| `BilledCost` | Yes | Actual amount to bill |
+| `BilledCost` | Yes | Actual amount to bill after subsidies/credits |
 | `EffectiveCost` | No | Cost after credits/adjustments |
 | `ResourceId` | No | Unique identifier |
 | `ResourceName` | No | Human-readable name |
 | `ServiceName` | Yes | Service category |
 | `Tags` | Yes | JSON object with billing metadata |
+
+*ListCost is required for discount transparency. See the Discount Transparency section.
 
 ### Tags JSON Structure
 
@@ -209,6 +211,48 @@ The billing system expects a CSV file with these columns:
   "fund_org": "FUND-CODE"
 }
 ```
+```
+
+### Discount Transparency Section
+
+Every guide should include a section explaining how to populate `ListCost` vs `BilledCost`:
+
+```markdown
+## Discount Transparency
+
+OpenChargeback shows PIs both the **list price** (full cost) and **billed price** (what they actually pay). This transparency helps researchers understand the true value of subsidized resources.
+
+**Key columns:**
+- `ListCost`: Full retail/unsubsidized price
+- `BilledCost`: Actual amount charged after discounts, subsidies, or free allocations
+
+**The discount percentage is calculated as:**
+```
+discount_percent = (ListCost - BilledCost) / ListCost × 100
+```
+
+### Common Scenarios
+
+{Include 2-3 scenarios specific to this data source. Examples below.}
+
+#### Scenario: Free Tier / University-Covered Resources
+Resources that are free to PIs but have a real cost:
+- `ListCost` = full rate (what it would cost)
+- `BilledCost` = 0.00
+
+#### Scenario: Partial Subsidy
+Resources discounted but not free:
+- `ListCost` = full rate
+- `BilledCost` = discounted rate
+
+#### Scenario: PI Credits
+PI has credits that offset costs:
+- `ListCost` = full rate
+- `BilledCost` = full rate minus credits applied
+
+### Example Output
+
+{Show concrete CSV examples with ListCost ≠ BilledCost}
 ```
 
 ### Cost Calculation

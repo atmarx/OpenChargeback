@@ -4,14 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "focus-billing"
-version = "0.2.1"
+version = "0.3.0"
 description = "FOCUS-format billing data processor for research computing chargebacks"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.14"
 license = "MIT"
-authors = [
-    { name = "Northwinds University IT" }
-]
+authors = []
 keywords = ["billing", "finops", "focus", "chargeback", "research-computing"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -22,6 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Office/Business :: Financial :: Accounting",
 ]
 dependencies = [

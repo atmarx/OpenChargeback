@@ -393,6 +393,100 @@ def calculate_storage_cost(usage_bytes, rates):
 
 ---
 
+## Discount Transparency
+
+OpenChargeback shows PIs both the **list price** (full cost) and **billed price** (what they actually pay). This transparency helps researchers understand the true value of subsidized resources—even "free" resources have a real cost that's covered by the university or grants.
+
+**Key columns:**
+- `ListCost`: Full price at standard rates
+- `BilledCost`: Actual amount charged after subsidies
+
+**The discount percentage is calculated as:**
+```
+discount_percent = (ListCost - BilledCost) / ListCost × 100
+```
+
+### Compute Scenarios
+
+#### Scenario: Free Tier Partition
+Many HPC centers provide a "free tier" partition (e.g., `preempt`, `community`, `free`) that doesn't charge PIs:
+- `ListCost` = full rate (what it would cost on a paid partition)
+- `BilledCost` = $0.00
+
+This shows PIs the true value of subsidized compute.
+
+#### Scenario: Subsidized GPU Partition
+University covers 50% of GPU costs to encourage ML research:
+- `ListCost` = full GPU rate ($1.00/GPU-hour)
+- `BilledCost` = subsidized rate ($0.50/GPU-hour)
+
+#### Scenario: Grant-Funded Allocation
+PI has a condo/allocation that's pre-paid via grant:
+- `ListCost` = full rate (for resource accounting)
+- `BilledCost` = $0.00 (no additional charge)
+
+### Storage Scenarios
+
+#### Scenario: Free Scratch Storage
+Scratch storage is provided at no cost but has a 30-day purge policy:
+- `ListCost` = what equivalent project storage would cost
+- `BilledCost` = $0.00
+
+#### Scenario: First X GB Free
+University covers the first 500 GB of project storage per PI:
+- `ListCost` = full rate for all storage
+- `BilledCost` = rate × (usage - 500 GB), minimum $0.00
+
+### Example Output with Discounts
+
+```csv
+BillingPeriodStart,BillingPeriodEnd,ChargePeriodStart,ChargePeriodEnd,ListCost,BilledCost,ResourceId,ResourceName,ServiceName,Tags
+2025-01-01,2025-01-31,2025-01-01,2025-01-31,150.00,150.00,genomics-cpu,Genomics CPU Usage (paid partition),HPC Compute - CPU,"{""pi_email"": ""smith@example.edu"", ""project_id"": ""genomics"", ""fund_org"": ""NIH-2024""}"
+2025-01-01,2025-01-31,2025-01-01,2025-01-31,50.00,0.00,genomics-cpu-free,Genomics CPU Usage (free tier),HPC Compute - CPU,"{""pi_email"": ""smith@example.edu"", ""project_id"": ""genomics"", ""fund_org"": ""NIH-2024""}"
+2025-01-01,2025-01-31,2025-01-01,2025-01-31,500.00,250.00,genomics-gpu,Genomics GPU Usage (50% subsidy),HPC Compute - GPU,"{""pi_email"": ""smith@example.edu"", ""project_id"": ""genomics"", ""fund_org"": ""NIH-2024""}"
+2025-01-01,2025-01-31,2025-01-01,2025-01-31,100.00,50.00,genomics-storage,Genomics Storage (first 500GB free),HPC Storage - Project,"{""pi_email"": ""smith@example.edu"", ""project_id"": ""genomics"", ""fund_org"": ""NIH-2024""}"
+```
+
+### Implementation Notes
+
+Configure partition subsidies in your config file:
+
+```yaml
+# config.yaml
+billing:
+  rates:
+    cpu_hour: 0.01
+    gpu_hour: 1.00
+    storage_gb_month: 0.05
+
+  # Partition-specific subsidies
+  partition_subsidies:
+    standard: 0       # No subsidy - full price
+    gpu: 0.50         # 50% subsidy
+    preempt: 1.0      # 100% subsidy (free tier)
+    community: 1.0    # 100% subsidy (free tier)
+
+  # Storage subsidies
+  storage_free_gb: 500  # First 500 GB free per PI
+```
+
+Then calculate in your script:
+
+```python
+# Compute with partition subsidy
+list_cost = cpu_hours * rates.cpu_hour
+subsidy_rate = partition_subsidies.get(partition, 0)
+billed_cost = list_cost * (1 - subsidy_rate)
+
+# Storage with free allocation
+total_gb = usage_bytes / (1024 ** 3)
+list_cost = total_gb * rates.storage_gb_month
+billable_gb = max(0, total_gb - storage_free_gb)
+billed_cost = billable_gb * rates.storage_gb_month
+```
+
+---
+
 ## Implementation Guidelines
 
 ### 1. Script Structure

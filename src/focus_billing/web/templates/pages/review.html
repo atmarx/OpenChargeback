@@ -63,7 +63,7 @@
             {% endif %}
         </form>
 
-        <form id="bulk-form" method="post">
+        <form id="bulk-form" method="post" hx-boost="false" hx-disable>
             <div class="table-container">
                 <table>
                     <thead>
@@ -83,7 +83,7 @@
                         {% for charge in charges %}
                         <tr id="charge-row-{{ charge.id }}">
                             <td>
-                                <input type="checkbox" name="charge_ids" value="{{ charge.id }}" class="charge-checkbox" onchange="updateSelectedCount()">
+                                <input type="checkbox" name="charge_ids" value="{{ charge.id }}" class="charge-checkbox">
                             </td>
                             <td>{{ charge.pi_email }}</td>
                             <td>
@@ -133,10 +133,12 @@
             <div class="action-row">
                 <span class="selected-count" id="selected-count">0 selected</span>
                 <div class="btn-group">
-                    <button type="submit" formaction="/review/reject-selected" class="btn btn-sm btn-outline" id="reject-selected-btn" disabled onclick="return confirm('Reject and delete selected charges?')">
+                    <button type="button" class="btn btn-sm btn-outline btn-disabled" id="reject-selected-btn"
+                        onclick="submitBulkAction('/review/reject-selected', 'Reject and delete selected charges?'); return false;">
                         Reject Selected
                     </button>
-                    <button type="submit" formaction="/review/approve-selected" class="btn btn-sm btn-success" id="approve-selected-btn" disabled>
+                    <button type="button" class="btn btn-sm btn-success btn-disabled" id="approve-selected-btn"
+                        onclick="submitBulkAction('/review/approve-selected'); return false;">
                         Approve Selected
                     </button>
                 </div>
@@ -144,57 +146,6 @@
         </form>
     </div>
 </div>
-
-<script>
-function toggleAll(source) {
-    const checkboxes = document.querySelectorAll('.charge-checkbox');
-    checkboxes.forEach(cb => cb.checked = source.checked);
-    updateSelectedCount();
-}
-
-function updateSelectedCount() {
-    const checkboxes = document.querySelectorAll('.charge-checkbox:checked');
-    const count = checkboxes.length;
-    document.getElementById('selected-count').textContent = count + ' selected';
-    document.getElementById('approve-selected-btn').disabled = count === 0;
-    document.getElementById('reject-selected-btn').disabled = count === 0;
-
-    // Update select-all checkbox state
-    const allCheckboxes = document.querySelectorAll('.charge-checkbox');
-    const selectAll = document.getElementById('select-all');
-    if (allCheckboxes.length > 0) {
-        selectAll.checked = checkboxes.length === allCheckboxes.length;
-        selectAll.indeterminate = checkboxes.length > 0 && checkboxes.length < allCheckboxes.length;
-    }
-}
-
-// Listen for htmx events to update counts
-document.body.addEventListener('chargeApproved', function() {
-    updateSelectedCount();
-    updateTotalCount();
-});
-
-document.body.addEventListener('chargeRejected', function() {
-    updateSelectedCount();
-    updateTotalCount();
-});
-
-function updateTotalCount() {
-    const rows = document.querySelectorAll('#review-table-body tr');
-    const count = rows.length;
-    const subtitle = document.querySelector('.page-subtitle');
-    if (subtitle) {
-        const periodText = subtitle.textContent.includes('in ') ? subtitle.textContent.split('in ')[1] : '';
-        subtitle.textContent = count + ' charge' + (count !== 1 ? 's' : '') + ' need' + (count === 1 ? 's' : '') + ' review' + (periodText ? ' in ' + periodText : '');
-    }
-
-    // Show empty state if no more charges
-    if (count === 0) {
-        const tableBody = document.getElementById('review-table-body');
-        tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px;"><div class="icon">&#10003;</div><h3>All caught up!</h3><p class="text-muted">No more charges to review.</p></td></tr>';
-    }
-}
-</script>
 
 {% else %}
 <div class="card">

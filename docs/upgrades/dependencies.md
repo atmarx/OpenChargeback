@@ -108,6 +108,82 @@ htmx is served locally from `src/focus_billing/web/static/js/htmx.min.js`.
    git commit -m "chore: upgrade htmx to 1.9.12"
    ```
 
+## Python Version Management
+
+The project pins Python versions to prevent untested interpreters from being used.
+
+### Version Constraints
+
+| File | Constraint | Purpose |
+|------|------------|---------|
+| `pyproject.toml` | `requires-python = ">=3.10,<3.14"` | Enforced by pip/build tools |
+| `.python-version` | `3.13` | Used by pyenv for local development |
+| `tool.ruff.target-version` | `py310` | Lints for minimum version compatibility |
+| `tool.mypy.python_version` | `3.10` | Type checks for minimum version |
+
+### How It Works
+
+- **`requires-python`**: pip refuses to install on unsupported Python versions
+- **`.python-version`**: pyenv automatically switches to Python 3.13 in this directory
+- **Linter/type checker targets**: Set to minimum version (3.10) to catch accidental use of newer syntax
+
+### When a New Python Version Releases
+
+When Python 3.14 is released:
+
+1. **Test on the new version**:
+   ```bash
+   pyenv install 3.14.0
+   pyenv local 3.14.0
+   pip install -e ".[dev]"
+   python -m pytest tests/ -v
+   ```
+
+2. **If tests pass**, update constraints:
+   ```toml
+   # pyproject.toml
+   requires-python = ">=3.10,<3.15"
+
+   # Add to classifiers
+   "Programming Language :: Python :: 3.14",
+   ```
+
+3. **Update `.python-version`** if you want to develop on the new version:
+   ```
+   3.14
+   ```
+
+4. **Commit and document**:
+   ```bash
+   git add pyproject.toml .python-version
+   git commit -m "chore: add Python 3.14 support"
+   ```
+
+### Dropping Old Python Versions
+
+When dropping support for an older version (e.g., Python 3.10):
+
+1. Update `requires-python`:
+   ```toml
+   requires-python = ">=3.11,<3.15"
+   ```
+
+2. Remove old classifiers:
+   ```diff
+   - "Programming Language :: Python :: 3.10",
+   ```
+
+3. Optionally update linter/type checker targets:
+   ```toml
+   [tool.ruff]
+   target-version = "py311"
+
+   [tool.mypy]
+   python_version = "3.11"
+   ```
+
+4. This is a **major version bump** per SemVer (breaking change).
+
 ## Security Updates
 
 For security patches, upgrade immediately:

@@ -6,7 +6,7 @@ Guides for upgrading OpenChargeback and its dependencies.
 
 | Guide | Description |
 |-------|-------------|
-| [Dependencies](dependencies.md) | Upgrading Python packages and vendored JavaScript |
+| [Dependencies](dependencies.md) | Upgrading Python packages, vendored JavaScript, and Python versions |
 | [Versioning](versioning.md) | Incrementing the project version for releases |
 
 ## Quick Reference

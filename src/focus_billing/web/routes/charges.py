@@ -36,8 +36,12 @@ async def list_charges(
     period_int = int(period) if period and period.isdigit() else None
     source_int = int(source) if source and source.isdigit() else None
 
-    # Use current period from session if not specified
-    period_id = period_int or get_current_period_id(request)
+    # Use current period from session only if period param not in URL
+    # If period is explicitly set (even to empty for "All periods"), respect that
+    if "period" in request.query_params:
+        period_id = period_int  # None means "All periods"
+    else:
+        period_id = get_current_period_id(request)
 
     # Pagination
     per_page = 50

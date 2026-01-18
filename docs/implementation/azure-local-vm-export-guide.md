@@ -61,36 +61,67 @@ If your Azure Local cluster is Arc-enabled, you can query VMs via Azure Resource
 
 ---
 
-## VM Metadata via Tags
+## VM Metadata
 
-Each VM must have billing metadata attached via Windows Admin Center tags or the VM Notes field.
+Each VM must have billing metadata for the export script to access. There are several approaches depending on your environment.
 
-### Option A: Windows Admin Center Tags
+### Recommended: VM Notes Field (JSON)
 
-In Windows Admin Center, VMs can have custom tags. You'll need tags for:
+Store billing metadata directly in the Hyper-V VM's Notes field as JSON. This approach:
+- Works from any machine with Hyper-V/cluster access
+- Doesn't depend on Windows Admin Center availability
+- Survives WAC gateway rebuilds
+- Is accessible via standard PowerShell cmdlets
+
+### Alternative: Windows Admin Center Tags
+
+WAC provides a nice UI for tagging VMs, but WAC tags are stored in the gateway's database—not on the VMs themselves. This means:
+- Tags are only accessible via WAC's REST API or direct database query
+- Script must run on or connect to the WAC gateway
+- If WAC is rebuilt, tags are lost
+
+**If you prefer WAC's tag UI**, consider a hybrid approach: use WAC for tag management, then run a sync script that copies WAC tags to VM Notes. This gives you the best of both worlds—nice UI for operators, portable metadata for billing. (See "Future Enhancement" at the end of this section.)
+
+### Required Metadata Fields
 
 | Purpose | Required | Description |
 |---------|----------|-------------|
 | PI Email | Yes | PI's university email address |
 | Project ID | Yes | Project identifier |
 | Fund/Org | Yes | Fund/org code for journal entries |
-| Annual Cost | Yes | Annual cost for this VM (e.g., "1200.00") |
-| Active Flag | No | Set to "false" to skip billing (default: "true") |
+| VM Tier | Yes | Pricing tier (determines annual cost) |
+| Subsidy Percent | No | Percentage of cost covered by university (default: 0) |
+| Active Flag | No | Set to `false` to skip billing (default: `true`) |
 
-The actual tag key names are up to you—use whatever naming convention fits your environment.
+The actual field names are up to you—use whatever naming convention fits your environment.
 
-### Option B: VM Notes Field (JSON)
+### VM Notes Field (JSON)
 
-If tags aren't practical, store metadata as JSON in the VM's Notes field. The field names are up to you; here's an example structure:
+Store metadata as JSON in the VM's Notes field. The field names are up to you; here's an example structure:
 
 ```json
 {
   "pi_email": "martinez.sofia@example.edu",
   "project_id": "climate-modeling",
   "fund_org": "NSF-ATM-2024",
-  "annual_cost": 1200.00,
+  "vm_tier": "standard",
+  "subsidy_percent": 0,
   "active": true,
   "notes": "4-core, 16GB RAM compute VM"
+}
+```
+
+For a GPU VM with premium backup:
+
+```json
+{
+  "pi_email": "chen.wei@example.edu",
+  "project_id": "ml-training",
+  "fund_org": "DOE-2024",
+  "vm_tier": "gpu-a100",
+  "subsidy_percent": 0,
+  "active": true,
+  "notes": "ML training VM with A100 GPU"
 }
 ```
 
@@ -128,10 +159,53 @@ Set-VM -Name "climate-vm-01" -Notes $metadata
 
 Your script should verify:
 - Notes field exists and is valid JSON
-- All required fields (PI email, project ID, fund/org, annual cost) are present
+- All required fields (PI email, project ID, fund/org, VM tier) are present
 - Email field looks like a valid email address
-- Annual cost is a positive number
+- VM tier is a recognized tier name
 - Active flag is not explicitly set to `false`
+
+### VM Tiers and Pricing
+
+Define pricing tiers in your script's configuration. This allows different VM types to have different annual costs:
+
+```powershell
+# VM tier pricing (annual cost)
+$vmTiers = @{
+    "standard"     = 1200.00   # 4-core, 16GB RAM
+    "large"        = 2400.00   # 8-core, 32GB RAM
+    "highmem"      = 3600.00   # 8-core, 64GB RAM
+    "gpu-t4"       = 4800.00   # With T4 GPU
+    "gpu-a100"     = 9600.00   # With A100 GPU
+    "premium-backup" = 600.00  # Add-on for premium backup tier
+}
+
+# Look up annual cost from tier
+$annualCost = $vmTiers[$metadata.vm_tier]
+if (-not $annualCost) {
+    Write-Warning "Unknown VM tier '$($metadata.vm_tier)' for $($vm.Name)"
+    continue
+}
+```
+
+**Combining tiers**: For VMs with add-ons (e.g., GPU + premium backup), you can either:
+- Create combined tier names (`gpu-a100-premium`)
+- Store multiple tiers and sum them
+- Use a base tier + add-on fields in metadata
+
+### Future Enhancement: WAC Tag Sync
+
+If you want to use Windows Admin Center's tag UI while keeping VM Notes as the source of truth for billing:
+
+1. **Use WAC for tag management** - Operators tag VMs via the WAC UI
+2. **Run a sync script** - Scheduled task copies WAC tags to VM Notes
+3. **Billing script reads VM Notes** - No WAC dependency at billing time
+
+This hybrid approach requires building:
+- A script that queries WAC's REST API for tags
+- Logic to map WAC tag names to your JSON schema
+- A scheduled task to run the sync (e.g., hourly or on-demand)
+
+This is a separate project—for now, manage metadata directly in VM Notes.
 
 ---
 
@@ -242,7 +316,16 @@ VMs deleted during a billing period are **not billed** for that period—we cann
 
 ```powershell
 # Conceptual example
-$annualCost = 1200.00
+
+# VM tier pricing (annual cost)
+$vmTiers = @{
+    "standard"  = 1200.00
+    "large"     = 2400.00
+    "gpu-a100"  = 9600.00
+}
+
+# Get annual cost from tier
+$annualCost = $vmTiers[$metadata.vm_tier]
 $monthlyRate = $annualCost / 12
 
 $periodStart = [DateTime]"2025-01-01"
@@ -253,14 +336,114 @@ $daysInMonth = ($periodEnd - $periodStart).Days + 1
 
 if ($vmCreationDate -lt $periodStart) {
     # Full month charge
-    $billedCost = $monthlyRate
+    $listCost = $monthlyRate
     $chargePeriodStart = $periodStart
 } else {
     # Prorated charge
     $daysActive = ($periodEnd - $vmCreationDate).Days + 1
-    $billedCost = [math]::Round($monthlyRate * ($daysActive / $daysInMonth), 2)
+    $listCost = [math]::Round($monthlyRate * ($daysActive / $daysInMonth), 2)
     $chargePeriodStart = $vmCreationDate
 }
+
+# Apply subsidy
+$subsidyPercent = if ($metadata.subsidy_percent) { $metadata.subsidy_percent } else { 0 }
+$billedCost = [math]::Round($listCost * (1 - ($subsidyPercent / 100)), 2)
+```
+
+---
+
+## Discount Transparency
+
+OpenChargeback shows PIs both the **list price** (full cost) and **billed price** (what they actually pay). This transparency helps researchers understand the true value of subsidized resources.
+
+**Key columns:**
+- `ListCost`: Full monthly rate (before proration or subsidies)
+- `BilledCost`: Actual amount charged
+
+**The discount percentage is calculated as:**
+```
+discount_percent = (ListCost - BilledCost) / ListCost × 100
+```
+
+### Common Scenarios
+
+#### Scenario: Prorated New VM
+VM created mid-month pays only for days active:
+- `ListCost` = full monthly rate ($100.00)
+- `BilledCost` = prorated amount ($54.84 for 17 days)
+
+This shows the PI what a full month would cost while charging fairly for partial usage.
+
+#### Scenario: University-Sponsored VM
+Some VMs may be fully sponsored by the university or a department:
+- `ListCost` = full monthly rate ($100.00)
+- `BilledCost` = $0.00
+
+The PI sees the true value of the resource even though they don't pay.
+
+#### Scenario: Partially Subsidized VM
+University covers 50% of VM costs:
+- `ListCost` = full monthly rate ($100.00)
+- `BilledCost` = subsidized rate ($50.00)
+
+### Example Output with Discounts
+
+```csv
+BillingPeriodStart,BillingPeriodEnd,ChargePeriodStart,ChargePeriodEnd,ListCost,BilledCost,ResourceId,ResourceName,ServiceName,Tags
+2025-01-01,2025-01-31,2025-01-01,2025-01-31,100.00,100.00,research-vm-01,Standard Research VM,Azure Local - Virtual Machines,"{""pi_email"": ""smith@example.edu"", ""project_id"": ""genomics"", ""fund_org"": ""NIH-2024""}"
+2025-01-01,2025-01-31,2025-01-01,2025-01-31,800.00,800.00,ml-training-01,GPU VM (A100),Azure Local - Virtual Machines,"{""pi_email"": ""chen@example.edu"", ""project_id"": ""ml-research"", ""fund_org"": ""DOE-2024""}"
+2025-01-01,2025-01-31,2025-01-15,2025-01-31,100.00,54.84,research-vm-02,New Standard VM (prorated),Azure Local - Virtual Machines,"{""pi_email"": ""smith@example.edu"", ""project_id"": ""genomics"", ""fund_org"": ""NIH-2024""}"
+2025-01-01,2025-01-31,2025-01-01,2025-01-31,100.00,0.00,pilot-vm-01,Sponsored Pilot VM,Azure Local - Virtual Machines,"{""pi_email"": ""jones@example.edu"", ""project_id"": ""pilot-project"", ""fund_org"": ""DEPT-SPONSORED""}"
+```
+
+Note: The GPU VM at $800/month ($9,600/year) shows the tier-based pricing in action.
+
+### Implementation Notes
+
+Your script should track subsidy status and VM tier in the metadata. Examples:
+
+**Standard VM (full price):**
+```json
+{
+  "pi_email": "smith@example.edu",
+  "project_id": "genomics",
+  "fund_org": "NIH-2024",
+  "vm_tier": "standard",
+  "subsidy_percent": 0,
+  "active": true
+}
+```
+
+**GPU VM (full price):**
+```json
+{
+  "pi_email": "chen@example.edu",
+  "project_id": "ml-research",
+  "fund_org": "DOE-2024",
+  "vm_tier": "gpu-a100",
+  "subsidy_percent": 0,
+  "active": true
+}
+```
+
+**Sponsored pilot VM (100% subsidy):**
+```json
+{
+  "pi_email": "jones@example.edu",
+  "project_id": "pilot-project",
+  "fund_org": "DEPT-SPONSORED",
+  "vm_tier": "standard",
+  "subsidy_percent": 100,
+  "active": true
+}
+```
+
+Then calculate:
+```powershell
+$annualCost = $vmTiers[$metadata.vm_tier]
+$monthlyRate = $annualCost / 12
+$listCost = $monthlyRate  # (or prorated amount)
+$billedCost = $listCost * (1 - ($metadata.subsidy_percent / 100))
 ```
 
 ---

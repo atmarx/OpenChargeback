@@ -32,7 +32,11 @@ async def list_statements(
 
     # Convert period to int, handling empty strings
     period_int = int(period) if period and period.isdigit() else None
-    period_id = period_int or get_current_period_id(request)
+    # Use current period from session only if period param not in URL
+    if "period" in request.query_params:
+        period_id = period_int  # None means "All periods"
+    else:
+        period_id = get_current_period_id(request)
     periods = db.list_periods()
 
     statements = []
@@ -72,7 +76,11 @@ async def generate_form(
 
     # Convert period to int, handling empty strings
     period_int = int(period) if period and period.isdigit() else None
-    period_id = period_int or get_current_period_id(request)
+    # Use current period from session only if period param not in URL
+    if "period" in request.query_params:
+        period_id = period_int  # None means "All periods"
+    else:
+        period_id = get_current_period_id(request)
     periods = db.list_periods()
 
     current_period = None

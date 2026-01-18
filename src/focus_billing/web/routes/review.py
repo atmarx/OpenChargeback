@@ -36,8 +36,11 @@ async def review_list(
     period_int = int(period) if period and period.isdigit() else None
     source_int = int(source) if source and source.isdigit() else None
 
-    # Use current period from session if not specified
-    period_id = period_int or get_current_period_id(request)
+    # Use current period from session only if period param not in URL
+    if "period" in request.query_params:
+        period_id = period_int  # None means "All periods"
+    else:
+        period_id = get_current_period_id(request)
 
     # Get flagged charges
     charges_list, total = db.get_charges_paginated(
@@ -121,9 +124,10 @@ async def approve_charge(
 
     # Check if this is an htmx request
     if request.headers.get("HX-Request"):
-        # Return empty response to remove the row
+        # Return empty HTML to remove the row (htmx swaps outerHTML with this)
         return Response(
-            content="",
+            content="<!-- removed -->",
+            media_type="text/html",
             headers={"HX-Trigger": "chargeApproved"},
         )
 
@@ -157,9 +161,10 @@ async def reject_charge(
 
     # Check if this is an htmx request
     if request.headers.get("HX-Request"):
-        # Return empty response to remove the row
+        # Return empty HTML to remove the row (htmx swaps outerHTML with this)
         return Response(
-            content="",
+            content="<!-- removed -->",
+            media_type="text/html",
             headers={"HX-Trigger": "chargeRejected"},
         )
 
@@ -198,11 +203,18 @@ async def approve_all_charges(
 @router.post("/approve-selected")
 async def approve_selected_charges(
     request: Request,
-    charge_ids: list[int] = Form(default=[]),
     user: User = Depends(get_current_user),
     db: Database = Depends(get_db),
 ):
     """Approve selected flagged charges."""
+    # Parse form data manually to handle list of charge_ids
+    form_data = await request.form()
+    charge_ids = [int(v) for v in form_data.getlist("charge_ids") if v]
+
+    if not charge_ids:
+        add_flash_message(request, "warning", "No charges selected.")
+        return RedirectResponse(url="/review", status_code=303)
+
     for charge_id in charge_ids:
         db.approve_charge(charge_id, performed_by=user.display_name)
 
@@ -213,11 +225,18 @@ async def approve_selected_charges(
 @router.post("/reject-selected")
 async def reject_selected_charges(
     request: Request,
-    charge_ids: list[int] = Form(default=[]),
     user: User = Depends(get_current_user),
     db: Database = Depends(get_db),
 ):
     """Reject selected flagged charges."""
+    # Parse form data manually to handle list of charge_ids
+    form_data = await request.form()
+    charge_ids = [int(v) for v in form_data.getlist("charge_ids") if v]
+
+    if not charge_ids:
+        add_flash_message(request, "warning", "No charges selected.")
+        return RedirectResponse(url="/review", status_code=303)
+
     for charge_id in charge_ids:
         db.reject_charge(charge_id, performed_by=user.display_name)
 

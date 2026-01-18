@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Journal Export Log - OpenChargeback{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Journal Export Log</h1>
+        <p class="page-subtitle">History of journal exports for accounting systems</p>
+    </div>
+    <div class="page-actions">
+        <a href="/journal" class="btn btn-primary">New Export</a>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-body" style="padding: 15px;">
+        <form method="get" action="/journal/logs" style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <label for="period" style="font-weight: 500; white-space: nowrap;">Period:</label>
+                <select name="period" id="period" class="form-input" style="width: auto; min-width: 150px;">
+                    <option value="">All periods</option>
+                    {% for p in periods %}
+                    <option value="{{ p.id }}" {% if selected_period == p.id|string %}selected{% endif %}>{{ p.period }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <label for="format" style="font-weight: 500; white-space: nowrap;">Format:</label>
+                <select name="format" id="format" class="form-input" style="width: auto; min-width: 120px;">
+                    <option value="">All</option>
+                    <option value="standard" {% if selected_format == 'standard' %}selected{% endif %}>Detail</option>
+                    <option value="summary" {% if selected_format == 'summary' %}selected{% endif %}>Summary</option>
+                    <option value="gl" {% if selected_format == 'gl' %}selected{% endif %}>GL</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-outline">Filter</button>
+            {% if selected_period or selected_format %}
+            <a href="/journal/logs" class="btn btn-outline">Clear</a>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body" style="padding: 0;">
+        {% if exports %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Period</th>
+                        <th>Format</th>
+                        <th>Rows</th>
+                        <th>Total Cost</th>
+                        <th>Flagged</th>
+                        <th>Exported By</th>
+                        <th>Exported At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for export in exports %}
+                    <tr>
+                        <td>
+                            <a href="/periods/{{ export.period }}" style="color: var(--accent); text-decoration: none;">
+                                {{ export.period }}
+                            </a>
+                        </td>
+                        <td>
+                            {% if export.format == 'standard' %}
+                            <span class="status status-open"><span class="status-dot"></span>Detail</span>
+                            {% elif export.format == 'summary' %}
+                            <span class="status status-closed"><span class="status-dot"></span>Summary</span>
+                            {% else %}
+                            <span class="status status-finalized"><span class="status-dot"></span>GL</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ export.row_count | default(0) }}</td>
+                        <td>{{ export.total_cost | currency }}</td>
+                        <td>
+                            {% if export.include_flagged %}
+                            <span class="text-muted">Yes</span>
+                            {% else %}
+                            <span class="text-muted">No</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ export.exported_by or 'System' }}</td>
+                        <td class="text-muted">{{ export.exported_at[:16] if export.exported_at else 'N/A' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if total_pages > 1 %}
+        <div style="padding: 15px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+            <span class="text-muted">Showing {{ ((page - 1) * 25) + 1 }}-{{ [page * 25, total] | min }} of {{ total }} exports</span>
+            <div style="display: flex; gap: 8px;">
+                {% if page > 1 %}
+                <a href="/journal/logs?page={{ page - 1 }}{% if selected_period %}&period={{ selected_period }}{% endif %}{% if selected_format %}&format={{ selected_format }}{% endif %}" class="btn btn-outline btn-sm">&laquo; Prev</a>
+                {% endif %}
+                {% if page < total_pages %}
+                <a href="/journal/logs?page={{ page + 1 }}{% if selected_period %}&period={{ selected_period }}{% endif %}{% if selected_format %}&format={{ selected_format }}{% endif %}" class="btn btn-outline btn-sm">Next &raquo;</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="empty-state">
+            <div class="icon">&#128202;</div>
+            <h3>No exports yet</h3>
+            <p>Journal exports will appear here after exporting data for accounting.</p>
+            <a href="/journal" class="btn btn-primary" style="margin-top: 15px;">Create Export</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

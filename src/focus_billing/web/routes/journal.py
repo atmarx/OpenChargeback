@@ -3,12 +3,14 @@
 import csv
 import io
 from datetime import datetime
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 
 from focus_billing import audit
 from focus_billing.db import Database
+from focus_billing.output.journal_template import export_journal_with_template
 from focus_billing.web.auth import User
 from focus_billing.web.deps import (
     get_current_period_id,
@@ -19,6 +21,60 @@ from focus_billing.web.deps import (
 )
 
 router = APIRouter(prefix="/journal", tags=["journal"])
+
+
+@router.get("/logs", response_class=HTMLResponse)
+async def journal_logs(
+    request: Request,
+    period: str | None = Query(None),
+    format: str | None = Query(None),
+    page: int = Query(1, ge=1),
+    user: User = Depends(get_current_user),
+    db: Database = Depends(get_db),
+):
+    """Show journal export history."""
+    templates = request.app.state.templates
+    flash_messages = get_flash_messages(request)
+
+    # Get all periods for filter dropdown
+    periods = db.list_periods()
+
+    # Convert period to int if provided
+    period_id = int(period) if period and period.isdigit() else None
+
+    # Get journal exports with optional filtering
+    all_exports = db.get_journal_exports(billing_period_id=period_id, limit=500)
+
+    # Filter by format if specified
+    if format:
+        all_exports = [e for e in all_exports if e.format == format]
+
+    # Pagination
+    per_page = 25
+    total = len(all_exports)
+    total_pages = (total + per_page - 1) // per_page
+    start = (page - 1) * per_page
+    exports = all_exports[start : start + per_page]
+
+    flagged_count = get_global_flagged_count(db, period_id)
+
+    return templates.TemplateResponse(
+        "pages/journal_logs.html",
+        {
+            "request": request,
+            "user": user,
+            "flash_messages": flash_messages,
+            "exports": exports,
+            "periods": periods,
+            "selected_period": period,
+            "selected_format": format,
+            "page": page,
+            "total": total,
+            "total_pages": total_pages,
+            "flagged_count": flagged_count,
+            "page_title": "Journal Export Log",
+        },
+    )
 
 
 @router.get("", response_class=HTMLResponse)
@@ -34,7 +90,11 @@ async def journal_form(
 
     # Convert period to int, handling empty strings
     period_int = int(period) if period and period.isdigit() else None
-    period_id = period_int or get_current_period_id(request)
+    # Use current period from session only if period param not in URL
+    if "period" in request.query_params:
+        period_id = period_int  # None means "All periods"
+    else:
+        period_id = get_current_period_id(request)
     periods = db.list_periods()
 
     current_period = None
@@ -176,6 +236,25 @@ async def export_journal(
             "debit": "",
             "credit": f"{total:.2f}",
         })
+
+    elif format == "template":
+        # Template-based format: uses Jinja2 template from config
+        config = request.app.state.config
+
+        # Build source_id to name mapping
+        sources = db.list_sources()
+        source_id_to_name = {s.id: s.name for s in sources}
+
+        # Render using template
+        template_dir = Path("templates")
+        content = export_journal_with_template(
+            charges=charges,
+            period=period.period,
+            config=config,
+            template_dir=template_dir,
+            source_id_to_name=source_id_to_name,
+        )
+        output.write(content)
 
     output.seek(0)
     filename = f"journal_{period.period}_{format}_{datetime.now().strftime('%Y%m%d')}.csv"

@@ -96,6 +96,15 @@
                             </p>
                         </div>
                     </label>
+                    <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer;">
+                        <input type="radio" name="format" value="template" style="margin-top: 3px;">
+                        <div>
+                            <strong>Custom Template (GL)</strong>
+                            <p class="text-muted" style="margin: 2px 0 0 0; font-size: 13px;">
+                                Uses configured Jinja2 template with debit/credit entries per source
+                            </p>
+                        </div>
+                    </label>
                 </div>
             </div>
 
@@ -148,6 +157,8 @@
                         <span class="text-muted">Summary</span>
                         {% elif export.format == 'gl' %}
                         <span class="text-muted">GL</span>
+                        {% elif export.format == 'template' %}
+                        <span class="text-muted">Template</span>
                         {% else %}
                         <span class="text-muted">{{ export.format }}</span>
                         {% endif %}
@@ -198,6 +209,15 @@
                     Double-entry format with columns: period, account, description, debit, credit.
                     Each fund/org gets a debit entry, balanced by a credit to a clearing account.
                     Best for importing into financial/ERP systems.
+                </p>
+            </div>
+            <div>
+                <h4 style="margin: 0 0 5px 0; font-size: 14px;">Custom Template (GL)</h4>
+                <p class="text-muted" style="margin: 0; font-size: 13px; line-height: 1.6;">
+                    Uses a Jinja2 template (configured in config.yaml) to generate output.
+                    Creates debit entries for each PI's fund/org and credit entries for each source's fund/org.
+                    Fund/org strings are parsed via regex into components (fund, orgn, etc.).
+                    Best for institution-specific GL formats.
                 </p>
             </div>
         </div>

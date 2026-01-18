@@ -266,6 +266,17 @@ body {
     color: var(--text);
 }
 
+.btn-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 .btn-outline:hover {
     background: var(--bg);
 }
@@ -638,6 +649,9 @@ tr:hover {
     align-items: center;
     gap: 12px;
     animation: slideIn 0.3s ease;
+    min-width: 200px;
+    background: #e8f5e9;
+    color: var(--success);
 }
 
 .flash-message.info {

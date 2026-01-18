@@ -64,6 +64,9 @@ Copy `config.example.yaml` to `config.yaml` and customize:
 # Development mode - emails go to files instead of SMTP
 dev_mode: false
 
+# Currency symbol for display (e.g., "$", "€", "£")
+currency: "$"
+
 database:
   path: ./billing.db
 
@@ -86,6 +89,7 @@ tag_mapping:
   project_id: "project"       # Project identifier
   fund_org: "fund_org"        # Fund/org code for accounting
   cost_center: "cost_center"  # Optional cost center
+  account_code: "account_code"  # Optional GL account code per charge
 
 output:
   pdf_dir: ./output/statements
@@ -119,21 +123,52 @@ review:
   fund_org_patterns:
     - "^\\d{6}-\\d{4}$"   # Valid fund/org format
 
-# Known import sources (for web UI auto-detection)
+# Known import sources (for web UI auto-detection and journal exports)
 imports:
   known_sources:
     - name: AWS
       pattern: aws
+      fund_org: IT-CLOUD-AWS      # Fund/org for journal credit entries
+      account_code: "54100"       # Default GL account code
     - name: Azure
       pattern: azure
+      fund_org: IT-CLOUD-AZURE
+      account_code: "54100"
     - name: GCP
       pattern: gcp
+      fund_org: IT-CLOUD-GCP
+      account_code: "54100"
     - name: HPC
       pattern: hpc
+      fund_org: IT-HPC-COMPUTE
+      account_code: "54200"
     - name: IT Storage
       pattern: it_storage
+      fund_org: IT-STORAGE-SECURE
+      account_code: "54300"
     - name: Storage
       pattern: storage
+      fund_org: IT-STORAGE-RESEARCH
+      account_code: "54300"
+
+# Journal/GL export configuration
+journal:
+  # Regex to parse fund_org into components (using named capture groups)
+  # Example for "DEPT-PROJECT-2024" → orgn="DEPT", fund="PROJECT-2024"
+  fund_org_regex: "^(?P<orgn>[^-]+)-(?P<fund>.+)$"
+
+  # Account code validation (optional, leave empty to skip)
+  account_code_regex: "^\\d{5}$"
+
+  # Jinja2 template for custom GL format (in templates/ directory)
+  template: journal_gl.csv
+
+  # Default account code if not on charge or source
+  default_account: "54000"
+
+  # Description templates for journal entries
+  debit_description: "{source} {period} Research Computing Charges"
+  credit_description: "{source} {period} Research Computing Charges"
 ```
 
 ### Import Auto-Detection
@@ -329,8 +364,13 @@ The web interface provides a dashboard for managing billing periods, reviewing c
 - **Dashboard**: Overview of current period with stats and quick actions
 - **Periods**: Create, close, reopen, and finalize billing periods
 - **Charges**: Browse and search all charges with filtering
-- **Review Queue**: Approve or reject flagged charges
+- **Review Queue**: Approve or reject flagged charges with bulk actions
 - **Statements**: Generate PDFs and send emails to PIs
+- **Journal Export**: Export accounting data in multiple formats:
+  - Standard Detail (one row per charge)
+  - Summary by PI/Project (aggregated)
+  - General Ledger (debit/credit to clearing account)
+  - Custom Template (debit/credit per source using Jinja2 template)
 - **Imports**: Upload FOCUS CSV files via drag-and-drop
 - **Settings**: Configure review patterns and view system info
 
@@ -396,13 +436,16 @@ PI and project attribution is extracted from the `Tags` column. Example:
 
 ## Custom Templates
 
-Override the default PDF and email templates by creating files in a `templates/` directory:
+Override the default templates by creating files in a `templates/` directory:
 
 ```
 templates/
 ├── statement.html      # PDF statement template (Jinja2)
-└── email_summary.html  # Email body template (Jinja2)
+├── email_summary.html  # Email body template (Jinja2)
+└── journal_gl.csv      # Journal/GL export template (Jinja2)
 ```
+
+### PDF and Email Templates
 
 Templates have access to these variables:
 - `period`, `pi_email`, `project_id`, `fund_org`
@@ -410,6 +453,56 @@ Templates have access to these variables:
 - `service_breakdown`, `service_list_breakdown` (dict of service → amount)
 - `charges` (list of Charge objects with `billed_cost`, `list_cost`, `service_name`, etc.)
 - `organization_name`, `contact_email`, `generated_at`
+
+### Journal/GL Templates
+
+Journal templates are used for the "Custom Template (GL)" export format. They receive a list of `JournalEntry` objects with debit and credit entries.
+
+**Available variables in journal templates:**
+
+| Variable | Description |
+|----------|-------------|
+| `entries` | List of JournalEntry objects |
+| `period` | Billing period string (e.g., "2025-01") |
+| `config` | Full application config |
+
+**JournalEntry fields:**
+
+| Field | Description |
+|-------|-------------|
+| `fund_org` | Raw fund/org string |
+| `fund` | Parsed fund component (from regex) |
+| `orgn` | Parsed org component (from regex) |
+| `account` | GL account code |
+| `amount` | Entry amount (always positive) |
+| `is_debit` | True for debit entries |
+| `is_credit` | True for credit entries |
+| `description` | Entry description |
+| `source_name` | Data source (e.g., "AWS", "HPC") |
+| `period` | Billing period |
+| `pi_email` | PI email (debit entries only) |
+| `project_id` | Project ID (debit entries only) |
+| `program`, `activity`, `location` | Optional GL fields (default empty) |
+
+**Example journal template (`journal_gl.csv`):**
+
+```jinja2
+Fund,Orgn,Account,Program,Activity,Location,Debit,Credit,Description,Reference ID
+{%- for entry in entries %}
+{{ entry.fund }},{{ entry.orgn }},{{ entry.account }},{{ entry.program }},{{ entry.activity }},{{ entry.location }},{% if entry.is_debit %}{{ "%.2f"|format(entry.amount) }}{% endif %},{% if entry.is_credit %}{{ "%.2f"|format(entry.amount) }}{% endif %},{{ entry.description|truncate_desc }},{{ entry.reference_id }}
+{%- endfor %}
+```
+
+**Custom filters:**
+- `truncate_desc(max_len=35)` - Truncates description to max length
+
+**How debit/credit entries work:**
+
+For each billing period, the journal export creates:
+1. **Debit entries**: One per unique (PI fund_org, source) combination, charging the PI's fund
+2. **Credit entries**: One per source, crediting the source's configured fund_org
+
+This creates balanced double-entry accounting where charges to PIs are offset by credits to the service provider's fund.
 
 ---
 

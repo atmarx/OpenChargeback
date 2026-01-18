@@ -79,10 +79,24 @@ If your monthly billing involves dozens of PIs rather than thousands, and you'd 
 - **Review workflow**: Flag and approve charges before generating statements
 - **PDF statements**: Professional documents suitable for grant reporting
 - **Email delivery**: Send statements directly to PIs (or save to files in dev mode)
-- **Journal export**: CSV format for your accounting system
+- **Flexible GL exports**: Template-based journal exports with debit/credit pairing—parse fund/org codes with regex, map to your chart of accounts
 - **Web interface**: Dashboard, charge browser, and drag-drop CSV import
 - **CLI tools**: Script everything for automation
+- **Right-sized**: SQLite database, no build step, no external services—runs on a laptop or a VM
 - **Dark mode**: Because of course
+
+---
+
+## GL Integration That Actually Works
+
+Most billing tools export a flat CSV. Your accounting system needs debits and credits, fund codes, org codes, and account numbers in a specific format. OpenChargeback bridges that gap:
+
+- **Debit/credit pairing**: Each charge becomes a debit to the PI's fund and a credit to the service provider's fund
+- **Regex-based parsing**: Extract fund, org, program codes from your existing tag formats (`123456-7890` → fund: `123456`, org: `7890`)
+- **Template-driven output**: Jinja2 templates let you match exactly what Banner, PeopleSoft, or your homegrown system expects
+- **Per-source configuration**: Different cloud accounts can credit different internal funds
+
+No more manual Excel gymnastics to turn billing data into journal entries.
 
 ---
 
@@ -158,7 +172,7 @@ Import these to explore the UI and test your workflow before connecting real dat
 # Install dev dependencies
 pip install -e ".[dev]"
 
-# Run tests
+# Run tests (236 tests covering core functionality)
 pytest
 
 # Type checking
@@ -167,6 +181,13 @@ mypy src/
 # Linting
 ruff check src/
 ```
+
+### Reliability
+
+- **Locked dependencies**: `requirements.lock` pins every package with SHA256 hashes
+- **Python version constraints**: Tested on Python 3.10–3.13
+- **Type hints throughout**: Full mypy coverage
+- **No runtime surprises**: SQLite, Jinja2, and FastAPI—no external services to fail
 
 ---
 

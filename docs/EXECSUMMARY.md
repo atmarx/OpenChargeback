@@ -6,7 +6,7 @@ OpenChargeback automates the **research computing chargeback process**. It colle
 
 - **PDF statements** for each research project (suitable for grant justification)
 - **Accounting journal entries** for import into your financial system
-- **Email notifications** to Principal Investigators with their statements attached
+- **Email notifications** to Principal Investigators (or Invoice-ees) with their statements attached
 
 ## The Problem It Solves
 
@@ -72,6 +72,41 @@ A key feature is showing PIs the "true cost" of subsidized services. For example
 
 This helps PIs understand the value of institutional resources and provides documentation for grant reporting.
 
+## Strategic Value of Discount Transparency
+
+Beyond operational efficiency, discount transparency addresses a common challenge in research computing: communicating the value of subsidized infrastructure.
+
+### The Challenge
+
+When services are provided at no cost, users naturally lose awareness of their true value. This creates friction during:
+
+- **Infrastructure refresh cycles** — Requests for capital funding to replace "free" systems meet resistance because the delivered value isn't documented
+- **Subsidy policy changes** — Transitioning from fully subsidized to cost-sharing models feels punitive when users have no baseline understanding of costs
+- **Budget justification** — IT leadership cannot easily quantify the value delivered to researchers without consistent cost data
+
+### How Transparency Helps
+
+By showing list price alongside billed amount on every statement, OpenChargeback creates an ongoing record of value delivered:
+
+| Report Capability | Business Value |
+|-------------------|----------------|
+| Annual subsidized value per PI | Demonstrates return on infrastructure investment |
+| Aggregate list cost by service | Supports capital planning and rate-setting |
+| Discount trends over time | Documents policy changes and their impact |
+| Per-project resource valuation | Enables grant reporting and compliance |
+
+### Example: Infrastructure Refresh
+
+When requesting $2M for a storage array refresh, leadership can present:
+
+> "Over the past three years, this infrastructure delivered $4.8M in storage services to 147 research projects, subsidized at an average rate of 85%. The proposed refresh maintains this capacity for the next five years."
+
+This shifts the conversation from "why does IT need money?" to "how do we sustain the value we're already delivering?"
+
+### Minimal Implementation Overhead
+
+Discount transparency requires no additional systems or processes. Export scripts simply include both list price and billed price for each charge—a configuration choice, not a development effort. The billing system calculates and displays discounts automatically.
+
 ## Multi-Project Support
 
 PIs often have multiple active grants. OpenChargeback generates separate statements for each project, ensuring charges are attributed to the correct funding source.
@@ -90,6 +125,48 @@ The system includes several safeguards:
 - **Period validation** to catch data from the wrong billing cycle
 - **Audit logging** of all imports and actions
 - **Duplicate prevention** when re-importing corrected data
+
+## Audit Trail and Compliance
+
+Unlike ad-hoc scripts or spreadsheets, OpenChargeback maintains a complete audit trail suitable for financial compliance and reconciliation.
+
+### What Gets Logged
+
+| Event | Recorded Data |
+|-------|---------------|
+| Data imports | Timestamp, source file, user, record count, period |
+| Charge review | Who approved/rejected, when, reason (if provided) |
+| Statement generation | Period, PI, project, amounts, generation timestamp |
+| Policy changes | Subsidy rate modifications, rate card updates |
+| Re-imports | Original vs. corrected data, delta summary |
+
+### Why This Matters
+
+**For Research Accounting:**
+- Reconcile journal entries back to source charges
+- Document the chain from raw billing data to PI statement
+- Answer "why did this project get charged $X?" with traceable evidence
+
+**For Compliance:**
+- Demonstrate that subsidies were applied consistently according to policy
+- Show that charges flagged for review were handled appropriately
+- Provide auditors with a clear data lineage from source systems to financial records
+
+**For Institutional Memory:**
+- Track when subsidy policies changed and who authorized it
+- Preserve context for billing decisions after staff turnover
+- Answer questions about historical charges years later
+
+### Example: Audit Query
+
+When an auditor asks "How did Dr. Smith's charges change between the draft and final statement?":
+
+1. Query import logs for the billing period
+2. Compare original import to any corrected re-imports
+3. Review approval/rejection actions on flagged charges
+4. Show the delta between draft and final amounts
+
+This level of traceability transforms billing from "trust us, the spreadsheet is right" to "here's the documented evidence."
 
 ## What It Requires
 

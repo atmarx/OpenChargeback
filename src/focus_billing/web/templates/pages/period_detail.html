@@ -49,22 +49,22 @@
 
 <!-- Stats Grid -->
 <div class="stats-grid">
-    <div class="stat-card">
+    <a href="/charges?period={{ period.id }}" class="stat-card" style="text-decoration: none; color: inherit;">
         <div class="label">Total Charges</div>
         <div class="value">{{ period.total_cost | currency }}</div>
         <div class="change">{{ period.charge_count }} line items</div>
-    </div>
-    <div class="stat-card">
+    </a>
+    <a href="/projects?period={{ period.id }}" class="stat-card" style="text-decoration: none; color: inherit;">
         <div class="label">Active PIs</div>
         <div class="value">{{ period.pi_count }}</div>
         <div class="change">this period</div>
-    </div>
-    <div class="stat-card">
+    </a>
+    <a href="/projects?period={{ period.id }}" class="stat-card" style="text-decoration: none; color: inherit;">
         <div class="label">Projects</div>
         <div class="value">{{ period.project_count }}</div>
         <div class="change">across all PIs</div>
-    </div>
-    <div class="stat-card">
+    </a>
+    <a href="/review?period={{ period.id }}" class="stat-card" style="text-decoration: none; color: inherit;">
         <div class="label">Pending Review</div>
         <div class="value" {% if period.flagged_count > 0 %}style="color: var(--warning)"{% endif %}>
             {{ period.flagged_count }}
@@ -74,7 +74,7 @@
         {% else %}
         <div class="change positive">All charges approved</div>
         {% endif %}
-    </div>
+    </a>
 </div>
 
 <div class="grid-2">

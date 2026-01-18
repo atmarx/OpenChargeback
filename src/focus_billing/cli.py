@@ -42,6 +42,11 @@ def get_config(config_path: Path | None) -> Config:
     return load_config(config_path)
 
 
+def fmt_currency(value: float, config: Config) -> str:
+    """Format a value with the configured currency symbol."""
+    return f"{config.currency}{value:,.2f}"
+
+
 def get_db(config: Config) -> Database:
     """Get database connection and ensure it's initialized."""
     db = Database(config.database.path)
@@ -98,9 +103,9 @@ def ingest(
         table.add_row("Source", source)
         table.add_row("Period(s)", ", ".join(result.periods))
         table.add_row("Total Rows", str(result.total_rows))
-        table.add_row("Total Cost", f"${result.total_cost:,.2f}")
+        table.add_row("Total Cost", fmt_currency(result.total_cost, config))
         table.add_row("Flagged Rows", str(result.flagged_rows))
-        table.add_row("Flagged Cost", f"${result.flagged_cost:,.2f}")
+        table.add_row("Flagged Cost", fmt_currency(result.flagged_cost, config))
 
         console.print(table)
 
@@ -151,7 +156,7 @@ def generate(
         table.add_row("Period", period)
         table.add_row("PIs", str(result.pi_count))
         table.add_row("Projects", str(result.project_count))
-        table.add_row("Total Cost", f"${result.total_cost:,.2f}")
+        table.add_row("Total Cost", fmt_currency(result.total_cost, config))
         table.add_row("Statements Generated", str(result.statements_generated))
         if send and not dry_run:
             table.add_row("Emails Sent", str(result.emails_sent))
@@ -160,7 +165,7 @@ def generate(
 
         if result.excluded_cost > 0:
             console.print(
-                f"\n[yellow]Note: ${result.excluded_cost:,.2f} excluded "
+                f"\n[yellow]Note: {fmt_currency(result.excluded_cost, config)} excluded "
                 f"({result.excluded_charges} charges flagged for review)[/yellow]"
             )
 
@@ -240,10 +245,10 @@ def show(
             total += proj_cost
             flagged = sum(1 for c in proj_charges if c.needs_review)
             status = f"{flagged} flagged" if flagged else "OK"
-            table.add_row(proj, str(len(proj_charges)), f"${proj_cost:,.2f}", status)
+            table.add_row(proj, str(len(proj_charges)), fmt_currency(proj_cost, config), status)
 
         table.add_row("", "", "", "", end_section=True)
-        table.add_row("[bold]Total[/bold]", "", f"[bold]${total:,.2f}[/bold]", "")
+        table.add_row("[bold]Total[/bold]", "", f"[bold]{fmt_currency(total, config)}[/bold]", "")
 
         console.print(table)
 
@@ -472,12 +477,12 @@ def review_list(
                 str(charge.id),
                 charge.pi_email,
                 charge.resource_name or charge.resource_id or "N/A",
-                f"${charge.billed_cost:,.2f}",
+                fmt_currency(charge.billed_cost, config),
                 charge.review_reason or "Unknown",
             )
 
         console.print(table)
-        console.print(f"\nTotal: {len(charges)} charges, ${sum(c.billed_cost for c in charges):,.2f}")
+        console.print(f"\nTotal: {len(charges)} charges, {fmt_currency(sum(c.billed_cost for c in charges), config)}")
 
     finally:
         db.close()
