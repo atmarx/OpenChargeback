@@ -7,6 +7,7 @@ This section documents OpenChargeback's security model for auditors, security te
 1. [Authentication](authentication.md) - User authentication and session management
 2. [Data Protection](data-protection.md) - Data handling, encryption, and privacy
 3. [Audit Trail](audit-trail.md) - Activity logging and compliance
+4. [Supply Chain](supply-chain.md) - SBOM, dependency pinning, vulnerability scanning
 
 ## Security Summary
 
@@ -18,6 +19,7 @@ This section documents OpenChargeback's security model for auditors, security te
 | **Data in Transit** | HTTPS (via reverse proxy) |
 | **Audit Logging** | Structured logs for all significant events |
 | **Access Control** | Role-based (admin, reviewer, viewer) |
+| **Supply Chain** | SBOM, pinned dependencies with hashes, pip-audit |
 
 ## Quick Security Checklist
 
@@ -57,7 +59,6 @@ This section documents OpenChargeback's security model for auditors, security te
 - Physical server access
 - Compromised administrator accounts
 - Denial of service attacks
-- Supply chain attacks on dependencies
 
 ## Reporting Security Issues
 

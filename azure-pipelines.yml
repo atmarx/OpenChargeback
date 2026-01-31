@@ -1,0 +1,105 @@
+# Azure DevOps Pipeline for OpenChargeback
+# Runs tests, security scans, and generates SBOM
+
+trigger:
+  branches:
+    include:
+      - main
+
+pr:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  pythonVersion: '3.13'
+
+stages:
+  - stage: Test
+    displayName: 'Test'
+    jobs:
+      - job: TestMatrix
+        displayName: 'Test on Python'
+        strategy:
+          matrix:
+            Python310:
+              python.version: '3.10'
+            Python311:
+              python.version: '3.11'
+            Python312:
+              python.version: '3.12'
+            Python313:
+              python.version: '3.13'
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '$(python.version)'
+            displayName: 'Use Python $(python.version)'
+
+          - script: |
+              python -m pip install --upgrade pip
+              pip install -r requirements.lock --require-hashes
+              pip install -e ".[dev]"
+            displayName: 'Install dependencies'
+
+          - script: ruff check src/
+            displayName: 'Lint with ruff'
+
+          - script: mypy src/
+            displayName: 'Type check with mypy'
+
+          - script: pytest tests/ -v --tb=short --junitxml=test-results.xml
+            displayName: 'Run tests'
+
+          - task: PublishTestResults@2
+            inputs:
+              testResultsFiles: 'test-results.xml'
+              testRunTitle: 'Python $(python.version) Tests'
+            condition: always()
+
+  - stage: Security
+    displayName: 'Security'
+    dependsOn: []  # Run in parallel with Test
+    jobs:
+      - job: SecurityAudit
+        displayName: 'Security Audit'
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '$(pythonVersion)'
+            displayName: 'Use Python $(pythonVersion)'
+
+          - script: |
+              python -m pip install --upgrade pip
+              pip install -r requirements.lock --require-hashes
+              pip install pip-audit
+            displayName: 'Install dependencies'
+
+          - script: pip-audit --require-hashes -r requirements.lock
+            displayName: 'Run pip-audit'
+
+      - job: SBOM
+        displayName: 'Generate SBOM'
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '$(pythonVersion)'
+            displayName: 'Use Python $(pythonVersion)'
+
+          - script: |
+              python -m pip install --upgrade pip
+              pip install -r requirements.lock --require-hashes
+              pip install cyclonedx-bom
+            displayName: 'Install dependencies'
+
+          - script: cyclonedx-py environment --output-format json -o $(Build.ArtifactStagingDirectory)/sbom.json
+            displayName: 'Generate SBOM'
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              PathtoPublish: '$(Build.ArtifactStagingDirectory)/sbom.json'
+              ArtifactName: 'sbom'
+            displayName: 'Publish SBOM artifact'

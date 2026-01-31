@@ -1,5 +1,7 @@
 # Deploying to Azure App Service
 
+> **Note**: For CI (tests, linting, security scanning), see [`azure-pipelines.yml`](../../azure-pipelines.yml) in the repository root. This guide covers deployment to Azure App Service.
+
 This guide covers deploying focus-billing to Azure App Service with:
 
 - Infrastructure as Code using Bicep

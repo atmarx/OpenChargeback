@@ -47,6 +47,7 @@ htmlcov/
 
 # Instance data (runtime files, database, config with secrets)
 instance/
+output/
 
 # Planning/internal docs (not published)
 planning/

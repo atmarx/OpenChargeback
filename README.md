@@ -4,101 +4,54 @@
 
 OpenChargeback helps research computing groups show PIs exactly what their cloud, HPC, and storage resources cost—even when those costs are partially or fully subsidized.
 
----
-
 ## The Problem
 
-You run research computing infrastructure. Maybe it's a shared HPC cluster, a cloud allocation, or campus storage. Your PIs use these resources, and someone needs to track that usage—for grant reporting, for chargebacks, or just so researchers understand the true cost of the compute they're consuming.
+You run research computing infrastructure—shared HPC, cloud allocations, campus storage. Your PIs use these resources, and someone needs to track usage for grant reporting, chargebacks, or just so researchers understand the true cost of what they're consuming.
 
-Enterprise FinOps tools exist, but they're designed for organizations spending millions per month with dedicated billing teams. You don't need a $50k/year platform with SSO, custom RBAC, and a sales call. You need something that:
-
-- Imports billing data from anywhere (cloud, HPC, storage)
-- Shows PIs their costs with discount transparency
-- Generates PDF statements for grant documentation
-- Exports journal entries for your accounting system
-- Doesn't require a DBA or dedicated infrastructure
-
----
-
-## Who This Is For
-
-- **Research computing groups** at universities and national labs
-- **Shared HPC facilities** that need to show usage by PI/project
-- **Cloud allocation managers** distributing credits across research groups
-- **Anyone** who wants to show researchers the true cost of subsidized services
-
-If your monthly billing involves dozens of PIs rather than thousands, and you'd rather run a Python script than negotiate an enterprise contract, this tool is for you.
-
----
+Enterprise FinOps tools exist, but they're designed for organizations spending millions per month with dedicated billing teams. You don't need a $50k/year platform. You need something that imports billing data, shows PIs their costs with discount transparency, generates PDF statements, and exports journal entries—without requiring a DBA or enterprise contract.
 
 ## How It Works
-
-1. **Export your usage data** in FOCUS CSV format (we provide guides for common sources)
-2. **Import it** via CLI or web interface
-3. **Review** any flagged charges (missing tags, unusual patterns)
-4. **Generate statements** as PDFs with full discount transparency
-5. **Send to PIs** via email or download for manual distribution
-6. **Export journal entries** for your accounting system
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
 │  AWS/Azure  │     │    HPC      │     │   Storage   │     │   Other     │
-│   Export    │     │   sacct     │     │   Reports   │     │   Sources   │
+│   Export    │     │   Slurm     │     │   Reports   │     │   Sources   │
 └──────┬──────┘     └──────┬──────┘     └──────┬──────┘     └──────┬──────┘
        │                   │                   │                   │
        └───────────────────┴───────────────────┴───────────────────┘
-                                    │
-                                    ▼
-                          ┌─────────────────┐
-                          │   FOCUS CSV     │
-                          │   (Standard     │
-                          │    Format)      │
-                          └────────┬────────┘
                                    │
                                    ▼
-                          ┌─────────────────┐
-                          │ OpenChargeback  │
-                          │  CLI or Web UI  │
-                          └────────┬────────┘
-                                   │
-                    ┌──────────────┼──────────────┐
-                    ▼              ▼              ▼
-              ┌──────────┐  ┌──────────┐  ┌──────────┐
-              │   PDF    │  │  Email   │  │ Journal  │
-              │Statements│  │ Delivery │  │  Export  │
-              └──────────┘  └──────────┘  └──────────┘
+                         ┌─────────────────┐
+                         │   FOCUS CSV     │
+                         │   (Standard     │
+                         │    Format)      │
+                         └────────┬────────┘
+                                  │
+                                  ▼
+                         ┌─────────────────┐
+                         │ OpenChargeback  │
+                         │  CLI or Web UI  │
+                         └────────┬────────┘
+                                  │
+                   ┌──────────────┼──────────────┐
+                   ▼              ▼              ▼
+             ┌──────────┐  ┌──────────┐  ┌──────────┐
+             │   PDF    │  │  Email   │  │ Journal  │
+             │Statements│  │ Delivery │  │  Export  │
+             └──────────┘  └──────────┘  └──────────┘
 ```
-
----
 
 ## Features
 
-- **Multi-source billing**: Combine AWS, Azure, GCP, HPC clusters, and storage in one view
-- **FOCUS format**: Uses the [FinOps standard](https://focus.finops.org/) for portable billing data
-- **Discount transparency**: Show list price, discount, and billed amount so PIs see true costs
-- **Review workflow**: Flag and approve charges before generating statements
-- **PDF statements**: Professional documents suitable for grant reporting
-- **Email delivery**: Send statements directly to PIs (or save to files in dev mode)
-- **Flexible GL exports**: Template-based journal exports with debit/credit pairing—parse fund/org codes with regex, map to your chart of accounts
-- **Web interface**: Dashboard, charge browser, and drag-drop CSV import
-- **CLI tools**: Script everything for automation
-- **Right-sized**: SQLite database, no build step, no external services—runs on a laptop or a VM
-- **Dark mode**: Because of course
-
----
-
-## GL Integration That Actually Works
-
-Most billing tools export a flat CSV. Your accounting system needs debits and credits, fund codes, org codes, and account numbers in a specific format. OpenChargeback bridges that gap:
-
-- **Debit/credit pairing**: Each charge becomes a debit to the PI's fund and a credit to the service provider's fund
-- **Regex-based parsing**: Extract fund, org, program codes from your existing tag formats (`123456-7890` → fund: `123456`, org: `7890`)
-- **Template-driven output**: Jinja2 templates let you match exactly what Banner, PeopleSoft, or your homegrown system expects
-- **Per-source configuration**: Different cloud accounts can credit different internal funds
-
-No more manual Excel gymnastics to turn billing data into journal entries.
-
----
+- **Multi-source billing** — Combine AWS, Azure, GCP, HPC, and storage in one view
+- **[FOCUS format](https://focus.finops.org/)** — Portable billing data using the FinOps standard
+- **Discount transparency** — Show list price, discount, and billed amount
+- **Review workflow** — Flag and approve charges before generating statements
+- **PDF statements** — Professional documents suitable for grant reporting
+- **GL exports** — Template-based journal entries with debit/credit pairing, regex fund parsing
+- **Web interface** — Dashboard, charge browser, drag-drop CSV import, dark mode
+- **CLI tools** — Script everything for automation
+- **Right-sized** — SQLite, no build step, no external services
 
 ## Quick Start
 
@@ -107,98 +60,81 @@ No more manual Excel gymnastics to turn billing data into journal entries.
 python -m venv .venv && source .venv/bin/activate
 pip install -e .
 
-# Import sample data
-focus-billing ingest sample_data/aws_2025-01.csv --source AWS
-focus-billing ingest sample_data/hpc_2025-01.csv --source HPC
+# Copy and edit configuration
+cp config.example.yaml config.yaml
 
-# See what you've got
-focus-billing periods list
+# Import sample data
+focus-billing ingest sample_data/inputs/aws_2025-01.csv -s aws -p 2025-01 -c config.yaml
+focus-billing ingest sample_data/inputs/hpc_2025-01.csv -s hpc -p 2025-01 -c config.yaml
 
 # Generate statements (dry run)
-focus-billing generate --period 2025-01 --dry-run
+focus-billing generate -p 2025-01 -c config.yaml --dry-run
 
 # Or start the web UI
-focus-billing web
+focus-billing serve -c config.yaml
 ```
 
-Then open http://localhost:8000 and log in with the credentials in `config.yaml`.
+Open http://localhost:8000 and log in with credentials from `config.yaml`.
 
----
+## CLI Automation
+
+The CLI and web interface share the same engine. Anything you can do in the web UI, you can script:
+
+```bash
+# Monthly billing cron job
+PERIOD=$(date +%Y-%m)
+CONFIG=/etc/openchargeback/config.yaml
+
+focus-billing ingest /data/aws_${PERIOD}.csv -s aws -p $PERIOD -c $CONFIG
+focus-billing ingest /data/azure_${PERIOD}.csv -s azure -p $PERIOD -c $CONFIG
+focus-billing generate -p $PERIOD -c $CONFIG --send
+focus-billing export-journal -p $PERIOD -f gl -c $CONFIG
+```
+
+Statements go out, journals land in a shared folder for accounting—no web clicks required. Use the web UI for exceptions: reviewing flagged charges, adjusting patterns, one-off resends.
+
+See [sample_data/](sample_data/) for example inputs and outputs, or run `scripts/generate-sample-outputs.sh` to regenerate them.
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [Executive Summary](docs/EXECSUMMARY.md) | High-level overview for finance and leadership |
-| [Operations Guide](docs/operations/) | CLI commands, configuration, web interface |
-| [Technology Stack](docs/TECHNOLOGY.md) | Frameworks, libraries, and architecture decisions |
-| [Implementation Guides](docs/implementation/) | Export guides for AWS, Azure, HPC, storage sources |
-| [Upgrade Guides](docs/upgrades/) | Dependency management and versioning |
-| [SBOM](sbom.json) | Software Bill of Materials (CycloneDX 1.6) |
+Full documentation is in [`docs/`](docs/README.md):
 
----
+| Guide | Description |
+|-------|-------------|
+| [Getting Started](docs/getting-started/) | Installation, configuration |
+| [User Guide](docs/user-guide/) | CLI commands, web UI, FOCUS format |
+| [Admin Guide](docs/admin-guide/) | Billing workflows, review process, templates |
+| [Integrations](docs/integrations/) | Azure, AWS, HPC/Slurm, storage export guides |
+| [Operations](docs/operations/) | Database, logging, Docker deployment |
+| [Security](docs/security/) | Authentication, audit trail, data protection |
 
-## Creating Export Scripts for Your Data Sources
-
-Not every billing source has a native FOCUS export. That's okay—the FOCUS format is simple, and we've designed our implementation guides to work well with AI assistants.
-
-**To add a new data source:**
-
-1. Read the [Implementation Guide Template](docs/implementation/TEMPLATE.md)
-2. Copy it and fill in the details for your source
-3. Use the guide with Claude, ChatGPT, or your preferred AI to generate an export script
-4. Run the script, import the CSV, done
-
-The guides are written to give AI assistants all the context they need to generate working code on the first try—including edge cases, error handling, and your specific field mappings.
-
----
-
-## Sample Data
-
-The `sample_data/` directory includes realistic FOCUS CSV files for testing:
-
-- `aws_2025-01.csv` / `aws_2025-12.csv` - AWS cloud billing
-- `azure_2025-01.csv` / `azure_2025-12.csv` - Azure compute
-- `hpc_2025-01.csv` / `hpc_2025-12.csv` - HPC cluster usage
-- `storage_2025-01.csv` / `storage_2025-12.csv` - Research storage
-
-Import these to explore the UI and test your workflow before connecting real data.
-
----
+Additional resources:
+- [Executive Summary](docs/EXECSUMMARY.md) — Overview for leadership and finance
+- [Technology Stack](docs/TECHNOLOGY.md) — Architecture and dependencies
+- [Tag Specification](docs/integrations/TAG-SPECIFICATION.md) — Required cloud resource tags
+- [SBOM](sbom.json) — Software Bill of Materials (CycloneDX 1.6)
 
 ## Development
 
 ```bash
-# Install dev dependencies
 pip install -e ".[dev]"
-
-# Run tests (236 tests covering core functionality)
-pytest
-
-# Type checking
-mypy src/
-
-# Linting
-ruff check src/
+pytest                    # 239 tests
+mypy src/                 # Type checking
+ruff check src/           # Linting
 ```
 
-### Reliability
-
-- **Locked dependencies**: `requirements.lock` pins every package with SHA256 hashes
-- **Python version constraints**: Tested on Python 3.10–3.13
-- **Type hints throughout**: Full mypy coverage
-- **No runtime surprises**: SQLite, Jinja2, and FastAPI—no external services to fail
-
----
+See [docs/development/](docs/development/) for architecture and contributing guidelines.
 
 ## License
 
 MIT
 
----
-
 ## Contributing
 
-Issues and pull requests welcome at [github.com/atmarx/OpenChargeback](https://github.com/atmarx/OpenChargeback).
+Issues and PRs welcome at [github.com/atmarx/OpenChargeback](https://github.com/atmarx/OpenChargeback).
 
-If you've written an export guide for a data source we don't cover, we'd love to include it.
+If you've written an [integration guide](docs/integrations/TEMPLATE.md) for a data source we don't cover, we'd love to include it.
+
+---
+
+<sub>Built with [Claude Code](https://claude.ai/code) — the "we" in this README is one human and one AI, pair programming our way through research computing's billing problem.</sub>

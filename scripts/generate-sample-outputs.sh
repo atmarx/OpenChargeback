@@ -23,9 +23,21 @@ else
     exit 1
 fi
 
+# Enable dev_mode so emails are written to files instead of sent via SMTP
+# Save original value and restore at the end
+ORIG_DEV_MODE=$(grep -E "^dev_mode:" "$CONFIG" | awk '{print $2}')
+sed -i 's/^dev_mode: .*/dev_mode: true/' "$CONFIG"
+
+# Cleanup function to restore config on exit
+cleanup() {
+    sed -i "s/^dev_mode: .*/dev_mode: $ORIG_DEV_MODE/" "$CONFIG"
+}
+trap cleanup EXIT
+
 # Step 1: Reset database
 echo "Step 1: Resetting database..."
 rm -f instance/billing.db
+rm -rf instance/output/emails
 echo "  Database cleared."
 
 # Step 2: Ingest all 2025-01 sample files
@@ -40,10 +52,10 @@ for f in sample_data/inputs/*_${PERIOD}.csv; do
     fi
 done
 
-# Step 3: Generate statements
+# Step 3: Generate statements and send emails (dev_mode saves to files)
 echo ""
-echo "Step 3: Generating PDF statements..."
-focus-billing generate -p "$PERIOD" -c "$CONFIG"
+echo "Step 3: Generating PDF statements and emails..."
+focus-billing generate -p "$PERIOD" -c "$CONFIG" --send
 
 # Step 4: Export journal
 echo ""
@@ -54,7 +66,7 @@ focus-billing export-journal -p "$PERIOD" -f gl -c "$CONFIG"
 echo ""
 echo "Step 5: Copying outputs to sample_data/outputs/..."
 rm -rf sample_data/outputs/pdfs sample_data/outputs/journals sample_data/outputs/emails
-mkdir -p sample_data/outputs/pdfs sample_data/outputs/journals
+mkdir -p sample_data/outputs/pdfs sample_data/outputs/journals sample_data/outputs/emails
 
 # Copy PDFs
 if [ -d "instance/output/pdfs" ] && [ "$(ls -A instance/output/pdfs 2>/dev/null)" ]; then
@@ -68,9 +80,16 @@ if [ -d "instance/output/journals" ] && [ "$(ls -A instance/output/journals 2>/d
     echo "  Copied $(ls sample_data/outputs/journals/*.csv 2>/dev/null | wc -l) journal files"
 fi
 
+# Copy emails
+if [ -d "instance/output/emails" ] && [ "$(ls -A instance/output/emails 2>/dev/null)" ]; then
+    cp instance/output/emails/*.html sample_data/outputs/emails/ 2>/dev/null || true
+    echo "  Copied $(ls sample_data/outputs/emails/*.html 2>/dev/null | wc -l) email files"
+fi
+
 echo ""
 echo "=== Done! ==="
 echo ""
 echo "Sample outputs are in sample_data/outputs/"
-echo "  - pdfs/      : Statement PDFs for each PI"
+echo "  - pdfs/      : Statement PDFs for each PI/project"
 echo "  - journals/  : GL journal export CSV"
+echo "  - emails/    : Email HTML files (dev mode output)"
