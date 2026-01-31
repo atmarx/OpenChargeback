@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from focus_billing.config import Config
+from focus_billing.db import Database
 from focus_billing.web.auth import authenticate_user
-from focus_billing.web.deps import add_flash_message, get_config, get_flash_messages
+from focus_billing.web.deps import add_flash_message, get_config, get_db, get_flash_messages
 
 router = APIRouter(tags=["auth"])
 
@@ -40,12 +41,14 @@ async def login_submit(
     username: str = Form(...),
     password: str = Form(...),
     config: Config = Depends(get_config),
+    db: Database = Depends(get_db),
 ):
     """Handle login form submission."""
     templates = request.app.state.templates
 
-    # Check if web interface is enabled and has users
-    if not config.web.users:
+    # Check if there are any users (DB or config)
+    db_users = db.list_users()
+    if not db_users and not config.web.users:
         return templates.TemplateResponse(
             "pages/login.html",
             {
@@ -56,8 +59,8 @@ async def login_submit(
             },
         )
 
-    # Authenticate user
-    user = authenticate_user(username, password, config)
+    # Authenticate user (checks DB first, then config)
+    user = authenticate_user(username, password, config, db)
 
     if user is None:
         return templates.TemplateResponse(
@@ -72,7 +75,20 @@ async def login_submit(
 
     # Set session
     request.session["user_id"] = user.id
-    add_flash_message(request, f"Welcome back, {user.display_name}!", "success")
+
+    # Check if password meets current complexity requirements (DB users only)
+    # We can validate the entered password since we have it in plaintext here
+    if user.is_db_user:
+        is_valid, _ = config.web.password_requirements.validate_password(password)
+        if not is_valid:
+            add_flash_message(
+                request,
+                "warning",
+                "Your password no longer meets the current security requirements. Please update your password.",
+            )
+            return RedirectResponse(url="/settings/users/change-password", status_code=302)
+
+    add_flash_message(request, "success", f"Welcome back, {user.display_name}!")
 
     return RedirectResponse(url="/", status_code=302)
 

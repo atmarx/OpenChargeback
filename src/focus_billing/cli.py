@@ -559,6 +559,8 @@ def serve(
     config_path: ConfigOption = None,
 ):
     """Start the web server."""
+    import os
+
     import uvicorn
 
     from .web import create_app
@@ -582,15 +584,25 @@ def serve(
 
     console.print(f"\n[green]Open http://{server_host}:{server_port} in your browser[/green]\n")
 
-    # Create app with config path for proper initialization
-    app_instance = create_app(config_path)
-
-    uvicorn.run(
-        app_instance,
-        host=server_host,
-        port=server_port,
-        reload=reload,
-    )
+    if reload:
+        # Reload mode requires import string; pass config via env var
+        if config_path:
+            os.environ["FOCUS_BILLING_CONFIG"] = str(config_path)
+        uvicorn.run(
+            "focus_billing.web:create_app",
+            factory=True,
+            host=server_host,
+            port=server_port,
+            reload=reload,
+        )
+    else:
+        # Non-reload mode can use app instance directly
+        app_instance = create_app(config_path)
+        uvicorn.run(
+            app_instance,
+            host=server_host,
+            port=server_port,
+        )
 
 
 if __name__ == "__main__":

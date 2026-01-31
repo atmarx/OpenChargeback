@@ -51,16 +51,29 @@
             Journal Export
         </a>
 
+        {% if user and user.is_admin() %}
         <div class="nav-section">
             <div class="nav-section-title">System</div>
         </div>
-        <a href="/settings" class="nav-item {{ 'active' if '/settings' in request.url.path else '' }}">
+        <a href="/settings" class="nav-item {{ 'active' if request.url.path == '/settings' else '' }}">
             <span class="icon">&#9881;</span>
             Settings
         </a>
+        <a href="/settings/users" class="nav-item {{ 'active' if '/settings/users' in request.url.path else '' }}">
+            <span class="icon">&#128100;</span>
+            Users
+        </a>
+        {% endif %}
+        <div class="nav-section">
+            <div class="nav-section-title">Audit Logs</div>
+        </div>
         <a href="/imports" class="nav-item {{ 'active' if '/imports' in request.url.path else '' }}">
             <span class="icon">&#128214;</span>
             Import Log
+        </a>
+        <a href="/review/logs" class="nav-item {{ 'active' if '/review/logs' in request.url.path else '' }}">
+            <span class="icon">&#10003;</span>
+            Review Log
         </a>
         <a href="/emails" class="nav-item {{ 'active' if '/emails' in request.url.path else '' }}">
             <span class="icon">&#128231;</span>

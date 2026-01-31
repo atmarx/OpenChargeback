@@ -1,0 +1,14 @@
+{
+  "projects": [
+    {
+      "project_id": "ai-strategy",
+      "pi_email": "alex.ham@northwinds.edu",
+      "fund_org": "DEPT-XYZ",
+      "users": [
+        { "email": "ah@northwinds.edu", "role": "pi" },
+        { "email": "ab@northwinds.edu", "role": "staff" },
+        { "email": "student1@northwinds.edu", "role": "student" }
+      ]
+    }
+  ]
+}

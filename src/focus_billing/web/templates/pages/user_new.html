@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Add User - OpenChargeback{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Add User</h1>
+        <p class="page-subtitle">Create a new system user</p>
+    </div>
+</div>
+
+<div class="card" style="max-width: 600px;">
+    <div class="card-header">
+        <h3 class="card-title">User Details</h3>
+    </div>
+    <div class="card-body">
+        <form method="post" action="/settings/users">
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label for="username" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                    Username <span style="color: #ef4444;">*</span>
+                </label>
+                <input type="text" id="username" name="username" class="form-input" required
+                       pattern="[a-zA-Z0-9_-]+" title="Letters, numbers, underscores, and hyphens only"
+                       placeholder="jsmith" style="width: 100%;">
+                <p class="form-help">Used for login. Cannot be changed after creation.</p>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label for="email" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                    Email <span style="color: #ef4444;">*</span>
+                </label>
+                <input type="email" id="email" name="email" class="form-input" required
+                       placeholder="jsmith@example.edu" style="width: 100%;">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label for="display_name" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                    Display Name
+                </label>
+                <input type="text" id="display_name" name="display_name" class="form-input"
+                       placeholder="Jane Smith" style="width: 100%;">
+                <p class="form-help">Shown in the UI and audit logs. Optional.</p>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label for="role" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                    Role <span style="color: #ef4444;">*</span>
+                </label>
+                <select id="role" name="role" class="form-input" required style="width: 100%;">
+                    {% for r in roles %}
+                    <option value="{{ r }}" {{ 'selected' if r == 'viewer' else '' }}>
+                        {{ r | capitalize }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <p class="form-help">
+                    <strong>Admin:</strong> Full access including user management<br>
+                    <strong>Reviewer:</strong> Can approve/reject charges<br>
+                    <strong>Viewer:</strong> Read-only access
+                </p>
+            </div>
+
+            <div class="alert-banner info">
+                <span class="icon">&#128274;</span>
+                <div class="message">
+                    <strong>Password Requirements</strong><br>
+                    {{ password_requirements }}
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label for="password" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                    Password <span style="color: #ef4444;">*</span>
+                </label>
+                <input type="password" id="password" name="password" class="form-input" required
+                       style="width: 100%;">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label for="confirm_password" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                    Confirm Password <span style="color: #ef4444;">*</span>
+                </label>
+                <input type="password" id="confirm_password" name="confirm_password" class="form-input" required
+                       style="width: 100%;">
+            </div>
+
+            <div class="btn-group">
+                <button type="submit" class="btn btn-primary">Create User</button>
+                <a href="/settings/users" class="btn btn-outline">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

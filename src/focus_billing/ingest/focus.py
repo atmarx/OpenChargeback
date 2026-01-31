@@ -183,6 +183,11 @@ class FocusIngester(BaseIngester):
             "fund_org": self.config.tag_mapping.fund_org,
             "cost_center": self.config.tag_mapping.cost_center,
         }
+        # Add custom reference fields if configured
+        if self.config.tag_mapping.reference_1:
+            tag_mapping["reference_1"] = self.config.tag_mapping.reference_1
+        if self.config.tag_mapping.reference_2:
+            tag_mapping["reference_2"] = self.config.tag_mapping.reference_2
 
         # Get or create source
         source = None
@@ -298,6 +303,8 @@ class FocusIngester(BaseIngester):
                 pi_email=pi_email,
                 project_id=tags.get("project_id"),
                 fund_org=tags.get("fund_org"),
+                reference_1=tags.get("reference_1"),
+                reference_2=tags.get("reference_2"),
                 raw_tags=tags.get("raw"),
                 needs_review=needs_review,
                 review_reason=review_reason,

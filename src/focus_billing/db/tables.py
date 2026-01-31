@@ -110,6 +110,8 @@ charges = Table(
     Column("pi_email", String(254), nullable=False),
     Column("project_id", String(200)),
     Column("fund_org", String(100)),
+    Column("reference_1", String(200)),  # Custom reference field (e.g., grant number)
+    Column("reference_2", String(200)),  # Custom reference field (e.g., request ID)
     Column("raw_tags", Text),  # JSON string
     Column("needs_review", Boolean, server_default="0"),
     Column("review_reason", Text),
@@ -237,4 +239,55 @@ journal_exports = Table(
 Index("idx_journal_exports_period", journal_exports.c.billing_period_id)
 Index("idx_journal_exports_exported_at", journal_exports.c.exported_at)
 
-SCHEMA_VERSION = 5
+# Users for database-backed authentication
+users = Table(
+    "users",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("username", String(100), nullable=False, unique=True),
+    Column("email", String(254), nullable=False),
+    Column("display_name", String(200)),
+    Column("password_hash", String(200), nullable=False),
+    Column("role", String(20), nullable=False, server_default="viewer"),
+    Column("is_config_user", Boolean, server_default="0"),  # True = from config.yaml bootstrap
+    Column("created_at", DateTime, server_default=func.now()),
+    Column("updated_at", DateTime, server_default=func.now()),
+    Column("created_by", String(100)),  # Username of creator (NULL for bootstrap)
+    CheckConstraint(
+        "role IN ('admin', 'reviewer', 'viewer')",
+        name="user_role_check",
+    ),
+)
+
+Index("idx_users_email", users.c.email)
+
+# Review action logs for audit trail
+review_logs = Table(
+    "review_logs",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column(
+        "billing_period_id",
+        Integer,
+        ForeignKey("billing_periods.id", ondelete="CASCADE"),
+        nullable=False,
+    ),
+    Column("charge_id", Integer, nullable=False),  # Original charge ID (may be deleted)
+    Column("action", String(20), nullable=False),  # approved, rejected
+    Column("pi_email", String(254), nullable=False),
+    Column("resource_id", String(500)),
+    Column("service_name", String(200)),
+    Column("amount", Float, nullable=False),
+    Column("note", Text),
+    Column("performed_at", DateTime, server_default=func.now()),
+    Column("performed_by", String(200)),
+    CheckConstraint(
+        "action IN ('approved', 'rejected')",
+        name="review_action_check",
+    ),
+)
+
+Index("idx_review_logs_period", review_logs.c.billing_period_id)
+Index("idx_review_logs_performed_at", review_logs.c.performed_at)
+
+SCHEMA_VERSION = 8

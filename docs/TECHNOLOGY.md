@@ -17,6 +17,7 @@ This document describes the frameworks, libraries, and tools used in OpenChargeb
 | Templating | [Jinja2](https://jinja.palletsprojects.com/) | HTML template rendering |
 | Frontend | [htmx](https://htmx.org/) | Hypermedia-driven interactivity (no build step) |
 | CLI | [Typer](https://typer.tiangolo.com/) | Command-line interface with Rich integration |
+| Terminal Output | [Rich](https://rich.readthedocs.io/) | Colored output, tables, progress bars |
 
 ## Data Processing
 
@@ -24,7 +25,7 @@ This document describes the frameworks, libraries, and tools used in OpenChargeb
 |-----------|---------|---------|
 | Data Manipulation | [pandas](https://pandas.pydata.org/) | CSV parsing, aggregation, transforms |
 | Database ORM | [SQLAlchemy](https://www.sqlalchemy.org/) | SQL abstraction (Core, not ORM patterns) |
-| Configuration | [Pydantic](https://docs.pydantic.dev/) | Config validation and environment loading |
+| Configuration | [Pydantic](https://docs.pydantic.dev/) + [pydantic-settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) | Config validation and environment variable loading |
 | YAML Parsing | [PyYAML](https://pyyaml.org/) | Configuration file parsing |
 
 ## Output Generation
@@ -41,6 +42,12 @@ This document describes the frameworks, libraries, and tools used in OpenChargeb
 | Password Hashing | [bcrypt](https://github.com/pyca/bcrypt) | Secure password storage |
 | Session Management | [itsdangerous](https://itsdangerous.palletsprojects.com/) | Signed session cookies |
 | File Uploads | [python-multipart](https://github.com/andrew-d/python-multipart) | Multipart form parsing |
+
+## Build System
+
+| Tool | Purpose |
+|------|---------|
+| [hatchling](https://hatch.pypa.io/) | PEP 517 build backend for packaging |
 
 ## Development Tools
 

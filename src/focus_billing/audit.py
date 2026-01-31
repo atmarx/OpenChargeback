@@ -171,6 +171,7 @@ def log_charge_approved(
     period: str,
     pi_email: str,
     amount: float,
+    note: str | None = None,
     user: str | None = None,
 ) -> None:
     """Log a charge approval event."""
@@ -181,6 +182,7 @@ def log_charge_approved(
         period=period,
         pi_email=pi_email,
         amount=round(amount, 2),
+        note=note or "",
         user=user or "system",
     )
 

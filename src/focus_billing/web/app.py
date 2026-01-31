@@ -55,11 +55,20 @@ def create_app(config_path: Path | None = None) -> FastAPI:
     """Create and configure the FastAPI application.
 
     Args:
-        config_path: Path to the configuration file.
+        config_path: Path to the configuration file. If None, checks
+            FOCUS_BILLING_CONFIG environment variable.
 
     Returns:
         Configured FastAPI application.
     """
+    import os
+
+    # Check environment variable if no path provided (used by uvicorn reload)
+    if config_path is None:
+        env_config = os.environ.get("FOCUS_BILLING_CONFIG")
+        if env_config:
+            config_path = Path(env_config)
+
     # Load configuration
     config = load_config(config_path)
 
@@ -120,9 +129,11 @@ def create_app(config_path: Path | None = None) -> FastAPI:
         periods,
         projects,
         review,
+        review_logs,
         settings,
         sources,
         statements,
+        users,
     )
 
     app.include_router(auth_routes.router)
@@ -132,12 +143,43 @@ def create_app(config_path: Path | None = None) -> FastAPI:
     app.include_router(charges.router)
     app.include_router(projects.router)
     app.include_router(review.router)
+    app.include_router(review_logs.router)
     app.include_router(imports.router)
     app.include_router(statements.router)
     app.include_router(journal.router)
     app.include_router(emails.router)
     app.include_router(settings.router)
+    app.include_router(users.router)
     app.include_router(help.router)
+
+    @app.on_event("startup")
+    async def startup_sync_users():
+        """Sync config.yaml users to database on startup."""
+        from focus_billing.db import Database
+
+        if config.web.users:
+            db = Database(config.database.path)
+            db.initialize()
+            try:
+                # Convert WebUserConfig objects to dict format for sync
+                config_users = {}
+                for username, user_config in config.web.users.items():
+                    config_users[username] = {
+                        "email": user_config.email,
+                        "display_name": user_config.display_name,
+                        "password_hash": user_config.password_hash,
+                        "role": user_config.role,
+                    }
+                result = db.sync_config_users(config_users)
+                if result["created"] or result["updated"]:
+                    print(
+                        f"Users synced from config.yaml: "
+                        f"{result['created']} created, "
+                        f"{result['updated']} updated, "
+                        f"{result['unchanged']} unchanged"
+                    )
+            finally:
+                db.close()
 
     @app.get("/health")
     async def health_check():

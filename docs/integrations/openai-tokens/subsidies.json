@@ -1,0 +1,15 @@
+{
+  "subsidies": [
+    {
+      "name": "provost_ai_initiative",
+      "description": "Provost covers first $500/year per project for AI services",
+      "fund_org": "PROVOST-AI-2026",
+      "type": "per_project_cap",
+      "cap_amount": 500.00,
+      "period": "fiscal_year",
+      "fiscal_year_start": "07-01",
+      "applies_to_services": ["OpenAI"],
+      "enabled": true
+    }
+  ]
+}

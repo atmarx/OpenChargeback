@@ -23,7 +23,7 @@ def expand_env_vars(value: str) -> str:
 class DatabaseConfig(BaseModel):
     """Database configuration."""
 
-    path: Path = Field(default=Path("./billing.db"))
+    path: Path = Field(default=Path("./instance/billing.db"))
 
 
 class SmtpConfig(BaseModel):
@@ -60,14 +60,17 @@ class TagMappingConfig(BaseModel):
     fund_org: str = "fund_org"
     cost_center: str = "cost_center"
     account_code: str = "account_code"  # Optional account code from charge tags
+    # Custom reference fields - map to institution-specific tags
+    reference_1: str = ""  # e.g., grant number, award ID
+    reference_2: str = ""  # e.g., request ID, ticket number
 
 
 class OutputConfig(BaseModel):
     """Output directory configuration."""
 
-    pdf_dir: Path = Field(default=Path("./output/statements"))
-    journal_dir: Path = Field(default=Path("./output/journals"))
-    email_dir: Path = Field(default=Path("./output/emails"))  # For dev mode
+    pdf_dir: Path = Field(default=Path("./instance/output/pdfs"))
+    journal_dir: Path = Field(default=Path("./instance/output/journals"))
+    email_dir: Path = Field(default=Path("./instance/output/emails"))  # For dev mode
 
 
 class LoggingConfig(BaseModel):
@@ -104,7 +107,53 @@ class WebUserConfig(BaseModel):
     email: str
     display_name: str
     password_hash: str
-    role: Literal["admin", "user"] = "user"
+    role: Literal["admin", "reviewer", "viewer"] = "viewer"
+    recovery: bool = False  # If true, this user bypasses DB and always works for lockout recovery
+
+
+class PasswordRequirements(BaseModel):
+    """Password policy configuration."""
+
+    min_length: int = 8
+    require_uppercase: bool = False
+    require_lowercase: bool = False
+    require_numbers: bool = False
+    require_special_chars: bool = False
+
+    def get_requirements_text(self) -> str:
+        """Generate human-readable password requirements."""
+        parts = [f"at least {self.min_length} characters"]
+        if self.require_uppercase:
+            parts.append("one uppercase letter")
+        if self.require_lowercase:
+            parts.append("one lowercase letter")
+        if self.require_numbers:
+            parts.append("one number")
+        if self.require_special_chars:
+            parts.append("one special character (!@#$%^&*)")
+        if len(parts) == 1:
+            return f"Password must be {parts[0]}."
+        return f"Password must contain {', '.join(parts[:-1])}, and {parts[-1]}."
+
+    def validate_password(self, password: str) -> tuple[bool, str | None]:
+        """Validate password against requirements.
+
+        Returns:
+            Tuple of (is_valid, error_message). error_message is None if valid.
+        """
+        if len(password) < self.min_length:
+            return False, f"Password must be at least {self.min_length} characters."
+        if self.require_uppercase and not any(c.isupper() for c in password):
+            return False, "Password must contain at least one uppercase letter."
+        if self.require_lowercase and not any(c.islower() for c in password):
+            return False, "Password must contain at least one lowercase letter."
+        if self.require_numbers and not any(c.isdigit() for c in password):
+            return False, "Password must contain at least one number."
+        if self.require_special_chars:
+            special = set("!@#$%^&*()_+-=[]{}|;:,.<>?")
+            if not any(c in special for c in password):
+                return False, "Password must contain at least one special character."
+        return True, None
 
 
 class ReviewConfig(BaseModel):
@@ -169,6 +218,7 @@ class WebConfig(BaseModel):
     secret_key: str = ""
     session_lifetime_hours: int = 8
     users: dict[str, WebUserConfig] = Field(default_factory=dict)
+    password_requirements: PasswordRequirements = Field(default_factory=PasswordRequirements)
 
     @field_validator("secret_key", mode="before")
     @classmethod
@@ -212,7 +262,7 @@ def load_config(config_path: Path | None = None) -> Config:
         ValidationError: If config is invalid.
     """
     if config_path is None:
-        config_path = Path("config.yaml")
+        config_path = Path("instance/config.yaml")
 
     if not config_path.exists():
         # Return default config if no file exists

@@ -1,8 +1,14 @@
-# FOCUS Billing Configuration
-# Copy this file to config.yaml and customize for your environment
+# OpenChargeback Configuration
+# Copy this file to instance/config.yaml and customize for your environment
+
+# Development mode - when true, emails are saved to files instead of sent via SMTP
+dev_mode: false
+
+# Currency symbol for display (e.g., "$", "€", "£", "¥")
+currency: "$"
 
 database:
-  path: ./billing.db
+  path: ./instance/billing.db
 
 smtp:
   host: smtp.example.edu
@@ -23,15 +29,20 @@ tag_mapping:
   project_id: "project"
   fund_org: "fund_org"
   cost_center: "cost_center"
+  # Custom reference fields - map to your institution's tags
+  # These appear in journal exports and are searchable in the UI
+  reference_1: "grant_number"    # e.g., NSF award ID, PO number
+  reference_2: "request_id"      # e.g., ServiceNow ticket, allocation ID
 
 output:
-  pdf_dir: ./output/statements
-  journal_dir: ./output/journals
+  pdf_dir: ./instance/output/pdfs
+  journal_dir: ./instance/output/journals
+  email_dir: ./instance/output/emails   # For dev_mode email files
 
 logging:
-  level: INFO                     # INFO, WARN, ERROR
+  level: INFO                     # DEBUG, INFO, WARN, WARNING, ERROR
   format: splunk                  # "splunk" (key=value) or "json"
-  file: ./logs/focus-billing.log  # Optional file output (also logs to stderr)
+  file: ./instance/logs/focus-billing.log  # Optional file output (also logs to stderr)
 
 # Web interface configuration
 web:
@@ -40,6 +51,9 @@ web:
   port: 8000
   secret_key: ${WEB_SECRET_KEY}  # Generate with: python -c "import secrets; print(secrets.token_hex(32))"
   session_lifetime_hours: 8
+
+  # Bootstrap/recovery users defined in config
+  # These users are available during initial setup or for emergency recovery.
   users:
     admin:
       email: admin@example.edu
@@ -47,7 +61,83 @@ web:
       # Generate hash with: python -c "import bcrypt; print(bcrypt.hashpw(b'yourpassword', bcrypt.gensalt()).decode())"
       # Default password below is "admin123" - CHANGE THIS!
       password_hash: "$2b$12$Fxu99zxFh4plt3a2FDyEnuFyg2Co/osXmQGGYw.HFl0/Id6V.Uvey"
-      role: admin
+      role: admin  # admin, reviewer, or viewer
+      # Recovery mode - when true, this user ALWAYS authenticates against config.yaml,
+      # bypassing the database. Use for emergency recovery if locked out of DB users.
+      # Set to false for normal bootstrap users that can be overridden by DB.
+      recovery: true
+
+  # Password policy for database users
+  # Enforced when creating users or changing passwords. If requirements are
+  # tightened after users exist, they will be prompted to update on next login.
+  password_requirements:
+    min_length: 8
+    require_uppercase: false
+    require_lowercase: false
+    require_numbers: false
+    require_special_chars: false
+
+# Review/flagging configuration
+# Charges matching these patterns are auto-flagged for manual review
+review:
+  # Regex patterns that trigger review if matched in charge fields
+  flag_patterns: []
+  # Regex patterns that fund/org codes MUST match (flagged if no match)
+  # Example: require format like "DEPT-PROJECT-2024"
+  fund_org_patterns: []
+
+# Import source configuration
+# Pre-defined sources for CSV imports with auto-detection and defaults
+imports:
+  known_sources:
+  - name: AWS
+    pattern: aws           # Filename pattern for auto-selection
+    fund_org: ""           # Credit fund/org (source receives funds)
+    account_code: ""       # Default GL account code
+  - name: Azure
+    pattern: azure
+    fund_org: ""
+    account_code: ""
+  - name: Azure Local
+    pattern: azure-local   # On-prem Azure Stack HCI / Azure Local VMs
+    fund_org: ""
+    account_code: ""
+  - name: GCP
+    pattern: gcp
+    fund_org: ""
+    account_code: ""
+  - name: HPC
+    pattern: hpc
+    fund_org: ""
+    account_code: ""
+  - name: OpenAI
+    pattern: openai        # ChatGPT EDU / OpenAI API usage
+    fund_org: ""
+    account_code: ""
+  - name: Storage
+    pattern: storage
+    fund_org: ""
+    account_code: ""
+
+# Journal/GL export configuration
+journal:
+  # Regex with named capture groups to parse fund_org into components
+  # Example: "DEPT-PROJECT-2024" -> orgn="DEPT", fund="PROJECT-2024"
+  fund_org_regex: "^(?P<orgn>[^-]+)-(?P<fund>.+)$"
+
+  # Regex to validate account codes (optional, leave empty to skip)
+  account_code_regex: ""
+
+  # Template file in templates/ directory
+  template: journal_gl.csv
+
+  # Default account code if not specified on charge or source
+  default_account: ""
+
+  # Description templates for journal entries
+  # Available variables: {source}, {period}, {fund_org}, {pi_email}, {project_id}
+  debit_description: "{source} {period} Research Computing Charges"
+  credit_description: "{source} {period} Research Computing Charges"
 
 # Future: API source credentials (secrets via env vars)
 # sources:

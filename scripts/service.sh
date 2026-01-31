@@ -132,10 +132,11 @@ case $ACTION in
         echo -e "${GREEN}Starting OpenChargeback...${NC}"
 
         if [[ "$ENV" == "dev" ]]; then
-            # In dev mode, use local Python with reload
-            if [[ ! -f "config.yaml" ]]; then
-                echo -e "${YELLOW}Warning: config.yaml not found. Copying from config.example.yaml${NC}"
-                cp config.example.yaml config.yaml
+            # In dev mode, use local Python with reload and instance directory
+            if [[ ! -f "instance/config.yaml" ]]; then
+                echo -e "${YELLOW}Warning: instance/config.yaml not found. Copying from config.example.yaml${NC}"
+                mkdir -p instance
+                cp config.example.yaml instance/config.yaml
             fi
 
             echo -e "${BLUE}Starting local development server...${NC}"
@@ -145,7 +146,7 @@ case $ACTION in
                 source .venv/bin/activate
                 pip install -e .
             }
-            focus-billing serve --reload
+            focus-billing serve --reload --config instance/config.yaml --host 0.0.0.0
         else
             # In prod mode, use Docker
             dc up $DOCKER_OPTS --build
@@ -170,9 +171,10 @@ case $ACTION in
     watch)
         echo -e "${GREEN}Starting OpenChargeback in watch mode...${NC}"
 
-        if [[ ! -f "config.yaml" ]]; then
-            echo -e "${YELLOW}Warning: config.yaml not found. Copying from config.example.yaml${NC}"
-            cp config.example.yaml config.yaml
+        if [[ ! -f "instance/config.yaml" ]]; then
+            echo -e "${YELLOW}Warning: instance/config.yaml not found. Copying from config.example.yaml${NC}"
+            mkdir -p instance
+            cp config.example.yaml instance/config.yaml
         fi
 
         # Use local Python with reload for watch mode
@@ -186,7 +188,7 @@ case $ACTION in
         echo -e "${BLUE}Starting with auto-reload enabled...${NC}"
         echo -e "${GREEN}Open http://127.0.0.1:8000 in your browser${NC}"
         echo ""
-        focus-billing serve --reload
+        focus-billing serve --reload --config instance/config.yaml --host 0.0.0.0
         ;;
 
     status)

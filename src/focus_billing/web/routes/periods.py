@@ -15,6 +15,7 @@ from focus_billing.web.deps import (
     get_db,
     get_flash_messages,
     get_global_flagged_count,
+    require_admin,
 )
 from focus_billing.web.services.period_service import PeriodService
 
@@ -52,7 +53,7 @@ async def list_periods(
 @router.get("/new", response_class=HTMLResponse)
 async def new_period_form(
     request: Request,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
     db: Database = Depends(get_db),
 ):
     """Show form to create a new period."""
@@ -84,7 +85,7 @@ async def create_period(
     request: Request,
     period: str = Form(...),
     notes: str = Form(None),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
     db: Database = Depends(get_db),
 ):
     """Create a new billing period."""
@@ -135,6 +136,11 @@ async def view_period(
     current_period_id = get_current_period_id(request)
     flagged_count = get_global_flagged_count(db, current_period_id)
 
+    # For import modal (when period is open)
+    all_periods = db.list_periods()
+    config = request.app.state.config
+    known_sources = config.imports.known_sources
+
     return templates.TemplateResponse(
         "pages/period_detail.html",
         {
@@ -146,6 +152,9 @@ async def view_period(
             "statements": statements,
             "top_pis": top_pis,
             "flagged_count": flagged_count,
+            "periods": all_periods,
+            "current_period": period,
+            "known_sources": known_sources,
             "page_title": f"Period {period.period}",
         },
     )
@@ -155,7 +164,7 @@ async def view_period(
 async def close_period(
     request: Request,
     period_slug: str,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
     db: Database = Depends(get_db),
 ):
     """Close a billing period."""
@@ -191,7 +200,7 @@ async def reopen_period(
     request: Request,
     period_slug: str,
     reason: str = Form(""),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
     db: Database = Depends(get_db),
 ):
     """Reopen a closed billing period with a required reason."""
@@ -225,7 +234,7 @@ async def reopen_period(
 async def finalize_period(
     request: Request,
     period_slug: str,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
     db: Database = Depends(get_db),
 ):
     """Finalize a billing period."""
@@ -242,6 +251,16 @@ async def finalize_period(
             request,
             "error",
             f"Cannot finalize: {flagged_count} charges still need review.",
+        )
+        return RedirectResponse(url=f"/periods/{period_slug}", status_code=303)
+
+    # Check that statements have been generated
+    statements = db.get_statements_for_period(period_obj.id)
+    if not statements:
+        add_flash_message(
+            request,
+            "error",
+            "Cannot finalize: Generate statements first before finalizing the period.",
         )
         return RedirectResponse(url=f"/periods/{period_slug}", status_code=303)
 

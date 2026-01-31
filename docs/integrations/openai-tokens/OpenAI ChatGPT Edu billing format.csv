@@ -1,0 +1,7 @@
+﻿date_partition,account_id,account_user_id,email,name,public_id,usage_type,usage_credits,usage_quantity,usage_units
+1/5/2026,test_account,test_user_1,ab@northwinds.edu,Aaron B,user-test_1,chat.completion.5.reasoning,10,1,counts
+1/7/2026,test_account,test_user_1,ab@northwinds.edu,Aaron B,user-test_1,codex,217.535,4350.7,counts
+1/8/2026,test_account,test_user_2,ah@northwinds.edu,Alex H,user-test_2,chat.completion.5.reasoning,10,1,counts
+1/8/2026,test_account,test_user_1,ab@northwinds.edu,Aaron B,user-test_1,codex,4.305,86.1,counts
+1/11/2026,test_account,test_user_1,ab@northwinds.edu,Aaron B,user-test_1,chat_tool.imagegen,125,25,counts
+1/12/2026,test_account,test_user_1,ab@northwinds.edu,Aaron B,user-test_1,codex,7.295,145.9,counts

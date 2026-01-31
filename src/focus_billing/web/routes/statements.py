@@ -14,6 +14,7 @@ from focus_billing.web.deps import (
     get_db,
     get_flash_messages,
     get_global_flagged_count,
+    require_admin,
 )
 
 router = APIRouter(prefix="/statements", tags=["statements"])
@@ -67,7 +68,7 @@ async def list_statements(
 async def generate_form(
     request: Request,
     period: str | None = Query(None),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
     db: Database = Depends(get_db),
 ):
     """Show form to generate statements."""
@@ -116,7 +117,7 @@ async def generate_statements_route(
     request: Request,
     period_id: int = Form(...),
     send_emails: bool = Form(False),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
     db: Database = Depends(get_db),
 ):
     """Generate statements for a billing period."""
@@ -186,11 +187,6 @@ async def download_statement(
     db: Database = Depends(get_db),
 ):
     """Download a statement PDF."""
-    # Get statement from database
-    statements = db.get_statements_for_period(0)  # Get all, filter below
-
-    # Find the statement by ID (we need a get_statement_by_id method)
-    # For now, let's get all statements and find it
     from sqlalchemy import select
     from focus_billing.db.tables import statements as stmt_table
 
@@ -204,14 +200,27 @@ async def download_statement(
         return RedirectResponse(url="/statements", status_code=303)
 
     pdf_path = result.pdf_path
-    if not pdf_path or not Path(pdf_path).exists():
-        add_flash_message(request, "error", "PDF file not found.")
-        return RedirectResponse(url="/statements", status_code=303)
+    period_id = result.billing_period_id
 
+    # Check if path exists
+    if not pdf_path:
+        add_flash_message(request, "error", "PDF file path not set.")
+        return RedirectResponse(url=f"/statements?period={period_id}", status_code=303)
+
+    pdf_file = Path(pdf_path)
+    if not pdf_file.exists():
+        add_flash_message(request, "error", f"PDF file not found: {pdf_file.name}")
+        return RedirectResponse(url=f"/statements?period={period_id}", status_code=303)
+
+    # Return with explicit headers for better browser compatibility
     return FileResponse(
-        pdf_path,
+        path=str(pdf_file.resolve()),
         media_type="application/pdf",
-        filename=Path(pdf_path).name,
+        filename=pdf_file.name,
+        headers={
+            "Content-Disposition": f'attachment; filename="{pdf_file.name}"',
+            "Content-Type": "application/pdf",
+        },
     )
 
 
@@ -219,7 +228,7 @@ async def download_statement(
 async def send_statement(
     request: Request,
     statement_id: int,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
     db: Database = Depends(get_db),
 ):
     """Send a statement via email."""

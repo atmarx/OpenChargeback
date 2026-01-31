@@ -12,10 +12,10 @@ from focus_billing.web.auth import User
 from focus_billing.web.deps import (
     add_flash_message,
     get_current_period_id,
-    get_current_user,
     get_db,
     get_flash_messages,
     get_global_flagged_count,
+    require_admin,
 )
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -25,7 +25,7 @@ def get_config_path(request: Request) -> Path | None:
     """Get the config file path from app state."""
     config = request.app.state.config
     # Try to find the config path - check common locations
-    for path in [Path("config.yaml"), Path("config.yml")]:
+    for path in [Path("instance/config.yaml"), Path("instance/config.yml"), Path("config.yaml"), Path("config.yml")]:
         if path.exists():
             return path
     return None
@@ -34,7 +34,7 @@ def get_config_path(request: Request) -> Path | None:
 @router.get("", response_class=HTMLResponse)
 async def settings_page(
     request: Request,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
     db: Database = Depends(get_db),
 ):
     """Display settings page."""
@@ -70,7 +70,7 @@ async def update_review_patterns(
     request: Request,
     flag_patterns: str = Form(""),
     fund_org_patterns: str = Form(""),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
     db: Database = Depends(get_db),
 ):
     """Update review patterns in config file."""
@@ -133,7 +133,7 @@ async def update_review_patterns(
 @router.get("/test-patterns", response_class=HTMLResponse)
 async def test_patterns(
     request: Request,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
     db: Database = Depends(get_db),
 ):
     """Test current patterns against existing charges."""
@@ -337,7 +337,7 @@ async def reset_data(
     journal_exports: bool = Form(False),
     periods: bool = Form(False),
     sources: bool = Form(False),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
     db: Database = Depends(get_db),
 ):
     """Reset selected data (dev mode only)."""

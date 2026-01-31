@@ -13,6 +13,7 @@ from focus_billing.web.deps import (
     get_db,
     get_flash_messages,
     get_global_flagged_count,
+    require_reviewer,
 )
 
 router = APIRouter(prefix="/review", tags=["review"])
@@ -102,7 +103,8 @@ async def review_list(
 async def approve_charge(
     request: Request,
     charge_id: int,
-    user: User = Depends(get_current_user),
+    note: str = Form(""),
+    user: User = Depends(require_reviewer),
     db: Database = Depends(get_db),
 ):
     """Approve a single flagged charge."""
@@ -112,13 +114,25 @@ async def approve_charge(
 
     db.approve_charge(charge_id, performed_by=user.display_name)
 
-    # Emit audit log
+    # Log to database and emit audit log
     if charge and period:
+        db.log_review_action(
+            billing_period_id=period.id,
+            charge_id=charge_id,
+            action="approved",
+            pi_email=charge.pi_email,
+            resource_id=charge.resource_id,
+            service_name=charge.service_name,
+            amount=charge.billed_cost,
+            note=note.strip() if note else None,
+            performed_by=user.display_name,
+        )
         audit.log_charge_approved(
             charge_id=charge_id,
             period=period.period,
             pi_email=charge.pi_email,
             amount=charge.billed_cost,
+            note=note.strip() if note else None,
             user=user.display_name,
         )
 
@@ -139,13 +153,28 @@ async def approve_charge(
 async def reject_charge(
     request: Request,
     charge_id: int,
-    user: User = Depends(get_current_user),
+    note: str = Form(""),
+    user: User = Depends(require_reviewer),
     db: Database = Depends(get_db),
 ):
     """Reject (delete) a flagged charge."""
     # Get charge details for audit log before rejection
     charge = db.get_charge_by_id(charge_id)
     period = db.get_period_by_id(charge.billing_period_id) if charge else None
+
+    # Log to database BEFORE deleting the charge
+    if charge and period:
+        db.log_review_action(
+            billing_period_id=period.id,
+            charge_id=charge_id,
+            action="rejected",
+            pi_email=charge.pi_email,
+            resource_id=charge.resource_id,
+            service_name=charge.service_name,
+            amount=charge.billed_cost,
+            note=note.strip() if note else None,
+            performed_by=user.display_name,
+        )
 
     db.reject_charge(charge_id, performed_by=user.display_name)
 
@@ -156,6 +185,7 @@ async def reject_charge(
             period=period.period,
             pi_email=charge.pi_email,
             amount=charge.billed_cost,
+            reason=note.strip() if note else None,
             user=user.display_name,
         )
 
@@ -176,7 +206,7 @@ async def reject_charge(
 async def approve_all_charges(
     request: Request,
     period: int = Form(...),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_reviewer),
     db: Database = Depends(get_db),
 ):
     """Approve all flagged charges for a period."""
@@ -203,20 +233,47 @@ async def approve_all_charges(
 @router.post("/approve-selected")
 async def approve_selected_charges(
     request: Request,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_reviewer),
     db: Database = Depends(get_db),
 ):
     """Approve selected flagged charges."""
     # Parse form data manually to handle list of charge_ids
     form_data = await request.form()
     charge_ids = [int(v) for v in form_data.getlist("charge_ids") if v]
+    note = form_data.get("note", "").strip()
 
     if not charge_ids:
         add_flash_message(request, "warning", "No charges selected.")
         return RedirectResponse(url="/review", status_code=303)
 
     for charge_id in charge_ids:
+        # Get charge details for audit log
+        charge = db.get_charge_by_id(charge_id)
+        period = db.get_period_by_id(charge.billing_period_id) if charge else None
+
         db.approve_charge(charge_id, performed_by=user.display_name)
+
+        # Log to database and emit audit log for each charge
+        if charge and period:
+            db.log_review_action(
+                billing_period_id=period.id,
+                charge_id=charge_id,
+                action="approved",
+                pi_email=charge.pi_email,
+                resource_id=charge.resource_id,
+                service_name=charge.service_name,
+                amount=charge.billed_cost,
+                note=note if note else None,
+                performed_by=user.display_name,
+            )
+            audit.log_charge_approved(
+                charge_id=charge_id,
+                period=period.period,
+                pi_email=charge.pi_email,
+                amount=charge.billed_cost,
+                note=note if note else None,
+                user=user.display_name,
+            )
 
     add_flash_message(request, "success", f"Approved {len(charge_ids)} charge{'s' if len(charge_ids) != 1 else ''}.")
     return RedirectResponse(url="/review", status_code=303)
@@ -225,20 +282,50 @@ async def approve_selected_charges(
 @router.post("/reject-selected")
 async def reject_selected_charges(
     request: Request,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_reviewer),
     db: Database = Depends(get_db),
 ):
     """Reject selected flagged charges."""
     # Parse form data manually to handle list of charge_ids
     form_data = await request.form()
     charge_ids = [int(v) for v in form_data.getlist("charge_ids") if v]
+    note = form_data.get("note", "").strip()
 
     if not charge_ids:
         add_flash_message(request, "warning", "No charges selected.")
         return RedirectResponse(url="/review", status_code=303)
 
     for charge_id in charge_ids:
+        # Get charge details for audit log
+        charge = db.get_charge_by_id(charge_id)
+        period = db.get_period_by_id(charge.billing_period_id) if charge else None
+
+        # Log to database BEFORE deleting the charge
+        if charge and period:
+            db.log_review_action(
+                billing_period_id=period.id,
+                charge_id=charge_id,
+                action="rejected",
+                pi_email=charge.pi_email,
+                resource_id=charge.resource_id,
+                service_name=charge.service_name,
+                amount=charge.billed_cost,
+                note=note if note else None,
+                performed_by=user.display_name,
+            )
+
         db.reject_charge(charge_id, performed_by=user.display_name)
+
+        # Emit audit log for each charge
+        if charge and period:
+            audit.log_charge_rejected(
+                charge_id=charge_id,
+                period=period.period,
+                pi_email=charge.pi_email,
+                amount=charge.billed_cost,
+                reason=note if note else None,
+                user=user.display_name,
+            )
 
     add_flash_message(request, "success", f"Rejected {len(charge_ids)} charge{'s' if len(charge_ids) != 1 else ''}.")
     return RedirectResponse(url="/review", status_code=303)

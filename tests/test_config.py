@@ -64,9 +64,9 @@ class TestDatabaseConfig:
     """Tests for DatabaseConfig model."""
 
     def test_default_path(self):
-        """Default database path is billing.db."""
+        """Default database path is instance/billing.db."""
         config = DatabaseConfig()
-        assert config.path == Path("./billing.db")
+        assert config.path == Path("./instance/billing.db")
 
     def test_custom_path(self):
         """Custom path can be set."""
@@ -158,12 +158,12 @@ class TestOutputConfig:
     def test_default_pdf_dir(self):
         """Default PDF directory."""
         config = OutputConfig()
-        assert config.pdf_dir == Path("./output/statements")
+        assert config.pdf_dir == Path("./instance/output/pdfs")
 
     def test_default_journal_dir(self):
         """Default journal directory."""
         config = OutputConfig()
-        assert config.journal_dir == Path("./output/journals")
+        assert config.journal_dir == Path("./instance/output/journals")
 
 
 class TestLoggingConfig:
@@ -317,7 +317,7 @@ logging:
         config = load_config(config_file)
         assert config.logging.level == "ERROR"
         # Defaults still applied
-        assert config.database.path == Path("./billing.db")
+        assert config.database.path == Path("./instance/billing.db")
 
     def test_load_with_smtp(self, tmp_path):
         """Load config with SMTP settings."""

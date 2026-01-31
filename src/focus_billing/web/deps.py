@@ -28,14 +28,23 @@ def get_db(config: Config = Depends(get_config)) -> Generator[Database, None, No
 
 
 def get_current_user_optional(request: Request) -> User | None:
-    """Get the current user from session, or None if not authenticated."""
+    """Get the current user from session, or None if not authenticated.
+
+    Checks database first for user lookup, then falls back to config.yaml.
+    """
     config: Config = request.app.state.config
     user_id = request.session.get("user_id")
 
     if not user_id:
         return None
 
-    return get_user_by_id(user_id, config)
+    # Create a temporary DB connection for user lookup
+    db = Database(config.database.path)
+    db.initialize()
+    try:
+        return get_user_by_id(user_id, config, db)
+    finally:
+        db.close()
 
 
 def get_current_user(request: Request) -> User:
@@ -58,10 +67,23 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
 
     Raises HTTPException 403 if user is not an admin.
     """
-    if user.role != "admin":
+    if not user.is_admin():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required",
+        )
+    return user
+
+
+def require_reviewer(user: User = Depends(get_current_user)) -> User:
+    """Require the current user to be a reviewer or admin.
+
+    Raises HTTPException 403 if user is a viewer.
+    """
+    if not user.is_reviewer():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Reviewer access required",
         )
     return user
 

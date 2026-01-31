@@ -13,12 +13,29 @@
         {% endif %}
     </div>
     <div class="btn-group">
-        <button class="btn btn-success" onclick="openImportModal()">
-            <span>&#8593;</span> Import CSV
-        </button>
-        <a href="/statements/generate" class="btn btn-outline">
-            <span>&#9889;</span> Generate Statements
-        </a>
+        {% if current_period %}
+            {% if current_period.status == 'open' %}
+            <button class="btn btn-success" onclick="openImportModal()">
+                <span>&#8593;</span> Import CSV
+            </button>
+            <form method="post" action="/periods/{{ current_period.period }}/close" style="display: inline;">
+                <button type="submit" class="btn btn-outline">Close Period</button>
+            </form>
+            {% elif current_period.status == 'closed' %}
+            <a href="/periods/{{ current_period.period }}" class="btn btn-outline">Reopen</a>
+            {% if statement_count > 0 %}
+            <a href="/periods/{{ current_period.period }}" class="btn btn-primary">Finalize Period</a>
+            {% else %}
+            <a href="/statements/generate?period={{ current_period.id }}" class="btn btn-primary">
+                <span>&#9889;</span> Generate Statements
+            </a>
+            {% endif %}
+            {% else %}
+            <a href="/statements?period={{ current_period.id }}" class="btn btn-outline">Review Statements</a>
+            {% endif %}
+        {% else %}
+        <a href="/periods/new" class="btn btn-primary">Create Period</a>
+        {% endif %}
     </div>
 </div>
 
@@ -110,7 +127,7 @@
                 <tbody>
                     {% for import in recent_imports %}
                     <tr>
-                        <td>{{ import.source_name }}</td>
+                        <td><a href="/imports/{{ import.id }}" style="color: var(--accent); text-decoration: none;">{{ import.source_name }}</a></td>
                         <td class="text-muted">{{ import.period }}</td>
                         <td class="text-right">{{ import.row_count | default(0) }}</td>
                         <td class="text-right font-mono">{{ import.total_cost | currency }}</td>

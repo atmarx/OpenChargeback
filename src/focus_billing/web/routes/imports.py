@@ -16,6 +16,7 @@ from focus_billing.web.deps import (
     get_db,
     get_flash_messages,
     get_global_flagged_count,
+    require_admin,
 )
 
 router = APIRouter(prefix="/imports", tags=["imports"])
@@ -81,7 +82,7 @@ async def upload_files(
     source: str = Form(None),
     period: str = Form(None),
     files_metadata: str = Form(None),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
     db: Database = Depends(get_db),
 ):
     """Handle CSV file uploads.

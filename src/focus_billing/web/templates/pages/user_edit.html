@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}Edit User: {{ edit_user.username }} - OpenChargeback{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Edit User: {{ edit_user.username }}</h1>
+        <p class="page-subtitle">
+            {% if edit_user.is_config_user %}
+            <span class="status-badge status-warning">Bootstrap user from config.yaml</span>
+            {% else %}
+            Update user details and password
+            {% endif %}
+        </p>
+    </div>
+</div>
+
+<div class="grid-2">
+    <!-- User Details -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">User Details</h3>
+        </div>
+        <div class="card-body">
+            <form method="post" action="/settings/users/{{ edit_user.id }}/edit">
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500;">
+                        Username
+                    </label>
+                    <input type="text" class="form-input" value="{{ edit_user.username }}" disabled
+                           style="width: 100%;">
+                    <p class="form-help">Username cannot be changed.</p>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="email" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                        Email <span style="color: #ef4444;">*</span>
+                    </label>
+                    <input type="email" id="email" name="email" class="form-input" required
+                           value="{{ edit_user.email }}" style="width: 100%;"
+                           {% if edit_user.is_config_user %}disabled{% endif %}>
+                    {% if edit_user.is_config_user %}
+                    <p class="form-help">Config users must be edited in config.yaml.</p>
+                    {% endif %}
+                </div>
+
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="display_name" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                        Display Name
+                    </label>
+                    <input type="text" id="display_name" name="display_name" class="form-input"
+                           value="{{ edit_user.display_name or '' }}" style="width: 100%;"
+                           {% if edit_user.is_config_user %}disabled{% endif %}>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="role" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                        Role <span style="color: #ef4444;">*</span>
+                    </label>
+                    <select id="role" name="role" class="form-input" required style="width: 100%;"
+                            {% if edit_user.is_config_user %}disabled{% endif %}>
+                        {% for r in roles %}
+                        <option value="{{ r }}" {{ 'selected' if r == edit_user.role else '' }}>
+                            {{ r | capitalize }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                {% if not edit_user.is_config_user %}
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <a href="/settings/users" class="btn btn-outline">Cancel</a>
+                </div>
+                {% else %}
+                <div class="alert-banner" style="background: #fff3e0; border-color: #ffcc80;">
+                    <span class="icon">&#9888;</span>
+                    <div class="message">
+                        <strong>Bootstrap User</strong><br>
+                        This user is defined in config.yaml. Edit the config file to change their details.
+                    </div>
+                </div>
+                <a href="/settings/users" class="btn btn-outline">Back to Users</a>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    <!-- Password Reset -->
+    {% if not edit_user.is_config_user %}
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Reset Password</h3>
+        </div>
+        <div class="card-body">
+            <div class="alert-banner info">
+                <span class="icon">&#128274;</span>
+                <div class="message">
+                    <strong>Password Requirements</strong><br>
+                    {{ password_requirements }}
+                </div>
+            </div>
+
+            <form method="post" action="/settings/users/{{ edit_user.id }}/password">
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="password" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                        New Password <span style="color: #ef4444;">*</span>
+                    </label>
+                    <input type="password" id="password" name="password" class="form-input" required
+                           style="width: 100%;">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="confirm_password" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                        Confirm Password <span style="color: #ef4444;">*</span>
+                    </label>
+                    <input type="password" id="confirm_password" name="confirm_password" class="form-input" required
+                           style="width: 100%;">
+                </div>
+
+                <button type="submit" class="btn btn-warning">Reset Password</button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- User Info -->
+<div class="card" style="margin-top: 20px; max-width: 600px;">
+    <div class="card-header">
+        <h3 class="card-title">User Information</h3>
+    </div>
+    <div class="card-body">
+        <table>
+            <tr>
+                <td style="font-weight: 500; width: 150px;">Created</td>
+                <td>{{ edit_user.created_at[:19] if edit_user.created_at else 'Unknown' }}</td>
+            </tr>
+            <tr>
+                <td style="font-weight: 500;">Created By</td>
+                <td>{{ edit_user.created_by or 'System (bootstrap)' }}</td>
+            </tr>
+            <tr>
+                <td style="font-weight: 500;">Last Updated</td>
+                <td>{{ edit_user.updated_at[:19] if edit_user.updated_at else 'Never' }}</td>
+            </tr>
+            <tr>
+                <td style="font-weight: 500;">Source</td>
+                <td>
+                    {% if edit_user.is_config_user %}
+                    <span class="status-badge status-warning">config.yaml</span>
+                    {% else %}
+                    <span class="status-badge status-default">database</span>
+                    {% endif %}
+                </td>
+            </tr>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}User Management - OpenChargeback{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">User Management</h1>
+        <p class="page-subtitle">Manage system users and their roles</p>
+    </div>
+    <div class="page-actions">
+        <a href="/settings/users/new" class="btn btn-primary">
+            + Add User
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Users ({{ users | length }})</h3>
+    </div>
+    <div class="card-body">
+        {% if users %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Display Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Source</th>
+                    <th>Created</th>
+                    <th style="width: 120px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr>
+                    <td class="font-mono">{{ u.username }}</td>
+                    <td>{{ u.display_name or '-' }}</td>
+                    <td>{{ u.email }}</td>
+                    <td>
+                        <span class="status-badge status-{{ 'success' if u.role == 'admin' else ('info' if u.role == 'reviewer' else 'default') }}">
+                            {{ u.role }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if u.is_config_user %}
+                        <span class="status-badge status-warning" title="Defined in config.yaml">config</span>
+                        {% else %}
+                        <span class="status-badge status-default">database</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-muted">{{ u.created_at[:10] if u.created_at else '-' }}</td>
+                    <td>
+                        <div class="btn-group">
+                            <a href="/settings/users/{{ u.id }}/edit" class="btn btn-sm btn-outline">Edit</a>
+                            {% if not u.is_config_user and u.username != user.username %}
+                            <form method="post" action="/settings/users/{{ u.id }}/delete" style="display: inline;"
+                                  onsubmit="return confirm('Delete user {{ u.username }}? This cannot be undone.');">
+                                <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <p>No users found. Users defined in config.yaml will appear after the next server restart.</p>
+            <a href="/settings/users/new" class="btn btn-primary">Add First User</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card" style="margin-top: 20px;">
+    <div class="card-header">
+        <h3 class="card-title">Role Permissions</h3>
+    </div>
+    <div class="card-body">
+        <table>
+            <thead>
+                <tr>
+                    <th>Permission</th>
+                    <th style="text-align: center;">Admin</th>
+                    <th style="text-align: center;">Reviewer</th>
+                    <th style="text-align: center;">Viewer</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>View dashboard, charges, periods</td>
+                    <td style="text-align: center; color: #22c55e;">&#10003;</td>
+                    <td style="text-align: center; color: #22c55e;">&#10003;</td>
+                    <td style="text-align: center; color: #22c55e;">&#10003;</td>
+                </tr>
+                <tr>
+                    <td>Download statements & export journals</td>
+                    <td style="text-align: center; color: #22c55e;">&#10003;</td>
+                    <td style="text-align: center; color: #22c55e;">&#10003;</td>
+                    <td style="text-align: center; color: #22c55e;">&#10003;</td>
+                </tr>
+                <tr>
+                    <td>Approve/reject flagged charges</td>
+                    <td style="text-align: center; color: #22c55e;">&#10003;</td>
+                    <td style="text-align: center; color: #22c55e;">&#10003;</td>
+                    <td style="text-align: center; color: #ef4444;">&#10007;</td>
+                </tr>
+                <tr>
+                    <td>Import data files</td>
+                    <td style="text-align: center; color: #22c55e;">&#10003;</td>
+                    <td style="text-align: center; color: #ef4444;">&#10007;</td>
+                    <td style="text-align: center; color: #ef4444;">&#10007;</td>
+                </tr>
+                <tr>
+                    <td>Create/close/finalize periods</td>
+                    <td style="text-align: center; color: #22c55e;">&#10003;</td>
+                    <td style="text-align: center; color: #ef4444;">&#10007;</td>
+                    <td style="text-align: center; color: #ef4444;">&#10007;</td>
+                </tr>
+                <tr>
+                    <td>Generate & send statements</td>
+                    <td style="text-align: center; color: #22c55e;">&#10003;</td>
+                    <td style="text-align: center; color: #ef4444;">&#10007;</td>
+                    <td style="text-align: center; color: #ef4444;">&#10007;</td>
+                </tr>
+                <tr>
+                    <td>Manage settings & users</td>
+                    <td style="text-align: center; color: #22c55e;">&#10003;</td>
+                    <td style="text-align: center; color: #ef4444;">&#10007;</td>
+                    <td style="text-align: center; color: #ef4444;">&#10007;</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

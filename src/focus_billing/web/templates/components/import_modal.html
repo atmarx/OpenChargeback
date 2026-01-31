@@ -6,7 +6,7 @@
             <h2 class="modal-title">Import Billing Data</h2>
             <button type="button" class="modal-close" onclick="closeImportModal()">&times;</button>
         </div>
-        <form id="import-form" method="post" action="/imports/upload" enctype="multipart/form-data" onsubmit="return false;">
+        <form id="import-form" enctype="multipart/form-data">
             <div class="modal-body">
                 <!-- Source and Period Selection (single file mode) -->
                 <div id="single-file-options" class="form-row">
@@ -90,7 +90,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline" onclick="closeImportModal()">Cancel</button>
-                <button type="submit" id="upload-btn" class="btn btn-primary" disabled>
+                <button type="button" id="upload-btn" class="btn btn-primary" disabled onclick="handleUpload()">
                     <span>&#8593;</span> Upload Files
                 </button>
             </div>
@@ -763,66 +763,53 @@ function formatFileSize(bytes) {
 }
 
 // Drag and drop handlers
+let dropZoneInitialized = false;
+
 function setupDropZone() {
+    if (dropZoneInitialized) return;
+
     const dropZone = document.getElementById('drop-zone');
     if (!dropZone) return;
+
+    dropZoneInitialized = true;
+    let dragCounter = 0;  // Track nested drag enter/leave events
+
+    dropZone.addEventListener('dragenter', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dragCounter++;
+        dropZone.classList.add('drag-over');
+    });
 
     dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
         e.stopPropagation();
+        // Keep drag-over class while dragging
         dropZone.classList.add('drag-over');
     });
 
     dropZone.addEventListener('dragleave', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        dropZone.classList.remove('drag-over');
+        dragCounter--;
+        // Only remove highlight when fully leaving the drop zone
+        if (dragCounter <= 0) {
+            dragCounter = 0;
+            dropZone.classList.remove('drag-over');
+        }
     });
 
     dropZone.addEventListener('drop', (e) => {
         e.preventDefault();
         e.stopPropagation();
+        dragCounter = 0;
         dropZone.classList.remove('drag-over');
         handleFiles(e.dataTransfer.files);
     });
 }
 
-// Prevent browser from opening dropped files (Firefox issue)
-document.addEventListener('dragover', (e) => {
-    // Only prevent if modal is open
-    const modal = document.getElementById('import-modal');
-    if (modal && modal.style.display !== 'none') {
-        e.preventDefault();
-    }
-});
-
-document.addEventListener('drop', (e) => {
-    // Only prevent if modal is open
-    const modal = document.getElementById('import-modal');
-    if (modal && modal.style.display !== 'none') {
-        e.preventDefault();
-    }
-});
-
-// Initialize drop zone when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', setupDropZone);
-} else {
-    setupDropZone();
-}
-
-// Close modal on Escape key
-document.addEventListener('keydown', (e) => {
-    const modal = document.getElementById('import-modal');
-    if (e.key === 'Escape' && modal && modal.style.display !== 'none') {
-        closeImportModal();
-    }
-});
-
-// Form submission with progress
-document.getElementById('import-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-
+// Handle upload button click
+async function handleUpload() {
     // Get finalized periods for validation
     const periodSelect = document.getElementById('import-period');
     const finalizedPeriods = Array.from(periodSelect.options)
@@ -894,6 +881,43 @@ document.getElementById('import-form').addEventListener('submit', async (e) => {
     } catch (error) {
         console.error('Upload error:', error);
         showResults({ error: error.message });
+    }
+}
+
+// Prevent browser from opening dropped files
+document.addEventListener('dragover', (e) => {
+    // Only prevent if modal is open
+    const modal = document.getElementById('import-modal');
+    if (modal && modal.style.display !== 'none') {
+        e.preventDefault();
+    }
+});
+
+document.addEventListener('drop', (e) => {
+    // Only prevent if modal is open
+    const modal = document.getElementById('import-modal');
+    if (modal && modal.style.display !== 'none') {
+        e.preventDefault();
+    }
+});
+
+// Initialize all handlers
+function initImportModal() {
+    setupDropZone();
+}
+
+// Initialize when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initImportModal);
+} else {
+    initImportModal();
+}
+
+// Close modal on Escape key
+document.addEventListener('keydown', (e) => {
+    const modal = document.getElementById('import-modal');
+    if (e.key === 'Escape' && modal && modal.style.display !== 'none') {
+        closeImportModal();
     }
 });
 

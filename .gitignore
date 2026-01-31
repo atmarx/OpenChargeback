@@ -45,14 +45,8 @@ htmlcov/
 # mypy
 .mypy_cache/
 
-# Application data
-*.db
-billing.db
-output/
-logs/
-
-# Config with secrets
-config.yaml
+# Instance data (runtime files, database, config with secrets)
+instance/
 
 # Planning/internal docs (not published)
 planning/

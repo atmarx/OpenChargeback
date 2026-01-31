@@ -1,20 +1,57 @@
-# OpenChargeback Operations Guide
+# Operations Guide
 
-This guide covers the day-to-day operation of OpenChargeback, including CLI commands, configuration, and administrative tasks.
+System administration and maintenance for OpenChargeback deployments.
+
+## Contents
+
+1. [Database](database.md) - SQLite management, backup, recovery
+2. [Logging](logging.md) - Log configuration and integration
+3. [Docker](docker.md) - Container deployment
+4. [Troubleshooting](troubleshooting.md) - Common issues and solutions
+
+## Related Documentation
+
+- **Getting Started**: [Installation](../getting-started/installation.md) and [Configuration](../getting-started/configuration.md)
+- **Day-to-Day Use**: [CLI](../user-guide/cli.md) and [Web UI](../user-guide/web-ui.md)
+- **Administrative Tasks**: [Admin Guide](../admin-guide/)
 
 ---
 
-## Table of Contents
+## Quick Reference
 
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [CLI Commands](#cli-commands)
-- [Web Interface](#web-interface)
-- [FOCUS File Format](#focus-file-format)
-- [Custom Templates](#custom-templates)
-- [Database](#database)
-- [Logging](#logging)
-- [Troubleshooting](#troubleshooting)
+### Service Management
+
+```bash
+# Docker
+docker compose -f docker/docker-compose.yml up -d
+docker compose -f docker/docker-compose.yml down
+docker compose -f docker/docker-compose.yml logs -f
+
+# Service script
+scripts/service.sh --start --env prod
+scripts/service.sh --stop
+scripts/service.sh --status
+```
+
+### Database Backup
+
+```bash
+cp instance/billing.db "instance/billing_$(date +%Y%m%d).db"
+```
+
+### Log Monitoring
+
+```bash
+tail -f instance/logs/focus-billing.log
+```
+
+---
+
+## Legacy Documentation
+
+The content below has been reorganized into focused documents. It remains here temporarily for reference.
+
+---
 
 ---
 

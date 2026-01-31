@@ -1,4 +1,4 @@
 Fund,Orgn,Account,Program,Activity,Location,Debit,Credit,Description (35 Characters maximum),Reference ID
 {%- for entry in entries %}
 {{ entry.fund }},{{ entry.orgn }},{{ entry.account }},{{ entry.program }},{{ entry.activity }},{{ entry.location }},{% if entry.is_debit %}{{ "%.2f"|format(entry.amount) }}{% endif %},{% if entry.is_credit %}{{ "%.2f"|format(entry.amount) }}{% endif %},{{ entry.description|truncate_desc }},{{ entry.reference_id }}
-{%- endfor %}
+{% endfor %}

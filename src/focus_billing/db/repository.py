@@ -18,8 +18,10 @@ from .tables import (
     email_logs,
     imports,
     journal_exports,
+    review_logs,
     sources,
     statements,
+    users,
 )
 
 
@@ -75,7 +77,9 @@ class Charge:
     pi_email: str
     project_id: str | None
     fund_org: str | None
-    raw_tags: dict | None
+    reference_1: str | None = None  # Custom reference field (e.g., grant number)
+    reference_2: str | None = None  # Custom reference field (e.g., request ID)
+    raw_tags: dict | None = None
     needs_review: bool = False
     review_reason: str | None = None
     reviewed_at: str | None = None
@@ -155,6 +159,41 @@ class JournalExport:
     filename: str | None
     # Joined fields
     period: str | None = None
+
+
+@dataclass
+class ReviewLog:
+    """Review action log record."""
+
+    id: int | None
+    billing_period_id: int
+    charge_id: int
+    action: str  # approved, rejected
+    pi_email: str
+    resource_id: str | None
+    service_name: str | None
+    amount: float
+    note: str | None
+    performed_at: str | None
+    performed_by: str | None
+    # Joined fields
+    period: str | None = None
+
+
+@dataclass
+class DBUser:
+    """User record from database."""
+
+    id: int
+    username: str
+    email: str
+    display_name: str | None
+    password_hash: str
+    role: str  # admin, reviewer, viewer
+    is_config_user: bool
+    created_at: str | None
+    updated_at: str | None
+    created_by: str | None
 
 
 @dataclass
@@ -498,6 +537,8 @@ class Database:
                     "pi_email": charge.pi_email,
                     "project_id": charge.project_id,
                     "fund_org": charge.fund_org,
+                    "reference_1": charge.reference_1,
+                    "reference_2": charge.reference_2,
                     "raw_tags": raw_tags_json,
                     "needs_review": charge.needs_review,
                     "review_reason": charge.review_reason,
@@ -509,7 +550,8 @@ class Database:
                     has_changes = False
                     for col in ["list_cost", "contracted_cost", "billed_cost", "effective_cost",
                                 "resource_name", "service_name", "pi_email", "project_id",
-                                "fund_org", "raw_tags", "needs_review", "review_reason"]:
+                                "fund_org", "reference_1", "reference_2", "raw_tags",
+                                "needs_review", "review_reason"]:
                         new_val = values.get(col)
                         old_val = existing_dict.get(col)
                         if new_val != old_val:
@@ -543,6 +585,8 @@ class Database:
                         "pi_email",
                         "project_id",
                         "fund_org",
+                        "reference_1",
+                        "reference_2",
                         "raw_tags",
                         "needs_review",
                         "review_reason",
@@ -1160,6 +1204,89 @@ class Database:
             result = conn.execute(delete(journal_exports))
             return result.rowcount
 
+    # Review log operations
+
+    def log_review_action(
+        self,
+        billing_period_id: int,
+        charge_id: int,
+        action: str,
+        pi_email: str,
+        amount: float,
+        resource_id: str | None = None,
+        service_name: str | None = None,
+        note: str | None = None,
+        performed_by: str | None = None,
+    ) -> int:
+        """Log a review action (approve/reject). Returns the new log ID."""
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                review_logs.insert().values(
+                    billing_period_id=billing_period_id,
+                    charge_id=charge_id,
+                    action=action,
+                    pi_email=pi_email,
+                    resource_id=resource_id,
+                    service_name=service_name,
+                    amount=amount,
+                    note=note,
+                    performed_by=performed_by,
+                )
+            )
+            return result.lastrowid
+
+    def get_review_logs(
+        self,
+        billing_period_id: int | None = None,
+        action: str | None = None,
+        limit: int = 100,
+    ) -> list[ReviewLog]:
+        """Get review logs, optionally filtered by period and/or action."""
+        with self.engine.connect() as conn:
+            stmt = (
+                select(review_logs, billing_periods.c.period)
+                .select_from(
+                    review_logs.join(
+                        billing_periods,
+                        review_logs.c.billing_period_id == billing_periods.c.id,
+                    )
+                )
+                .order_by(review_logs.c.performed_at.desc())
+            )
+
+            if billing_period_id:
+                stmt = stmt.where(review_logs.c.billing_period_id == billing_period_id)
+
+            if action:
+                stmt = stmt.where(review_logs.c.action == action)
+
+            stmt = stmt.limit(limit)
+
+            rows = conn.execute(stmt).fetchall()
+            return [
+                ReviewLog(
+                    id=row.id,
+                    billing_period_id=row.billing_period_id,
+                    charge_id=row.charge_id,
+                    action=row.action,
+                    pi_email=row.pi_email,
+                    resource_id=row.resource_id,
+                    service_name=row.service_name,
+                    amount=row.amount,
+                    note=row.note,
+                    performed_at=_format_datetime(row.performed_at),
+                    performed_by=row.performed_by,
+                    period=row.period,
+                )
+                for row in rows
+            ]
+
+    def clear_review_logs(self) -> int:
+        """Clear all review logs. Returns count of deleted rows."""
+        with self.engine.begin() as conn:
+            result = conn.execute(delete(review_logs))
+            return result.rowcount
+
     def clear_periods(self) -> int:
         """Clear all billing periods. Returns count of deleted rows.
 
@@ -1178,3 +1305,223 @@ class Database:
         with self.engine.begin() as conn:
             result = conn.execute(delete(sources))
             return result.rowcount
+
+    # User operations
+
+    def _user_from_row(self, row) -> DBUser:
+        """Convert a database row to a DBUser object."""
+        row_dict = _row_to_dict(row)
+        row_dict["is_config_user"] = bool(row_dict["is_config_user"])
+        row_dict["created_at"] = _format_datetime(row_dict["created_at"])
+        row_dict["updated_at"] = _format_datetime(row_dict["updated_at"])
+        return DBUser(**row_dict)
+
+    def get_user_by_username(self, username: str) -> DBUser | None:
+        """Get user by username."""
+        with self.engine.connect() as conn:
+            stmt = select(users).where(users.c.username == username)
+            row = conn.execute(stmt).fetchone()
+            if row:
+                return self._user_from_row(row)
+            return None
+
+    def get_user_by_id(self, user_id: int) -> DBUser | None:
+        """Get user by ID."""
+        with self.engine.connect() as conn:
+            stmt = select(users).where(users.c.id == user_id)
+            row = conn.execute(stmt).fetchone()
+            if row:
+                return self._user_from_row(row)
+            return None
+
+    def list_users(self) -> list[DBUser]:
+        """List all users ordered by username."""
+        with self.engine.connect() as conn:
+            stmt = select(users).order_by(users.c.username)
+            rows = conn.execute(stmt).fetchall()
+            return [self._user_from_row(row) for row in rows]
+
+    def create_user(
+        self,
+        username: str,
+        email: str,
+        password_hash: str,
+        role: str = "viewer",
+        display_name: str | None = None,
+        is_config_user: bool = False,
+        created_by: str | None = None,
+    ) -> DBUser:
+        """Create a new user.
+
+        Args:
+            username: Unique username for login.
+            email: User's email address.
+            password_hash: bcrypt hash of the password.
+            role: One of 'admin', 'reviewer', 'viewer'.
+            display_name: Optional display name.
+            is_config_user: True if this user came from config.yaml bootstrap.
+            created_by: Username of the creator (None for bootstrap).
+
+        Returns:
+            The newly created DBUser.
+
+        Raises:
+            sqlalchemy.exc.IntegrityError: If username already exists.
+        """
+        now = datetime.now()
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                users.insert().values(
+                    username=username,
+                    email=email,
+                    password_hash=password_hash,
+                    role=role,
+                    display_name=display_name,
+                    is_config_user=is_config_user,
+                    created_by=created_by,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+            return DBUser(
+                id=result.inserted_primary_key[0],
+                username=username,
+                email=email,
+                display_name=display_name,
+                password_hash=password_hash,
+                role=role,
+                is_config_user=is_config_user,
+                created_at=now.isoformat(),
+                updated_at=now.isoformat(),
+                created_by=created_by,
+            )
+
+    def update_user(
+        self,
+        user_id: int,
+        email: str | None = None,
+        display_name: str | None = None,
+        role: str | None = None,
+    ) -> DBUser | None:
+        """Update user details (not password).
+
+        Args:
+            user_id: ID of user to update.
+            email: New email (if provided).
+            display_name: New display name (if provided).
+            role: New role (if provided).
+
+        Returns:
+            Updated DBUser or None if not found.
+        """
+        values: dict[str, Any] = {"updated_at": datetime.now()}
+        if email is not None:
+            values["email"] = email
+        if display_name is not None:
+            values["display_name"] = display_name
+        if role is not None:
+            values["role"] = role
+
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                update(users).where(users.c.id == user_id).values(**values)
+            )
+            if result.rowcount == 0:
+                return None
+
+        return self.get_user_by_id(user_id)
+
+    def update_user_password(self, user_id: int, password_hash: str) -> bool:
+        """Update user's password hash.
+
+        Args:
+            user_id: ID of user to update.
+            password_hash: New bcrypt hash.
+
+        Returns:
+            True if user was found and updated, False otherwise.
+        """
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                update(users)
+                .where(users.c.id == user_id)
+                .values(password_hash=password_hash, updated_at=datetime.now())
+            )
+            return result.rowcount > 0
+
+    def delete_user(self, user_id: int) -> bool:
+        """Delete a user.
+
+        Args:
+            user_id: ID of user to delete.
+
+        Returns:
+            True if user was deleted, False if not found.
+
+        Note: Config users (is_config_user=True) should not be deleted via UI.
+              This method does not enforce that - caller should check.
+        """
+        with self.engine.begin() as conn:
+            result = conn.execute(delete(users).where(users.c.id == user_id))
+            return result.rowcount > 0
+
+    def sync_config_users(self, config_users: dict[str, dict]) -> dict[str, int]:
+        """Sync users from config.yaml to database.
+
+        This ensures config.yaml users exist in the DB and are marked as
+        is_config_user=True. Config users can be updated from config but
+        not deleted via the web UI.
+
+        Args:
+            config_users: Dict of username -> user config from config.yaml.
+                Each user config has: email, display_name, password_hash, role.
+
+        Returns:
+            Dict with counts: created, updated, unchanged.
+        """
+        counts = {"created": 0, "updated": 0, "unchanged": 0}
+
+        for username, user_config in config_users.items():
+            existing = self.get_user_by_username(username)
+
+            if existing:
+                # Check if update needed
+                needs_update = (
+                    existing.email != user_config.get("email", "")
+                    or existing.display_name != user_config.get("display_name")
+                    or existing.password_hash != user_config.get("password_hash", "")
+                    or existing.role != user_config.get("role", "viewer")
+                    or not existing.is_config_user
+                )
+
+                if needs_update:
+                    with self.engine.begin() as conn:
+                        conn.execute(
+                            update(users)
+                            .where(users.c.id == existing.id)
+                            .values(
+                                email=user_config.get("email", ""),
+                                display_name=user_config.get("display_name"),
+                                password_hash=user_config.get("password_hash", ""),
+                                role=user_config.get("role", "viewer"),
+                                is_config_user=True,
+                                updated_at=datetime.now(),
+                            )
+                        )
+                    counts["updated"] += 1
+                else:
+                    counts["unchanged"] += 1
+            else:
+                # Create new config user
+                self.create_user(
+                    username=username,
+                    email=user_config.get("email", ""),
+                    password_hash=user_config.get("password_hash", ""),
+                    role=user_config.get("role", "viewer"),
+                    display_name=user_config.get("display_name"),
+                    is_config_user=True,
+                    created_by=None,  # Bootstrap user
+                )
+                counts["created"] += 1
+
+        return counts

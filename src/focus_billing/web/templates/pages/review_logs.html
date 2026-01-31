@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}Review Log - OpenChargeback{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Review Log</h1>
+        <p class="page-subtitle">
+            {{ logs | length }} action{{ 's' if logs | length != 1 else '' }} recorded
+            {% if current_period_name %}for {{ current_period_name }}{% endif %}
+        </p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <!-- Filter Bar -->
+        <form method="get" action="/review/logs" class="filter-bar">
+            <select name="period" class="filter-dropdown" onchange="this.form.submit()">
+                <option value="">All Periods</option>
+                {% for p in periods %}
+                <option value="{{ p.id }}" {% if current_period_id == p.id %}selected{% endif %}>
+                    {{ p.period }}
+                </option>
+                {% endfor %}
+            </select>
+            <select name="action" class="filter-dropdown" onchange="this.form.submit()">
+                <option value="">All Actions</option>
+                <option value="approved" {% if current_action == 'approved' %}selected{% endif %}>Approved</option>
+                <option value="rejected" {% if current_action == 'rejected' %}selected{% endif %}>Rejected</option>
+            </select>
+            {% if current_period_id or current_action %}
+            <a href="/review/logs" class="btn btn-outline btn-sm">Clear</a>
+            {% endif %}
+        </form>
+
+        {% if logs %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Action</th>
+                        <th>Period</th>
+                        <th>PI</th>
+                        <th>Resource</th>
+                        <th class="text-right">Amount</th>
+                        <th>Note</th>
+                        <th>By</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td class="text-muted">{{ log.performed_at[:16] if log.performed_at else 'N/A' }}</td>
+                        <td>
+                            {% if log.action == 'approved' %}
+                            <span class="status status-finalized"><span class="status-dot"></span>Approved</span>
+                            {% else %}
+                            <span class="status status-flagged"><span class="status-dot"></span>Rejected</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.period }}</td>
+                        <td>{{ log.pi_email }}</td>
+                        <td>
+                            <div>{{ log.resource_id or 'N/A' }}</div>
+                            {% if log.service_name %}
+                            <div class="text-muted" style="font-size: 12px;">{{ log.service_name }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="text-right font-mono">{{ log.amount | currency }}</td>
+                        <td>
+                            {% if log.note %}
+                            <span title="{{ log.note }}" style="cursor: help;">{{ log.note[:30] }}{% if log.note | length > 30 %}...{% endif %}</span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted">{{ log.performed_by or 'system' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="icon">&#128196;</div>
+            <h3>No review actions yet</h3>
+            <p>Review actions will appear here when charges are approved or rejected.</p>
+            <a href="/review" class="btn btn-outline" style="margin-top: 15px;">Go to Review</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

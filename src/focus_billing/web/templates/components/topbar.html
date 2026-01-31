@@ -33,10 +33,14 @@
                     <div class="avatar">{{ user.display_name[:2] | upper if user else 'U' }}</div>
                     <div class="dropdown-user-info">
                         <strong>{{ user.display_name if user else 'User' }}</strong>
-                        <span class="text-muted">{{ user.username if user else '' }}</span>
+                        <span class="text-muted">{{ user.username if user else '' }} ({{ user.role if user else '' }})</span>
                     </div>
                 </div>
                 <div class="dropdown-divider"></div>
+                <a href="/settings/users/change-password" class="dropdown-item">
+                    <span class="dropdown-icon">&#128274;</span>
+                    Change Password
+                </a>
                 <button type="button" class="dropdown-item" onclick="toggleTheme()">
                     <span class="dropdown-icon" id="themeIcon">&#9790;</span>
                     <span id="themeLabel">Dark Mode</span>

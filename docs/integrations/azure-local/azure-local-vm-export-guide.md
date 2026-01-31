@@ -9,7 +9,7 @@ This guide provides instructions for generating FOCUS-format billing data from A
 Before building anything, review these sections:
 
 1. **[Output Format: FOCUS CSV](#output-format-focus-csv)** — The exact columns and format your script must produce
-2. **[VM Metadata via Tags](#vm-metadata-via-tags)** — How billing info is stored in Windows Admin Center tags
+2. **[VM Metadata](#vm-metadata)** — How billing info is stored on VMs (Notes field or WAC tags)
 3. **[Cost Calculation](#cost-calculation)** — How monthly charges are computed (including proration)
 4. **[Using AI Assistance](#using-ai-assistance-for-implementation)** — How to use this doc with Copilot to generate your script
 
@@ -674,6 +674,6 @@ Be prepared to answer:
 
 ## Questions?
 
-Contact the Research Computing Billing team:
-- Email: hpc-billing@example.edu
-- Documentation: [internal wiki link]
+Contact your institution's Research Computing Billing team.
+
+> **Note**: Replace this section with your institutional contact information before distributing.

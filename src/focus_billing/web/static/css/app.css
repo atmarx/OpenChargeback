@@ -69,7 +69,8 @@ body {
 
 .nav-section {
     padding: 0 20px;
-    margin-bottom: 20px;
+    margin-top: 12px;
+    margin-bottom: 4px;
 }
 
 .nav-section-title {
@@ -77,14 +78,15 @@ body {
     text-transform: uppercase;
     letter-spacing: 1px;
     color: rgba(255,255,255,0.5);
-    margin-bottom: 10px;
+    margin-top: 12px;
+    margin-bottom: 0px;
 }
 
 .nav-item {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 20px;
+    padding: 6px 20px;
     color: rgba(255,255,255,0.8);
     text-decoration: none;
     border-left: 3px solid transparent;
@@ -480,6 +482,11 @@ tr:hover {
     margin-bottom: 2px;
 }
 
+.alert-banner.info {
+    background: #e0f2fe;
+    border-color: #7dd3fc;
+}
+
 /* Forms */
 .form-group {
     margin-bottom: 20px;
@@ -505,6 +512,12 @@ tr:hover {
 .form-input:focus {
     outline: none;
     border-color: var(--accent);
+}
+
+.form-input:disabled {
+    background: var(--bg);
+    color: var(--text-secondary);
+    cursor: not-allowed;
 }
 
 .form-error {
@@ -634,11 +647,29 @@ tr:hover {
 .flash-messages {
     position: fixed;
     top: 20px;
-    right: 20px;
+    left: 50%;
+    transform: translateX(-50%);
     z-index: 1000;
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: 10px;
+    /* Offset for sidebar: center in the content area (sidebar is ~240px) */
+    margin-left: 120px;
+}
+
+/* Login page has no sidebar, so center fully */
+.login-body .flash-messages {
+    margin-left: 0;
+}
+
+/* Mobile: no sidebar offset */
+@media (max-width: 768px) {
+    .flash-messages {
+        margin-left: 0;
+        width: calc(100% - 40px);
+        max-width: 400px;
+    }
 }
 
 .flash-message {
@@ -648,10 +679,13 @@ tr:hover {
     display: flex;
     align-items: center;
     gap: 12px;
-    animation: slideIn 0.3s ease;
-    min-width: 200px;
+    animation: slideDown 0.3s ease;
+    min-width: 280px;
+    max-width: 500px;
     background: #e8f5e9;
     color: var(--success);
+    text-align: center;
+    justify-content: center;
 }
 
 .flash-message.info {
@@ -674,14 +708,25 @@ tr:hover {
     color: var(--danger);
 }
 
-@keyframes slideIn {
+@keyframes slideDown {
     from {
-        transform: translateX(100%);
+        transform: translateY(-20px);
         opacity: 0;
     }
     to {
-        transform: translateX(0);
+        transform: translateY(0);
         opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateY(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateY(-20px);
+        opacity: 0;
     }
 }
 
@@ -936,6 +981,11 @@ tr:hover {
 .dark .alert-banner {
     background: rgba(241, 196, 15, 0.1);
     border-color: var(--warning);
+}
+
+.dark .alert-banner.info {
+    background: rgba(93, 173, 226, 0.15);
+    border-color: #5dade2;
 }
 
 .dark .login-card {

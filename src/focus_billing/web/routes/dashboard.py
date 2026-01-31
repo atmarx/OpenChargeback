@@ -43,11 +43,15 @@ async def dashboard(
     stats = None
     top_pis = []
     flagged_count = 0
+    statement_count = 0
 
     if current_period:
         stats = service.get_period_stats(current_period.id)
         top_pis = service.get_top_pis(current_period.id, limit=5)
         flagged_count = stats.flagged_count
+        # Get statement count for period action buttons
+        statements = db.get_statements_for_period(current_period.id)
+        statement_count = len(statements) if statements else 0
 
     recent_imports = service.get_recent_imports(limit=5)
 
@@ -67,6 +71,7 @@ async def dashboard(
             "recent_imports": recent_imports,
             "top_pis": top_pis,
             "flagged_count": flagged_count,
+            "statement_count": statement_count,
             "known_sources": known_sources,
         },
     )

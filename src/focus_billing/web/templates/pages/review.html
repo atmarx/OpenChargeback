@@ -11,7 +11,7 @@
             {% if current_period_name %}in {{ current_period_name }}{% endif %}
         </p>
     </div>
-    {% if total > 0 and current_period_id %}
+    {% if total > 0 and current_period_id and user.is_reviewer() %}
     <form method="post" action="/review/approve-all" style="display: inline;">
         <input type="hidden" name="period" value="{{ current_period_id }}">
         <button type="submit" class="btn btn-success" onclick="return confirm('Approve all {{ total }} flagged charges?')">
@@ -63,14 +63,16 @@
             {% endif %}
         </form>
 
-        <form id="bulk-form" method="post" hx-boost="false" hx-disable>
+        <form id="bulk-form" method="post">
             <div class="table-container">
                 <table>
                     <thead>
                         <tr>
+                            {% if user.is_reviewer() %}
                             <th style="width: 40px;">
                                 <input type="checkbox" id="select-all" onclick="toggleAll(this)">
                             </th>
+                            {% endif %}
                             <th>PI</th>
                             <th>Resource</th>
                             <th>Service</th>
@@ -82,9 +84,11 @@
                     <tbody id="review-table-body">
                         {% for charge in charges %}
                         <tr id="charge-row-{{ charge.id }}">
+                            {% if user.is_reviewer() %}
                             <td>
                                 <input type="checkbox" name="charge_ids" value="{{ charge.id }}" class="charge-checkbox">
                             </td>
+                            {% endif %}
                             <td>{{ charge.pi_email }}</td>
                             <td>
                                 <a href="/charges/{{ charge.id }}">
@@ -102,27 +106,26 @@
                             </td>
                             <td class="text-right font-mono">{{ charge.billed_cost | currency }}</td>
                             <td>
+                                {% if user.is_reviewer() %}
                                 <div class="btn-group">
                                     <button
                                         type="button"
                                         class="btn btn-sm btn-outline"
                                         style="padding: 4px 8px;"
-                                        hx-post="/review/{{ charge.id }}/approve"
-                                        hx-target="#charge-row-{{ charge.id }}"
-                                        hx-swap="outerHTML"
+                                        onclick="approveCharge({{ charge.id }})"
                                         title="Approve"
                                     >&#10003;</button>
                                     <button
                                         type="button"
                                         class="btn btn-sm btn-outline"
                                         style="padding: 4px 8px;"
-                                        hx-post="/review/{{ charge.id }}/reject"
-                                        hx-target="#charge-row-{{ charge.id }}"
-                                        hx-swap="outerHTML"
-                                        hx-confirm="Reject and delete this charge?"
+                                        onclick="rejectCharge({{ charge.id }})"
                                         title="Reject"
                                     >&#10005;</button>
                                 </div>
+                                {% else %}
+                                <span class="text-muted">View only</span>
+                                {% endif %}
                             </td>
                         </tr>
                         {% endfor %}
@@ -130,19 +133,21 @@
                 </table>
             </div>
 
+            {% if user.is_reviewer() %}
             <div class="action-row">
                 <span class="selected-count" id="selected-count">0 selected</span>
                 <div class="btn-group">
                     <button type="button" class="btn btn-sm btn-outline btn-disabled" id="reject-selected-btn"
-                        onclick="submitBulkAction('/review/reject-selected', 'Reject and delete selected charges?'); return false;">
+                        onclick="openBulkNoteModal('reject'); return false;">
                         Reject Selected
                     </button>
                     <button type="button" class="btn btn-sm btn-success btn-disabled" id="approve-selected-btn"
-                        onclick="submitBulkAction('/review/approve-selected'); return false;">
+                        onclick="openBulkNoteModal('approve'); return false;">
                         Approve Selected
                     </button>
                 </div>
             </div>
+            {% endif %}
         </form>
     </div>
 </div>
@@ -159,4 +164,238 @@
     </div>
 </div>
 {% endif %}
+
+<!-- Single Action Note Modal -->
+<div id="singleNoteModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="card" style="max-width: 450px; width: 90%; margin: 20px;">
+        <div class="card-header">
+            <h3 class="card-title" id="singleModalTitle">Approve Charge</h3>
+        </div>
+        <div class="card-body">
+            <form id="singleNoteForm">
+                <input type="hidden" id="singleChargeId" name="charge_id">
+                <input type="hidden" id="singleAction" name="action">
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="singleNote" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                        Note <span class="text-muted">(optional)</span>
+                    </label>
+                    <textarea
+                        id="singleNote"
+                        name="note"
+                        class="form-input"
+                        style="width: 100%; height: 80px;"
+                        placeholder="Add a note for the audit log..."
+                    ></textarea>
+                </div>
+                <div class="btn-group" style="justify-content: flex-end;">
+                    <button type="button" class="btn btn-outline" onclick="closeSingleModal()">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary" id="singleSubmitBtn">
+                        Approve
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Action Note Modal -->
+<div id="bulkNoteModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div class="card" style="max-width: 450px; width: 90%; margin: 20px;">
+        <div class="card-header">
+            <h3 class="card-title" id="bulkModalTitle">Approve Selected</h3>
+        </div>
+        <div class="card-body">
+            <p id="bulkCount" style="margin-bottom: 15px; color: var(--text-muted);"></p>
+            <form id="bulkNoteForm">
+                <input type="hidden" id="bulkAction" name="action">
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label for="bulkNote" style="display: block; margin-bottom: 8px; font-weight: 500;">
+                        Note <span class="text-muted">(applies to all)</span>
+                    </label>
+                    <textarea
+                        id="bulkNote"
+                        name="note"
+                        class="form-input"
+                        style="width: 100%; height: 80px;"
+                        placeholder="Add a note for the audit log..."
+                    ></textarea>
+                </div>
+                <div class="btn-group" style="justify-content: flex-end;">
+                    <button type="button" class="btn btn-outline" onclick="closeBulkModal()">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary" id="bulkSubmitBtn">
+                        Approve
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Single charge actions
+function approveCharge(chargeId) {
+    document.getElementById('singleChargeId').value = chargeId;
+    document.getElementById('singleAction').value = 'approve';
+    document.getElementById('singleModalTitle').textContent = 'Approve Charge';
+    document.getElementById('singleSubmitBtn').textContent = 'Approve';
+    document.getElementById('singleSubmitBtn').className = 'btn btn-success';
+    document.getElementById('singleNote').value = '';
+    document.getElementById('singleNoteModal').style.display = 'flex';
+}
+
+function rejectCharge(chargeId) {
+    document.getElementById('singleChargeId').value = chargeId;
+    document.getElementById('singleAction').value = 'reject';
+    document.getElementById('singleModalTitle').textContent = 'Reject Charge';
+    document.getElementById('singleSubmitBtn').textContent = 'Reject';
+    document.getElementById('singleSubmitBtn').className = 'btn btn-danger';
+    document.getElementById('singleNote').value = '';
+    document.getElementById('singleNoteModal').style.display = 'flex';
+}
+
+function closeSingleModal() {
+    document.getElementById('singleNoteModal').style.display = 'none';
+}
+
+document.getElementById('singleNoteForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const chargeId = document.getElementById('singleChargeId').value;
+    const action = document.getElementById('singleAction').value;
+    const note = document.getElementById('singleNote').value;
+
+    const formData = new FormData();
+    formData.append('note', note);
+
+    try {
+        const response = await fetch(`/review/${chargeId}/${action}`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'HX-Request': 'true'
+            }
+        });
+
+        if (response.ok) {
+            // Remove the row from the table
+            const row = document.getElementById(`charge-row-${chargeId}`);
+            if (row) row.remove();
+
+            // Update the count in the header
+            updateReviewCount();
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+
+    closeSingleModal();
+});
+
+// Bulk actions
+function openBulkNoteModal(action) {
+    const checkboxes = document.querySelectorAll('.charge-checkbox:checked');
+    if (checkboxes.length === 0) {
+        return;
+    }
+
+    document.getElementById('bulkAction').value = action;
+    document.getElementById('bulkCount').textContent =
+        `${checkboxes.length} charge${checkboxes.length !== 1 ? 's' : ''} selected`;
+
+    if (action === 'approve') {
+        document.getElementById('bulkModalTitle').textContent = 'Approve Selected';
+        document.getElementById('bulkSubmitBtn').textContent = 'Approve All';
+        document.getElementById('bulkSubmitBtn').className = 'btn btn-success';
+    } else {
+        document.getElementById('bulkModalTitle').textContent = 'Reject Selected';
+        document.getElementById('bulkSubmitBtn').textContent = 'Reject All';
+        document.getElementById('bulkSubmitBtn').className = 'btn btn-danger';
+    }
+
+    document.getElementById('bulkNote').value = '';
+    document.getElementById('bulkNoteModal').style.display = 'flex';
+}
+
+function closeBulkModal() {
+    document.getElementById('bulkNoteModal').style.display = 'none';
+}
+
+document.getElementById('bulkNoteForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const action = document.getElementById('bulkAction').value;
+    const note = document.getElementById('bulkNote').value;
+
+    // Get selected charge IDs
+    const checkboxes = document.querySelectorAll('.charge-checkbox:checked');
+    const chargeIds = Array.from(checkboxes).map(cb => cb.value);
+
+    const formData = new FormData();
+    chargeIds.forEach(id => formData.append('charge_ids', id));
+    formData.append('note', note);
+
+    const url = action === 'approve' ? '/review/approve-selected' : '/review/reject-selected';
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (response.ok) {
+            // Reload the page to show flash message and updated list
+            window.location.reload();
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+
+    closeBulkModal();
+});
+
+// Update review count in subtitle
+function updateReviewCount() {
+    const remainingRows = document.querySelectorAll('#review-table-body tr').length;
+    const subtitle = document.querySelector('.page-subtitle');
+    if (subtitle) {
+        if (remainingRows === 0) {
+            window.location.reload(); // Reload to show empty state
+        } else {
+            const text = `${remainingRows} charge${remainingRows !== 1 ? 's' : ''} need${remainingRows === 1 ? 's' : ''} review`;
+            subtitle.innerHTML = subtitle.innerHTML.replace(/\d+ charges? needs? review/, text);
+        }
+    }
+}
+
+// Existing bulk action helpers
+function toggleAll(source) {
+    const checkboxes = document.querySelectorAll('.charge-checkbox');
+    checkboxes.forEach(cb => cb.checked = source.checked);
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    const selected = document.querySelectorAll('.charge-checkbox:checked').length;
+    document.getElementById('selected-count').textContent = `${selected} selected`;
+
+    const approveBtn = document.getElementById('approve-selected-btn');
+    const rejectBtn = document.getElementById('reject-selected-btn');
+
+    if (selected > 0) {
+        approveBtn.classList.remove('btn-disabled');
+        rejectBtn.classList.remove('btn-disabled');
+    } else {
+        approveBtn.classList.add('btn-disabled');
+        rejectBtn.classList.add('btn-disabled');
+    }
+}
+
+// Add change listeners to checkboxes
+document.addEventListener('DOMContentLoaded', function() {
+    const checkboxes = document.querySelectorAll('.charge-checkbox');
+    checkboxes.forEach(cb => cb.addEventListener('change', updateSelectedCount));
+});
+</script>
 {% endblock %}

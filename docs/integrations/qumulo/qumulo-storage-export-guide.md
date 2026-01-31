@@ -288,9 +288,9 @@ Calculate `ListCost` at standard rate, `BilledCost` at tiered rates.
 
 ```csv
 BillingPeriodStart,BillingPeriodEnd,ChargePeriodStart,ChargePeriodEnd,ListCost,BilledCost,ResourceId,ResourceName,ServiceName,Tags
-2025-01-15,2025-01-15,2025-01-15,2025-01-15,3.29,2.47,climate-modeling,Climate Modeling (first 500GB free),Research Storage - Projects,"{""pi_email"": ""martinez@example.edu"", ""project_id"": ""climate-modeling"", ""fund_org"": ""NSF-ATM-2024""}"
-2025-01-15,2025-01-15,2025-01-15,2025-01-15,0.82,0.00,pilot-project,Pilot Project (fully subsidized),Research Storage - Projects,"{""pi_email"": ""jones@example.edu"", ""project_id"": ""pilot-project"", ""fund_org"": ""DEPT-PILOT""}"
-2025-01-15,2025-01-15,2025-01-15,2025-01-15,4.11,2.11,genomics-lab,Genomics Lab (faculty credits),Research Storage - Projects,"{""pi_email"": ""smith@example.edu"", ""project_id"": ""genomics-lab"", ""fund_org"": ""NIH-2024""}"
+2025-01-01,2025-01-31,2025-01-15,2025-01-15,3.29,2.47,climate-modeling,Climate Modeling (first 500GB free),Research Storage - Projects,"{""pi_email"": ""martinez@example.edu"", ""project_id"": ""climate-modeling"", ""fund_org"": ""NSF-ATM-2024""}"
+2025-01-01,2025-01-31,2025-01-15,2025-01-15,0.82,0.00,pilot-project,Pilot Project (fully subsidized),Research Storage - Projects,"{""pi_email"": ""jones@example.edu"", ""project_id"": ""pilot-project"", ""fund_org"": ""DEPT-PILOT""}"
+2025-01-01,2025-01-31,2025-01-15,2025-01-15,4.11,2.11,genomics-lab,Genomics Lab (faculty credits),Research Storage - Projects,"{""pi_email"": ""smith@example.edu"", ""project_id"": ""genomics-lab"", ""fund_org"": ""NIH-2024""}"
 ```
 
 ### Implementation Notes
@@ -328,10 +328,10 @@ Or for a subsidized project:
 Calculate in your script:
 
 ```powershell
-# Read subsidy settings from metadata
-$freeGB = if ($metadata.free_gb) { $metadata.free_gb } else { 500 }  # Default 500GB free
-$subsidyPercent = if ($metadata.subsidy_percent) { $metadata.subsidy_percent } else { 0 }
-$dailyCredit = if ($metadata.daily_credit) { $metadata.daily_credit } else { 0 }
+# Read subsidy settings from metadata (use explicit null check to handle 0 values)
+$freeGB = if ($null -ne $metadata.free_gb) { $metadata.free_gb } else { 500 }  # Default 500GB free
+$subsidyPercent = if ($null -ne $metadata.subsidy_percent) { $metadata.subsidy_percent } else { 0 }
+$dailyCredit = if ($null -ne $metadata.daily_credit) { $metadata.daily_credit } else { 0 }
 
 # Calculate costs
 $listCost = [math]::Round($usageGB * $dailyRate, 2)
@@ -689,6 +689,6 @@ Be prepared to answer:
 
 ## Questions?
 
-Contact the Research Computing Billing team:
-- Email: hpc-billing@example.edu
-- Documentation: [internal wiki link]
+Contact your institution's Research Computing Billing team.
+
+> **Note**: Replace this section with your institutional contact information before distributing.

@@ -19,17 +19,24 @@
     </div>
     <div class="btn-group">
         {% if period.status == 'open' %}
+        <button class="btn btn-success" onclick="openImportModal()">
+            <span>&#8593;</span> Import CSV
+        </button>
         <form method="post" action="/periods/{{ period.period }}/close" style="display: inline;">
             <button type="submit" class="btn btn-outline">Close Period</button>
         </form>
+        {% elif period.status == 'closed' %}
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('reopenModal').style.display='flex'">Reopen</button>
+        {% if statements %}
+        <button type="button" class="btn btn-primary" onclick="document.getElementById('finalizeModal').style.display='flex'">Finalize Period</button>
+        {% else %}
         <a href="/statements/generate?period={{ period.id }}" class="btn btn-primary">
             <span>&#9889;</span> Generate Statements
         </a>
-        {% elif period.status == 'closed' %}
-        <button type="button" class="btn btn-outline" onclick="document.getElementById('reopenModal').style.display='flex'">Reopen</button>
-        <button type="button" class="btn btn-primary" onclick="document.getElementById('finalizeModal').style.display='flex'">Finalize</button>
+        {% endif %}
         {% else %}
-        <a href="/statements?period={{ period.id }}" class="btn btn-outline">View Statements</a>
+        <a href="/statements/generate?period={{ period.id }}" class="btn btn-outline">Regenerate Statements</a>
+        <a href="/statements?period={{ period.id }}" class="btn btn-primary">Review Statements</a>
         {% endif %}
     </div>
 </div>
@@ -344,4 +351,8 @@
         </div>
     </div>
 </div>
+
+{% if period.status == 'open' %}
+{% include "components/import_modal.html" %}
+{% endif %}
 {% endblock %}
