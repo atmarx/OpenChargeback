@@ -79,7 +79,7 @@ def create_app(config_path: Path | None = None) -> FastAPI:
     app = FastAPI(
         title="OpenChargeback",
         description="Research Computing Chargeback System",
-        version="0.3.1",
+        version="0.4.1",
         docs_url=None,  # Disable Swagger UI in production
         redoc_url=None,  # Disable ReDoc in production
     )
