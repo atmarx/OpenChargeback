@@ -13,7 +13,7 @@ from .db.repository import Database
 
 # Create Typer app with subcommands
 app = typer.Typer(
-    name="focus-billing",
+    name="openchargeback",
     help="FOCUS-format billing data processor for research computing chargebacks.",
     no_args_is_help=True,
 )
@@ -57,7 +57,7 @@ def get_db(config: Config) -> Database:
 @app.command()
 def version():
     """Show version information."""
-    console.print(f"focus-billing version {__version__}")
+    console.print(f"openchargeback version {__version__}")
 
 
 @app.command()
@@ -589,7 +589,7 @@ def serve(
         if config_path:
             os.environ["FOCUS_BILLING_CONFIG"] = str(config_path)
         uvicorn.run(
-            "focus_billing.web:create_app",
+            "openchargeback.web:create_app",
             factory=True,
             host=server_host,
             port=server_port,

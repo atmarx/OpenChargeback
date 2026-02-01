@@ -3,16 +3,16 @@
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from focus_billing.db import Database
-from focus_billing.web.auth import User
-from focus_billing.web.deps import (
+from openchargeback.db import Database
+from openchargeback.web.auth import User
+from openchargeback.web.deps import (
     add_flash_message,
     get_current_period_id,
     get_current_user,
     get_db,
     get_flash_messages,
 )
-from focus_billing.web.services.stats_service import StatsService
+from openchargeback.web.services.stats_service import StatsService
 
 router = APIRouter(tags=["dashboard"])
 

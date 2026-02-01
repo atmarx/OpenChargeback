@@ -3,8 +3,8 @@
 import bcrypt as bcrypt_lib
 from pydantic import BaseModel
 
-from focus_billing.config import Config, WebUserConfig
-from focus_billing.db.repository import Database, DBUser
+from openchargeback.config import Config, WebUserConfig
+from openchargeback.db.repository import Database, DBUser
 
 
 class User(BaseModel):

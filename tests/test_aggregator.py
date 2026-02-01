@@ -2,13 +2,13 @@
 
 import pytest
 
-from focus_billing.processing.aggregator import (
+from openchargeback.processing.aggregator import (
     ProjectSummary,
     PISummary,
     GenerateResult,
     aggregate_charges,
 )
-from focus_billing.db.repository import Charge
+from openchargeback.db.repository import Charge
 
 
 def make_charge(

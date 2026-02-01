@@ -561,7 +561,7 @@ Before scheduling:
 1. Run the script manually for a single VM
 2. Verify the output CSV format
 3. Test proration with a recently-created VM
-4. Test ingestion with `focus-billing ingest --dry-run`
+4. Test ingestion with `openchargeback ingest --dry-run`
 5. Run for all VMs and verify totals
 
 ---

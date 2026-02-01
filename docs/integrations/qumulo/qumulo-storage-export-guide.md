@@ -9,7 +9,7 @@ This guide provides instructions for generating FOCUS-format billing data from Q
 Before building anything, review these sections:
 
 1. **[Output Format: FOCUS CSV](#output-format-focus-csv)** — The exact columns and format your script must produce
-2. **[Project Metadata via Dot File](#2-project-metadata-via-dot-file)** — The `.focus-billing.json` file each project needs
+2. **[Project Metadata via Dot File](#2-project-metadata-via-dot-file)** — The `.openchargeback.json` file each project needs
 3. **[Cost Calculation](#cost-calculation)** — How daily charges are computed
 4. **[Using AI Assistance](#using-ai-assistance-for-implementation)** — How to use this doc with Copilot to generate your script
 
@@ -173,7 +173,7 @@ The `Tags` column must be a JSON object with these fields:
 | `project_id` | Yes | Project identifier matching folder name |
 | `fund_org` | Yes | Fund/org code for journal export |
 
-**Important**: These values come from the `.focus-billing.json` dot file in each project folder. See "Project Metadata via Dot File" in the Implementation Guidelines section.
+**Important**: These values come from the `.openchargeback.json` dot file in each project folder. See "Project Metadata via Dot File" in the Implementation Guidelines section.
 
 ---
 
@@ -295,7 +295,7 @@ BillingPeriodStart,BillingPeriodEnd,ChargePeriodStart,ChargePeriodEnd,ListCost,B
 
 ### Implementation Notes
 
-Track subsidies in the `.focus-billing.json` metadata file:
+Track subsidies in the `.openchargeback.json` metadata file:
 
 ```json
 {
@@ -360,11 +360,11 @@ Create a dedicated service account with:
 
 ### 2. Project Metadata via Dot File
 
-Each project folder must contain a `.focus-billing.json` file with billing metadata. This keeps metadata with the project and makes PIs/project admins responsible for maintaining their own billing info.
+Each project folder must contain a `.openchargeback.json` file with billing metadata. This keeps metadata with the project and makes PIs/project admins responsible for maintaining their own billing info.
 
-**File location**: `\\files.example.edu\research_projects\{project_id}\.focus-billing.json`
+**File location**: `\\files.example.edu\research_projects\{project_id}\.openchargeback.json`
 
-#### Sample `.focus-billing.json`
+#### Sample `.openchargeback.json`
 
 ```json
 {
@@ -388,7 +388,7 @@ Each project folder must contain a `.focus-billing.json` file with billing metad
 
 #### File Permissions
 
-The `.focus-billing.json` file should be readable by project members but only writable by storage admins:
+The `.openchargeback.json` file should be readable by project members but only writable by storage admins:
 
 | Principal | Permission |
 |-----------|------------|
@@ -405,7 +405,7 @@ The `.focus-billing.json` file should be readable by project members but only wr
 
 ```powershell
 # Conceptual example - set permissions when creating the file
-$metadataPath = "\\files.example.edu\research_projects\$projectId\.focus-billing.json"
+$metadataPath = "\\files.example.edu\research_projects\$projectId\.openchargeback.json"
 
 # Create the file first
 $metadata | ConvertTo-Json | Set-Content $metadataPath
@@ -458,7 +458,7 @@ You may want to pre-populate `project_id` with the folder name when creating pro
 
 ```powershell
 # Conceptual example - reading metadata from each project
-$metadataPath = Join-Path $projectPath ".focus-billing.json"
+$metadataPath = Join-Path $projectPath ".openchargeback.json"
 
 if (Test-Path $metadataPath) {
     $metadata = Get-Content $metadataPath -Raw | ConvertFrom-Json
@@ -473,7 +473,7 @@ if (Test-Path $metadataPath) {
     $projectId = $metadata.project_id
     $fundOrg = $metadata.fund_org
 } else {
-    Write-Warning "Missing .focus-billing.json in $projectPath"
+    Write-Warning "Missing .openchargeback.json in $projectPath"
     # Options: skip project, use fallback defaults, or fail
 }
 ```
@@ -489,7 +489,7 @@ Your script should verify:
 
 #### Handling Missing Dot Files
 
-Decide on a policy for projects without `.focus-billing.json`:
+Decide on a policy for projects without `.openchargeback.json`:
 - **Skip**: Don't bill, log a warning (recommended for initial rollout)
 - **Fail**: Stop the entire export (strict enforcement)
 - **Fallback**: Use a central mapping file as backup (see below)
@@ -538,7 +538,7 @@ Your script should:
 ### 6. Validation Checks
 
 Before writing output, verify:
-- [ ] All project folders have a valid `.focus-billing.json`
+- [ ] All project folders have a valid `.openchargeback.json`
 - [ ] All required fields in dot files are populated
 - [ ] No negative usage values
 - [ ] Total usage is within expected range (sanity check)
@@ -555,7 +555,7 @@ Before writing output, verify:
 |---------|--------------|------------|
 | Access denied errors | Service account permissions | Grant read access to project folders |
 | Script timeout | Too many files to enumerate | Parallelize or use Qumulo API |
-| Missing `.focus-billing.json` | New project without metadata | Contact PI to create dot file |
+| Missing `.openchargeback.json` | New project without metadata | Contact PI to create dot file |
 | Invalid JSON in dot file | Syntax error in metadata file | Validate JSON, check for trailing commas |
 | Zero-size projects | Empty folders or permission issues | Verify folder contents and access |
 | JSON parse errors in output | Unescaped quotes in project names | Escape special characters in Tags column |
@@ -565,7 +565,7 @@ Before writing output, verify:
 Before scheduling:
 1. Run the script manually for a single project
 2. Verify the output CSV format
-3. Test ingestion with `focus-billing ingest --dry-run`
+3. Test ingestion with `openchargeback ingest --dry-run`
 4. Run for all projects and verify totals
 
 ---
@@ -615,7 +615,7 @@ from our Qumulo file server for billing purposes. Here are the requirements:
 **Environment:**
 - Qumulo file server at \\files.example.edu
 - Research project folders at \research_projects\{project_id}\
-- Each project folder contains a .focus-billing.json metadata file
+- Each project folder contains a .openchargeback.json metadata file
 - Script will run as a scheduled task under a service account
 
 **Data Collection Method:**
@@ -623,7 +623,7 @@ from our Qumulo file server for billing purposes. Here are the requirements:
 - Option A: Use Qumulo REST API at https://[cluster]:8000/v1/
 - Option B: Use PowerShell Get-ChildItem to traverse directories and sum file sizes
 
-**Metadata File Format (.focus-billing.json):**
+**Metadata File Format (.openchargeback.json):**
 {
   "pi_email": "user@example.edu",
   "project_id": "project-name",
@@ -647,7 +647,7 @@ from our Qumulo file server for billing purposes. Here are the requirements:
 - Write to: \\files.example.edu\billing_exports\qumulo\qumulo_YYYY-MM-DD.csv
 
 **Error Handling:**
-- Skip projects missing .focus-billing.json (log warning)
+- Skip projects missing .openchargeback.json (log warning)
 - Skip projects where active = false
 - Log all errors but don't fail the entire export
 - Write a summary log with total projects, total GB, errors

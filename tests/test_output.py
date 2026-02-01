@@ -5,10 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from focus_billing.output.journal import export_journal_csv, _export_default_format
-from focus_billing.processing.aggregator import PISummary, ProjectSummary, aggregate_charges
-from focus_billing.db.repository import Database, Charge
-from focus_billing.config import Config, OutputConfig
+from openchargeback.output.journal import export_journal_csv, _export_default_format
+from openchargeback.processing.aggregator import PISummary, ProjectSummary, aggregate_charges
+from openchargeback.db.repository import Database, Charge
+from openchargeback.config import Config, OutputConfig
 
 
 class TestExportJournalCSV:

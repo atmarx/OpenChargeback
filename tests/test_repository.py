@@ -2,7 +2,7 @@
 
 import pytest
 
-from focus_billing.db.repository import (
+from openchargeback.db.repository import (
     Database,
     BillingPeriod,
     Source,
@@ -731,7 +731,7 @@ class TestTransactions:
 
     def test_transaction_commits(self, db):
         """Successful operations commit via engine.begin()."""
-        from focus_billing.db.tables import billing_periods
+        from openchargeback.db.tables import billing_periods
 
         with db.engine.begin() as conn:
             conn.execute(
@@ -744,7 +744,7 @@ class TestTransactions:
 
     def test_transaction_rollbacks_on_error(self, db):
         """Errors cause rollback via engine.begin()."""
-        from focus_billing.db.tables import billing_periods
+        from openchargeback.db.tables import billing_periods
 
         try:
             with db.engine.begin() as conn:

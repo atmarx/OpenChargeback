@@ -30,7 +30,7 @@ python convert-openai-usage-to-focus-v2.py \
   --subsidies subsidies.json
 
 # 5. Import into OpenChargeback
-focus-billing ingest openai-tokens_2026-01.csv --source openai
+openchargeback ingest openai-tokens_2026-01.csv --source openai
 ```
 
 ## Files

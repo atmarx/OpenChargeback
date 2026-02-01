@@ -13,8 +13,8 @@ The version is defined in **three places** and must be updated together:
 | File | Line | Format |
 |------|------|--------|
 | `pyproject.toml` | `version = "X.Y.Z"` | Package metadata |
-| `src/focus_billing/__init__.py` | `__version__ = "X.Y.Z"` | Runtime version |
-| `src/focus_billing/web/app.py` | `version="X.Y.Z"` | API/OpenAPI spec |
+| `src/openchargeback/__init__.py` | `__version__ = "X.Y.Z"` | Runtime version |
+| `src/openchargeback/web/app.py` | `version="X.Y.Z"` | API/OpenAPI spec |
 
 ## Incrementing the Version
 
@@ -27,10 +27,10 @@ The version is defined in **three places** and must be updated together:
 sed -i 's/version = "0.2.0"/version = "0.3.0"/' pyproject.toml
 
 # __init__.py
-sed -i 's/__version__ = "0.2.0"/__version__ = "0.3.0"/' src/focus_billing/__init__.py
+sed -i 's/__version__ = "0.2.0"/__version__ = "0.3.0"/' src/openchargeback/__init__.py
 
 # app.py
-sed -i 's/version="0.2.0"/version="0.3.0"/' src/focus_billing/web/app.py
+sed -i 's/version="0.2.0"/version="0.3.0"/' src/openchargeback/web/app.py
 ```
 
 Or manually edit each file.
@@ -59,7 +59,7 @@ python -m pytest tests/ -v
 ### 5. Commit and Tag
 
 ```bash
-git add pyproject.toml src/focus_billing/__init__.py src/focus_billing/web/app.py sbom.json
+git add pyproject.toml src/openchargeback/__init__.py src/openchargeback/web/app.py sbom.json
 git commit -m "Bump version to 0.3.0"
 git tag v0.3.0
 git push origin main --tags
@@ -71,21 +71,21 @@ git push origin main --tags
 
 ```bash
 source .venv/bin/activate
-python -c "from focus_billing import __version__; print(__version__)"
+python -c "from openchargeback import __version__; print(__version__)"
 ```
 
 ### From Package Metadata
 
 ```bash
-pip show focus-billing | grep Version
+pip show openchargeback | grep Version
 ```
 
 ### From Files
 
 ```bash
 grep 'version' pyproject.toml | head -1
-grep '__version__' src/focus_billing/__init__.py
-grep 'version=' src/focus_billing/web/app.py
+grep '__version__' src/openchargeback/__init__.py
+grep 'version=' src/openchargeback/web/app.py
 ```
 
 ## Pre-release Versions

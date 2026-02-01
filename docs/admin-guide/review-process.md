@@ -80,22 +80,22 @@ When importing with `--period`, charges with different `BillingPeriodStart` date
 
 ```bash
 # List all flagged charges
-focus-billing review list
+openchargeback review list
 
 # Filter by period
-focus-billing review list --period 2025-01
+openchargeback review list --period 2025-01
 
 # Filter by flag reason
-focus-billing review list --reason missing_fund_org
+openchargeback review list --reason missing_fund_org
 
 # Approve specific charge
-focus-billing review approve --id 12345
+openchargeback review approve --id 12345
 
 # Bulk approve all for period
-focus-billing review approve --period 2025-01
+openchargeback review approve --period 2025-01
 
 # Reject a charge
-focus-billing review reject --id 12345
+openchargeback review reject --id 12345
 ```
 
 ---
@@ -132,7 +132,7 @@ If you can't make a decision:
 After verifying flagged charges are acceptable:
 
 ```bash
-focus-billing review approve --period 2025-01
+openchargeback review approve --period 2025-01
 ```
 
 > **Caution**: Only use after manually reviewing the list.

@@ -3,10 +3,10 @@
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from focus_billing.config import Config
-from focus_billing.db import Database
-from focus_billing.web.auth import authenticate_user
-from focus_billing.web.deps import add_flash_message, get_config, get_db, get_flash_messages
+from openchargeback.config import Config
+from openchargeback.db import Database
+from openchargeback.web.auth import authenticate_user
+from openchargeback.web.deps import add_flash_message, get_config, get_db, get_flash_messages
 
 router = APIRouter(tags=["auth"])
 

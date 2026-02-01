@@ -5,10 +5,10 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from focus_billing import audit
-from focus_billing.db import Database
-from focus_billing.web.auth import User
-from focus_billing.web.deps import (
+from openchargeback import audit
+from openchargeback.db import Database
+from openchargeback.web.auth import User
+from openchargeback.web.deps import (
     add_flash_message,
     get_current_period_id,
     get_current_user,
@@ -17,7 +17,7 @@ from focus_billing.web.deps import (
     get_global_flagged_count,
     require_admin,
 )
-from focus_billing.web.services.period_service import PeriodService
+from openchargeback.web.services.period_service import PeriodService
 
 router = APIRouter(prefix="/periods", tags=["periods"])
 

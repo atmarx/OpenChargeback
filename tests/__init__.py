@@ -1,1 +1,1 @@
-"""Test suite for focus-billing."""
+"""Test suite for openchargeback."""

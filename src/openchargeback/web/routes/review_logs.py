@@ -3,9 +3,9 @@
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse
 
-from focus_billing.db import Database
-from focus_billing.web.auth import User
-from focus_billing.web.deps import (
+from openchargeback.db import Database
+from openchargeback.web.auth import User
+from openchargeback.web.deps import (
     get_current_period_id,
     get_current_user,
     get_db,

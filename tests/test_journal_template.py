@@ -5,14 +5,14 @@ from pathlib import Path
 
 import pytest
 
-from focus_billing.config import (
+from openchargeback.config import (
     Config,
     ImportConfig,
     JournalConfig,
     KnownSourceConfig,
     TagMappingConfig,
 )
-from focus_billing.output.journal_template import (
+from openchargeback.output.journal_template import (
     JournalEntry,
     build_journal_entries,
     export_journal_with_template,

@@ -66,7 +66,7 @@ output:
 logging:
   level: INFO                     # DEBUG, INFO, WARN, ERROR
   format: splunk                  # "splunk" (key=value) or "json"
-  file: ./instance/logs/focus-billing.log  # Optional file output
+  file: ./instance/logs/openchargeback.log  # Optional file output
 
 # Web interface settings
 web:

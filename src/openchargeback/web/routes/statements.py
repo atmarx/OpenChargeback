@@ -5,9 +5,9 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
-from focus_billing.db import Database
-from focus_billing.web.auth import User
-from focus_billing.web.deps import (
+from openchargeback.db import Database
+from openchargeback.web.auth import User
+from openchargeback.web.deps import (
     add_flash_message,
     get_current_period_id,
     get_current_user,
@@ -121,7 +121,7 @@ async def generate_statements_route(
     db: Database = Depends(get_db),
 ):
     """Generate statements for a billing period."""
-    from focus_billing.processing.aggregator import generate_statements
+    from openchargeback.processing.aggregator import generate_statements
 
     config = request.app.state.config
 
@@ -188,7 +188,7 @@ async def download_statement(
 ):
     """Download a statement PDF."""
     from sqlalchemy import select
-    from focus_billing.db.tables import statements as stmt_table
+    from openchargeback.db.tables import statements as stmt_table
 
     with db.engine.connect() as conn:
         result = conn.execute(
@@ -232,13 +232,13 @@ async def send_statement(
     db: Database = Depends(get_db),
 ):
     """Send a statement via email."""
-    from focus_billing.delivery.email import EmailSender
+    from openchargeback.delivery.email import EmailSender
 
     config = request.app.state.config
 
     # Get statement
     from sqlalchemy import select
-    from focus_billing.db.tables import statements as stmt_table, billing_periods
+    from openchargeback.db.tables import statements as stmt_table, billing_periods
 
     with db.engine.connect() as conn:
         result = conn.execute(

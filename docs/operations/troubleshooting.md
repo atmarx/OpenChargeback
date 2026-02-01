@@ -16,13 +16,13 @@ Common issues and their solutions.
 **Solutions**:
 ```bash
 # Check if period exists
-focus-billing periods list
+openchargeback periods list
 
 # Verify data has correct dates
 head -5 billing.csv | cut -d, -f1  # Check BillingPeriodStart column
 
 # Check for flagged charges
-focus-billing review list --period 2025-01
+openchargeback review list --period 2025-01
 ```
 
 ### "Period is finalized"
@@ -89,7 +89,7 @@ Validate template:
 ```bash
 # Try generating with default template
 mv templates/statement.html templates/statement.html.bak
-focus-billing generate --period 2025-01 --dry-run
+openchargeback generate --period 2025-01 --dry-run
 ```
 
 ### "Flagged charges not appearing in statements"
@@ -98,8 +98,8 @@ focus-billing generate --period 2025-01 --dry-run
 
 **Solution**: Review and approve flagged charges before generating statements:
 ```bash
-focus-billing review list --period 2025-01
-focus-billing review approve --period 2025-01  # After verification
+openchargeback review list --period 2025-01
+openchargeback review approve --period 2025-01  # After verification
 ```
 
 ---
@@ -123,7 +123,7 @@ grep dev_mode instance/config.yaml
 ls instance/output/emails/
 
 # Check logs
-grep "email" instance/logs/focus-billing.log
+grep "email" instance/logs/openchargeback.log
 ```
 
 ### SMTP Connection Errors
@@ -213,7 +213,7 @@ location /static/ {
 1. Ensure only one instance of the application is running
 2. Check for zombie processes:
    ```bash
-   ps aux | grep focus-billing
+   ps aux | grep openchargeback
    ```
 3. Restart the application:
    ```bash
@@ -229,7 +229,7 @@ location /static/ {
 **Solution**: For development, reset the database:
 ```bash
 rm instance/billing.db
-focus-billing web  # Recreates schema
+openchargeback web  # Recreates schema
 ```
 
 For production, migrations would be needed (not currently implemented).
@@ -294,7 +294,7 @@ For large files (>10k rows):
 
 If these solutions don't resolve your issue:
 
-1. Check the logs: `instance/logs/focus-billing.log`
+1. Check the logs: `instance/logs/openchargeback.log`
 2. Enable DEBUG logging: `logging.level: DEBUG`
 3. File an issue with:
    - Error message and stack trace

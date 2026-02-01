@@ -249,7 +249,7 @@ FUND_CODE,ORGN_CODE,ACCT_CODE,PROG_CODE,ACTV_CODE,LOCN_CODE,TRANS_AMT,DR_CR_IND,
 1. Create your template in `templates/`
 2. Run a dry-run generation:
    ```bash
-   focus-billing generate --period 2025-01 --dry-run
+   openchargeback generate --period 2025-01 --dry-run
    ```
 3. Check output in `output/pdfs/` or `output/emails/`
 4. Iterate until satisfied

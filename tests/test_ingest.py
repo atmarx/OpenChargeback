@@ -5,14 +5,14 @@ from pathlib import Path
 
 import pytest
 
-from focus_billing.ingest.focus import (
+from openchargeback.ingest.focus import (
     extract_period_from_date,
     parse_tags,
     FocusIngester,
     ingest_focus_file,
 )
-from focus_billing.config import Config, TagMappingConfig, ReviewConfig
-from focus_billing.db.repository import Database
+from openchargeback.config import Config, TagMappingConfig, ReviewConfig
+from openchargeback.db.repository import Database
 
 
 class TestExtractPeriodFromDate:

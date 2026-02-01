@@ -230,7 +230,7 @@ Like Qumulo, use a dot file or mapping for billing metadata:
 
 **Option A: Dot file in each directory**
 ```
-/ifs/research/{project_id}/.focus-billing.json
+/ifs/research/{project_id}/.openchargeback.json
 ```
 
 **Option B: Central mapping file**
@@ -608,7 +608,7 @@ Before scheduling:
 1. Run for a single account: `python export_billing.py --account climate-modeling`
 2. Compare sacct totals manually
 3. Verify Isilon quota matches web UI
-4. Test ingestion with `focus-billing ingest --dry-run`
+4. Test ingestion with `openchargeback ingest --dry-run`
 
 ---
 

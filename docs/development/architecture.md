@@ -18,7 +18,7 @@ Both share the same core modules for data processing.
 ├─────────────────────────────┬───────────────────────────────────┤
 │          CLI                │              Web                  │
 │       (click)               │           (FastAPI)               │
-│    src/focus_billing/cli.py │      src/focus_billing/web/       │
+│    src/openchargeback/cli.py │      src/openchargeback/web/       │
 └──────────────┬──────────────┴──────────────┬────────────────────┘
                │                              │
                ▼                              ▼
@@ -34,7 +34,7 @@ Both share the same core modules for data processing.
 │                      Data Layer                                 │
 ├─────────────────────────────────────────────────────────────────┤
 │                   Database (SQLite)                             │
-│              src/focus_billing/db/                              │
+│              src/openchargeback/db/                              │
 └─────────────────────────────────────────────────────────────────┘
 ```
 

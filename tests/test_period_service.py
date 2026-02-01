@@ -2,8 +2,8 @@
 
 import pytest
 
-from focus_billing.db import Database
-from focus_billing.web.services.period_service import PeriodService, PeriodWithStats
+from openchargeback.db import Database
+from openchargeback.web.services.period_service import PeriodService, PeriodWithStats
 
 
 @pytest.fixture
@@ -66,7 +66,7 @@ class TestPeriodServiceSlugMethods:
 
     def test_get_period_with_stats_by_slug_with_charges(self, db, service):
         """Get period with stats includes charge statistics."""
-        from focus_billing.db.repository import Charge
+        from openchargeback.db.repository import Charge
 
         # Create period and source
         period = db.get_or_create_period("2025-01")

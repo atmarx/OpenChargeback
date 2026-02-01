@@ -117,4 +117,4 @@ Charges failing validation are flagged for review rather than rejected outright.
 2. **Use consistent tag names** across all sources
 3. **Include ResourceId** for traceability back to cloud provider
 4. **Include ChargePeriodStart/End** for detailed charge dating
-5. **Test with dry-run** before production imports: `focus-billing ingest --dry-run`
+5. **Test with dry-run** before production imports: `openchargeback ingest --dry-run`

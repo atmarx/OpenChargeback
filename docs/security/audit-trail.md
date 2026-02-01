@@ -132,25 +132,25 @@ WHERE status = 'finalized';
 ### Recent Errors
 
 ```bash
-grep "level=ERROR" focus-billing.log | tail -20
+grep "level=ERROR" openchargeback.log | tail -20
 ```
 
 ### Failed Logins (Past 24 Hours)
 
 ```bash
-grep "login_failed" focus-billing.log | grep "$(date -d 'yesterday' +%Y-%m-%d)"
+grep "login_failed" openchargeback.log | grep "$(date -d 'yesterday' +%Y-%m-%d)"
 ```
 
 ### Import History
 
 ```bash
-grep "import_completed" focus-billing.log | grep "period=2025-01"
+grep "import_completed" openchargeback.log | grep "period=2025-01"
 ```
 
 ### Email Delivery Issues
 
 ```bash
-grep "email_failed" focus-billing.log
+grep "email_failed" openchargeback.log
 ```
 
 ## Splunk Queries

@@ -3,9 +3,9 @@
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse
 
-from focus_billing.db import Database
-from focus_billing.web.auth import User
-from focus_billing.web.deps import (
+from openchargeback.db import Database
+from openchargeback.web.auth import User
+from openchargeback.web.deps import (
     add_flash_message,
     get_config,
     get_current_period_id,
@@ -83,7 +83,7 @@ async def resend_email(
 ):
     """Resend a failed email."""
     from pathlib import Path
-    from focus_billing.delivery.email import EmailSender
+    from openchargeback.delivery.email import EmailSender
 
     config = request.app.state.config
 

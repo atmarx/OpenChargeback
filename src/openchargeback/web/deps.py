@@ -4,9 +4,9 @@ from typing import Generator
 
 from fastapi import Depends, HTTPException, Request, status
 
-from focus_billing.config import Config
-from focus_billing.db import Database
-from focus_billing.web.auth import User, get_user_by_id
+from openchargeback.config import Config
+from openchargeback.db import Database
+from openchargeback.web.auth import User, get_user_by_id
 
 
 def get_config(request: Request) -> Config:

@@ -126,7 +126,7 @@ htmx is served from a local copy rather than a CDN to:
 - Ensure availability during network issues
 - Prevent CDN compromise attacks
 
-Location: `src/focus_billing/web/static/js/htmx.min.js`
+Location: `src/openchargeback/web/static/js/htmx.min.js`
 
 Update procedure: See [Dependency Upgrade Guide](../upgrades/dependencies.md#upgrading-htmx-vendored-javascript).
 

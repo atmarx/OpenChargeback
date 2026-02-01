@@ -30,12 +30,12 @@ At the beginning of each month, import billing data from all sources.
 
 ```bash
 # Import each source
-focus-billing ingest ./aws_2025-01.csv --source aws
-focus-billing ingest ./azure_2025-01.csv --source azure
-focus-billing ingest ./hpc_2025-01.csv --source hpc
+openchargeback ingest ./aws_2025-01.csv --source aws
+openchargeback ingest ./azure_2025-01.csv --source azure
+openchargeback ingest ./hpc_2025-01.csv --source hpc
 
 # Or with expected period validation
-focus-billing ingest ./aws_2025-01.csv --source aws --period 2025-01
+openchargeback ingest ./aws_2025-01.csv --source aws --period 2025-01
 ```
 
 ### What Happens During Import
@@ -88,16 +88,16 @@ Charges are flagged for manual review when they don't meet validation rules.
 
 ```bash
 # List flagged charges
-focus-billing review list --period 2025-01
+openchargeback review list --period 2025-01
 
 # Approve specific charge
-focus-billing review approve --id 12345
+openchargeback review approve --id 12345
 
 # Approve all for period (after manual verification)
-focus-billing review approve --period 2025-01
+openchargeback review approve --period 2025-01
 
 # Reject a charge
-focus-billing review reject --id 12345
+openchargeback review reject --id 12345
 ```
 
 > **Important**: Flagged charges are **excluded from statements** until approved.
@@ -120,13 +120,13 @@ After all charges are imported and reviewed, generate PDF statements.
 
 ```bash
 # Dry run - see what would be generated
-focus-billing generate --period 2025-01 --dry-run
+openchargeback generate --period 2025-01 --dry-run
 
 # Generate PDFs only
-focus-billing generate --period 2025-01
+openchargeback generate --period 2025-01
 
 # Generate and send emails
-focus-billing generate --period 2025-01 --send
+openchargeback generate --period 2025-01 --send
 ```
 
 ### Statement Contents
@@ -160,8 +160,8 @@ Export journal entries for your accounting system.
 ### Via CLI
 
 ```bash
-focus-billing export-journal --period 2025-01
-focus-billing export-journal --period 2025-01 --output ./accounting/journal.csv
+openchargeback export-journal --period 2025-01
+openchargeback export-journal --period 2025-01 --output ./accounting/journal.csv
 ```
 
 ### Export Formats
@@ -184,7 +184,7 @@ See [Journal Export](journal-export.md) for detailed format documentation.
 Closing prevents further imports while allowing reopening if needed.
 
 ```bash
-focus-billing periods close 2025-01
+openchargeback periods close 2025-01
 ```
 
 ### Finalize Period
@@ -192,7 +192,7 @@ focus-billing periods close 2025-01
 **Finalization is permanent.** Only finalize after accounting confirms receipt of journal entries.
 
 ```bash
-focus-billing periods finalize 2025-01 --notes "Sent to Banner 2025-02-05"
+openchargeback periods finalize 2025-01 --notes "Sent to Banner 2025-02-05"
 ```
 
 Finalized periods:
@@ -221,7 +221,7 @@ Finalized periods:
 
 ### "No charges found for period"
 
-1. Verify period exists: `focus-billing periods list`
+1. Verify period exists: `openchargeback periods list`
 2. Check imports: Review import logs in database or web UI
 3. Verify source data has correct `BillingPeriodStart` dates
 

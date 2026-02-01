@@ -22,7 +22,7 @@ cp config.example.yaml instance/config.yaml
 # Edit instance/config.yaml with your settings
 
 # 3. Start the web interface
-focus-billing web
+openchargeback web
 
 # 4. Open http://localhost:8000 and log in
 ```

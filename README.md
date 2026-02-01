@@ -64,14 +64,14 @@ pip install -e .
 cp config.example.yaml config.yaml
 
 # Import sample data
-focus-billing ingest sample_data/inputs/aws_2025-01.csv -s aws -p 2025-01 -c config.yaml
-focus-billing ingest sample_data/inputs/hpc_2025-01.csv -s hpc -p 2025-01 -c config.yaml
+openchargeback ingest sample_data/inputs/aws_2025-01.csv -s aws -p 2025-01 -c config.yaml
+openchargeback ingest sample_data/inputs/hpc_2025-01.csv -s hpc -p 2025-01 -c config.yaml
 
 # Generate statements (dry run)
-focus-billing generate -p 2025-01 -c config.yaml --dry-run
+openchargeback generate -p 2025-01 -c config.yaml --dry-run
 
 # Or start the web UI
-focus-billing serve -c config.yaml
+openchargeback serve -c config.yaml
 ```
 
 Open http://localhost:8000 and log in with credentials from `config.yaml`.
@@ -85,10 +85,10 @@ The CLI and web interface share the same engine. Anything you can do in the web 
 PERIOD=$(date +%Y-%m)
 CONFIG=/etc/openchargeback/config.yaml
 
-focus-billing ingest /data/aws_${PERIOD}.csv -s aws -p $PERIOD -c $CONFIG
-focus-billing ingest /data/azure_${PERIOD}.csv -s azure -p $PERIOD -c $CONFIG
-focus-billing generate -p $PERIOD -c $CONFIG --send
-focus-billing export-journal -p $PERIOD -f gl -c $CONFIG
+openchargeback ingest /data/aws_${PERIOD}.csv -s aws -p $PERIOD -c $CONFIG
+openchargeback ingest /data/azure_${PERIOD}.csv -s azure -p $PERIOD -c $CONFIG
+openchargeback generate -p $PERIOD -c $CONFIG --send
+openchargeback export-journal -p $PERIOD -f gl -c $CONFIG
 ```
 
 Statements go out, journals land in a shared folder for accounting—no web clicks required. Use the web UI for exceptions: reviewing flagged charges, adjusting patterns, one-off resends.

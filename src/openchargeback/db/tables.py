@@ -1,4 +1,4 @@
-"""SQLAlchemy table definitions for focus-billing."""
+"""SQLAlchemy table definitions for openchargeback."""
 
 from sqlalchemy import (
     Boolean,

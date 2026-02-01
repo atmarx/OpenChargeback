@@ -7,7 +7,7 @@ This preprocessor:
 2. Attributes charges to projects/PIs
 3. Applies subsidy rules (e.g., "Provost covers first $500/project/year")
 4. Splits charges between subsidy fund_org and department fund_org
-5. Outputs FOCUS-format CSV for import into focus-billing
+5. Outputs FOCUS-format CSV for import into openchargeback
 
 State is maintained in subsidy_state.json to track running totals across runs.
 """

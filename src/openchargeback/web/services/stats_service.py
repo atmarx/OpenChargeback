@@ -1,8 +1,8 @@
 """Statistics service for dashboard data."""
 
-from focus_billing.db import Database
-from focus_billing.db.repository import BillingPeriod
-from focus_billing.web.schemas import PeriodStats
+from openchargeback.db import Database
+from openchargeback.db.repository import BillingPeriod
+from openchargeback.web.schemas import PeriodStats
 
 
 class StatsService:

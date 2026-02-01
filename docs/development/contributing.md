@@ -25,7 +25,7 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 
 # Verify installation
-focus-billing --version
+openchargeback --version
 python -m pytest tests/ -v
 ```
 
@@ -65,8 +65,8 @@ from pathlib import Path
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-from focus_billing.config import Config
-from focus_billing.db import repository
+from openchargeback.config import Config
+from openchargeback.db import repository
 ```
 
 ## Testing
@@ -81,7 +81,7 @@ python -m pytest tests/ -v
 python -m pytest tests/test_config.py -v
 
 # With coverage
-python -m pytest tests/ --cov=src/focus_billing
+python -m pytest tests/ --cov=src/openchargeback
 ```
 
 ### Writing Tests
@@ -94,7 +94,7 @@ python -m pytest tests/ --cov=src/focus_billing
 ```python
 # tests/test_example.py
 import pytest
-from focus_billing.config import Config
+from openchargeback.config import Config
 
 def test_config_loads_defaults():
     config = Config()
@@ -164,15 +164,15 @@ Brief description of changes.
 
 ### Adding a New Route
 
-1. Create route module in `src/focus_billing/web/routes/`
+1. Create route module in `src/openchargeback/web/routes/`
 2. Define router with prefix
 3. Import and include in `app.py`
 4. Add templates if needed
 
 ```python
-# src/focus_billing/web/routes/new_feature.py
+# src/openchargeback/web/routes/new_feature.py
 from fastapi import APIRouter, Depends, Request
-from focus_billing.web.deps import get_config
+from openchargeback.web.deps import get_config
 
 router = APIRouter(prefix="/new-feature", tags=["new-feature"])
 
@@ -186,7 +186,7 @@ async def list_items(request: Request, config=Depends(get_config)):
 
 ### Adding a New CLI Command
 
-1. Add command in `src/focus_billing/cli.py`
+1. Add command in `src/openchargeback/cli.py`
 2. Use click decorators
 3. Access config via context
 
@@ -202,7 +202,7 @@ def new_command(ctx, example):
 
 ### Adding Database Schema
 
-1. Update `src/focus_billing/db/tables.py`
+1. Update `src/openchargeback/db/tables.py`
 2. Add repository methods in `repository.py`
 3. For existing deployments, provide migration SQL
 

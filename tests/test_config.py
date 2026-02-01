@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from focus_billing.config import (
+from openchargeback.config import (
     Config,
     DatabaseConfig,
     SmtpConfig,

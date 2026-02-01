@@ -8,7 +8,7 @@ This project uses locked dependencies to ensure reproducible builds. This guide 
 |------|---------|
 | `pyproject.toml` | Source of truth for dependency requirements (with major version bounds) |
 | `requirements.lock` | Pinned versions with SHA256 hashes for all packages |
-| `src/focus_billing/web/static/js/htmx.min.js` | Vendored htmx library (v1.9.10) |
+| `src/openchargeback/web/static/js/htmx.min.js` | Vendored htmx library (v1.9.10) |
 
 ## Upgrading Python Dependencies
 
@@ -81,18 +81,18 @@ Major version upgrades require changing the bounds in `pyproject.toml`.
 
 ## Upgrading htmx (Vendored JavaScript)
 
-htmx is served locally from `src/focus_billing/web/static/js/htmx.min.js`.
+htmx is served locally from `src/openchargeback/web/static/js/htmx.min.js`.
 
 ### Steps to Upgrade
 
 1. Check current version:
    ```bash
-   head -1 src/focus_billing/web/static/js/htmx.min.js
+   head -1 src/openchargeback/web/static/js/htmx.min.js
    ```
 
 2. Download new version (check https://htmx.org for latest):
    ```bash
-   curl -o src/focus_billing/web/static/js/htmx.min.js \
+   curl -o src/openchargeback/web/static/js/htmx.min.js \
      https://unpkg.com/htmx.org@1.9.12/dist/htmx.min.js
    ```
 
@@ -104,7 +104,7 @@ htmx is served locally from `src/focus_billing/web/static/js/htmx.min.js`.
 
 4. Commit the change:
    ```bash
-   git add src/focus_billing/web/static/js/htmx.min.js
+   git add src/openchargeback/web/static/js/htmx.min.js
    git commit -m "chore: upgrade htmx to 1.9.12"
    ```
 

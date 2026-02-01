@@ -48,19 +48,19 @@ for f in sample_data/inputs/*_${PERIOD}.csv; do
         # Extract source name from filename (e.g., aws_2025-01.csv -> aws)
         srcname=$(basename "$f" | sed "s/_${PERIOD}.csv//")
         echo "  Ingesting $srcname..."
-        focus-billing ingest "$f" -s "$srcname" -p "$PERIOD" -c "$CONFIG" > /dev/null
+        openchargeback ingest "$f" -s "$srcname" -p "$PERIOD" -c "$CONFIG" > /dev/null
     fi
 done
 
 # Step 3: Generate statements and send emails (dev_mode saves to files)
 echo ""
 echo "Step 3: Generating PDF statements and emails..."
-focus-billing generate -p "$PERIOD" -c "$CONFIG" --send
+openchargeback generate -p "$PERIOD" -c "$CONFIG" --send
 
 # Step 4: Export journal
 echo ""
 echo "Step 4: Exporting journal (GL format)..."
-focus-billing export-journal -p "$PERIOD" -f gl -c "$CONFIG"
+openchargeback export-journal -p "$PERIOD" -f gl -c "$CONFIG"
 
 # Step 5: Copy outputs to sample_data/outputs
 echo ""

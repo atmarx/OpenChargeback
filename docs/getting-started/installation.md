@@ -43,10 +43,10 @@ See [Operations: Docker](../operations/docker.md) for production deployment deta
 
 ```bash
 # Check CLI is available
-focus-billing --help
+openchargeback --help
 
 # Check version
-focus-billing --version
+openchargeback --version
 ```
 
 ## Directory Structure

@@ -25,14 +25,14 @@ pip install -e ".[dev]"
 python -m pytest tests/ -v
 
 # Start development server
-focus-billing web
+openchargeback web
 ```
 
 ## Project Structure
 
 ```
 openchargeback/
-├── src/focus_billing/     # Main package
+├── src/openchargeback/     # Main package
 │   ├── cli.py             # CLI entry points
 │   ├── config.py          # Configuration (Pydantic models)
 │   ├── db/                # Database layer (SQLAlchemy Core)

@@ -8,11 +8,11 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 
-from focus_billing import audit
-from focus_billing.db import Database
-from focus_billing.output.journal_template import export_journal_with_template
-from focus_billing.web.auth import User
-from focus_billing.web.deps import (
+from openchargeback import audit
+from openchargeback.db import Database
+from openchargeback.output.journal_template import export_journal_with_template
+from openchargeback.web.auth import User
+from openchargeback.web.deps import (
     get_current_period_id,
     get_current_user,
     get_db,
@@ -138,7 +138,7 @@ async def export_journal(
     period = db.get_period_by_id(period_id)
     if not period:
         from fastapi.responses import RedirectResponse
-        from focus_billing.web.deps import add_flash_message
+        from openchargeback.web.deps import add_flash_message
         add_flash_message(request, "error", "Period not found.")
         return RedirectResponse(url="/journal", status_code=303)
 

@@ -9,8 +9,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
-from focus_billing import audit
-from focus_billing.config import Config, load_config
+from openchargeback import audit
+from openchargeback.config import Config, load_config
 
 
 def simple_markdown(text: str) -> str:
@@ -118,7 +118,7 @@ def create_app(config_path: Path | None = None) -> FastAPI:
     app.state.templates = templates
 
     # Include routers
-    from focus_billing.web.routes import (
+    from openchargeback.web.routes import (
         auth_routes,
         charges,
         dashboard,
@@ -155,7 +155,7 @@ def create_app(config_path: Path | None = None) -> FastAPI:
     @app.on_event("startup")
     async def startup_sync_users():
         """Sync config.yaml users to database on startup."""
-        from focus_billing.db import Database
+        from openchargeback.db import Database
 
         if config.web.users:
             db = Database(config.database.path)

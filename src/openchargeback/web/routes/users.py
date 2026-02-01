@@ -3,9 +3,9 @@
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from focus_billing.db import Database
-from focus_billing.web.auth import User, hash_password
-from focus_billing.web.deps import (
+from openchargeback.db import Database
+from openchargeback.web.auth import User, hash_password
+from openchargeback.web.deps import (
     add_flash_message,
     get_current_period_id,
     get_current_user,
@@ -320,7 +320,7 @@ async def change_password(
     db: Database = Depends(get_db),
 ):
     """Change the current user's password (self-service)."""
-    from focus_billing.web.auth import verify_password
+    from openchargeback.web.auth import verify_password
 
     config = request.app.state.config
 

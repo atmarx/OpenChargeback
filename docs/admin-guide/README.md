@@ -26,8 +26,8 @@ This section covers administrative tasks for billing coordinators and IT staff w
 
 | Task | CLI | Web UI |
 |------|-----|--------|
-| Import data | `focus-billing ingest` | Dashboard → Import |
-| Review charges | `focus-billing review list` | Review Queue |
-| Generate statements | `focus-billing generate` | Statements → Generate |
-| Export journal | `focus-billing export-journal` | Journal Export |
-| Close period | `focus-billing periods close` | Periods → Close |
+| Import data | `openchargeback ingest` | Dashboard → Import |
+| Review charges | `openchargeback review list` | Review Queue |
+| Generate statements | `openchargeback generate` | Statements → Generate |
+| Export journal | `openchargeback export-journal` | Journal Export |
+| Close period | `openchargeback periods close` | Periods → Close |

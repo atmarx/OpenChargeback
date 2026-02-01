@@ -300,7 +300,7 @@ result = calculation
 Before scheduling:
 1. Run the script manually for a single {resource}
 2. Verify the output CSV format
-3. Test ingestion with `focus-billing ingest --dry-run`
+3. Test ingestion with `openchargeback ingest --dry-run`
 4. Run for all {resources} and verify totals
 ```
 

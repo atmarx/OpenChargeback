@@ -3,8 +3,8 @@
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 
-from focus_billing.web.auth import User
-from focus_billing.web.deps import get_current_user, get_flash_messages
+from openchargeback.web.auth import User
+from openchargeback.web.deps import get_current_user, get_flash_messages
 
 
 router = APIRouter(prefix="/help", tags=["help"])

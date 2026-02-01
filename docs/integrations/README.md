@@ -99,6 +99,6 @@ imports:
    - Dates in correct format
 4. Test import with dry-run:
    ```bash
-   focus-billing ingest sample.csv --source yoursource --dry-run
+   openchargeback ingest sample.csv --source yoursource --dry-run
    ```
 5. Verify charges appear correctly in web UI

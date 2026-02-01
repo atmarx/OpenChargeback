@@ -146,7 +146,7 @@ case $ACTION in
                 source .venv/bin/activate
                 pip install -e .
             }
-            focus-billing serve --reload --config instance/config.yaml --host 0.0.0.0
+            openchargeback serve --reload --config instance/config.yaml --host 0.0.0.0
         else
             # In prod mode, use Docker
             dc up $DOCKER_OPTS --build
@@ -188,7 +188,7 @@ case $ACTION in
         echo -e "${BLUE}Starting with auto-reload enabled...${NC}"
         echo -e "${GREEN}Open http://127.0.0.1:8000 in your browser${NC}"
         echo ""
-        focus-billing serve --reload --config instance/config.yaml --host 0.0.0.0
+        openchargeback serve --reload --config instance/config.yaml --host 0.0.0.0
         ;;
 
     status)

@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "focus-billing"
+name = "openchargeback"
 version = "0.3.1"
 description = "FOCUS-format billing data processor for research computing chargebacks"
 readme = "README.md"
@@ -53,10 +53,10 @@ dev = [
 ]
 
 [project.scripts]
-focus-billing = "focus_billing.cli:app"
+openchargeback = "openchargeback.cli:app"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/focus_billing"]
+packages = ["src/openchargeback"]
 
 [tool.ruff]
 target-version = "py310"
@@ -75,7 +75,7 @@ ignore = [
 ]
 
 [tool.ruff.isort]
-known-first-party = ["focus_billing"]
+known-first-party = ["openchargeback"]
 
 [tool.mypy]
 python_version = "3.10"

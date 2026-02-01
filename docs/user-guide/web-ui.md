@@ -6,7 +6,7 @@ The web interface provides a dashboard for managing billing periods, reviewing c
 
 ```bash
 # From CLI
-focus-billing web
+openchargeback web
 
 # Or with Docker
 docker compose -f docker/docker-compose.yml up -d

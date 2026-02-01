@@ -9,7 +9,7 @@ logging:
   enabled: true
   level: INFO                     # DEBUG, INFO, WARN, WARNING, ERROR
   format: splunk                  # "splunk" (key=value) or "json"
-  file: ./instance/logs/focus-billing.log  # Optional file output
+  file: ./instance/logs/openchargeback.log  # Optional file output
 ```
 
 ## Log Levels
@@ -55,7 +55,7 @@ When `logging.file` is configured, logs are written to both stderr and the file:
 
 ```yaml
 logging:
-  file: ./instance/logs/focus-billing.log
+  file: ./instance/logs/openchargeback.log
 ```
 
 The parent directory is created automatically if it doesn't exist.
@@ -65,7 +65,7 @@ The parent directory is created automatically if it doesn't exist.
 For file-based logging, configure logrotate:
 
 ```
-/path/to/instance/logs/focus-billing.log {
+/path/to/instance/logs/openchargeback.log {
     daily
     rotate 14
     compress
@@ -139,7 +139,7 @@ For JSON format logs, use the Datadog agent log configuration:
 ```yaml
 logs:
   - type: file
-    path: /path/to/focus-billing.log
+    path: /path/to/openchargeback.log
     service: openchargeback
     source: python
 ```
@@ -149,19 +149,19 @@ logs:
 ### "Why wasn't this charge imported?"
 
 ```bash
-grep "charge_id=ABC123" focus-billing.log
+grep "charge_id=ABC123" openchargeback.log
 # Or search for the period
-grep "period=2025-01" focus-billing.log | grep -E "(flagged|rejected)"
+grep "period=2025-01" openchargeback.log | grep -E "(flagged|rejected)"
 ```
 
 ### "Why did this email fail?"
 
 ```bash
-grep "email_failed" focus-billing.log | grep "smith@example.edu"
+grep "email_failed" openchargeback.log | grep "smith@example.edu"
 ```
 
 ### "What happened during this import?"
 
 ```bash
-grep "ingest" focus-billing.log | grep "2026-01-08T12:15"
+grep "ingest" openchargeback.log | grep "2026-01-08T12:15"
 ```

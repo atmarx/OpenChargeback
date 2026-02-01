@@ -2,7 +2,7 @@
 
 > **Note**: For CI (tests, linting, security scanning), see [`azure-pipelines.yml`](../../azure-pipelines.yml) in the repository root. This guide covers deployment to Azure App Service.
 
-This guide covers deploying focus-billing to Azure App Service with:
+This guide covers deploying openchargeback to Azure App Service with:
 
 - Infrastructure as Code using Bicep
 - CI/CD via Azure DevOps Pipelines or GitHub Actions
@@ -21,7 +21,7 @@ This guide covers deploying focus-billing to Azure App Service with:
 ┌─────────────────────────────────────────────────────────────┐
 │                    Azure App Service (B1)                    │
 │  ┌─────────────────────────────────────────────────────┐    │
-│  │           focus-billing Container (Port 8000)        │    │
+│  │           openchargeback Container (Port 8000)        │    │
 │  └─────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
          │                    │                    │
@@ -76,7 +76,7 @@ param location string = resourceGroup().location
 @description('Container image tag')
 param imageTag string = 'latest'
 
-var appName = 'focus-billing-${environmentName}'
+var appName = 'openchargeback-${environmentName}'
 
 // Container Registry
 resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
@@ -97,7 +97,7 @@ resource storage 'Microsoft.Storage/storageAccounts@2023-01-01' = {
     name: 'default'
 
     resource dataShare 'shares' = {
-      name: 'focus-billing-data'
+      name: 'openchargeback-data'
     }
   }
 }
@@ -143,7 +143,7 @@ resource appService 'Microsoft.Web/sites@2023-01-01' = {
   properties: {
     serverFarmId: appServicePlan.id
     siteConfig: {
-      linuxFxVersion: 'DOCKER|${acr.properties.loginServer}/focus-billing:${imageTag}'
+      linuxFxVersion: 'DOCKER|${acr.properties.loginServer}/openchargeback:${imageTag}'
       alwaysOn: true
       httpLoggingEnabled: true
       appSettings: [
@@ -159,7 +159,7 @@ resource appService 'Microsoft.Web/sites@2023-01-01' = {
         data: {
           type: 'AzureFiles'
           accountName: storage.name
-          shareName: 'focus-billing-data'
+          shareName: 'openchargeback-data'
           mountPath: '/data'
           accessKey: storage.listKeys().keys[0].value
         }
@@ -214,7 +214,7 @@ dependencies = [
 
 ### ACS Email Provider
 
-Create `src/focus_billing/delivery/acs.py`:
+Create `src/openchargeback/delivery/acs.py`:
 
 ```python
 from azure.communication.email import EmailClient
@@ -265,9 +265,9 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  resourceGroup: 'focus-billing-rg'
+  resourceGroup: 'openchargeback-rg'
   acrName: 'focusbillingprodacr'
-  appName: 'focus-billing-prod'
+  appName: 'openchargeback-prod'
 
 stages:
   - stage: Build
@@ -283,8 +283,8 @@ stages:
               inlineScript: |
                 az acr build \
                   --registry $(acrName) \
-                  --image focus-billing:$(Build.SourceVersion) \
-                  --image focus-billing:latest \
+                  --image openchargeback:$(Build.SourceVersion) \
+                  --image openchargeback:latest \
                   --file docker/Dockerfile \
                   .
 
@@ -326,9 +326,9 @@ on:
     branches: [main]
 
 env:
-  RESOURCE_GROUP: focus-billing-rg
+  RESOURCE_GROUP: openchargeback-rg
   ACR_NAME: focusbillingprodacr
-  APP_NAME: focus-billing-prod
+  APP_NAME: openchargeback-prod
 
 jobs:
   build-and-deploy:
@@ -351,8 +351,8 @@ jobs:
         run: |
           az acr build \
             --registry ${{ env.ACR_NAME }} \
-            --image focus-billing:${{ github.sha }} \
-            --image focus-billing:latest \
+            --image openchargeback:${{ github.sha }} \
+            --image openchargeback:latest \
             --file docker/Dockerfile \
             .
 
@@ -387,10 +387,10 @@ jobs:
 Create secrets via CLI:
 
 ```bash
-az keyvault secret set --vault-name focus-billing-prod-kv \
+az keyvault secret set --vault-name openchargeback-prod-kv \
   --name web-secret-key --value "$(openssl rand -base64 32)"
 
-az keyvault secret set --vault-name focus-billing-prod-kv \
+az keyvault secret set --vault-name openchargeback-prod-kv \
   --name acs-connection-string --value "<your-connection-string>"
 ```
 
@@ -418,13 +418,13 @@ az keyvault secret set --vault-name focus-billing-prod-kv \
 
 1. **Create Resource Group**:
    ```bash
-   az group create --name focus-billing-rg --location eastus
+   az group create --name openchargeback-rg --location eastus
    ```
 
 2. **Deploy Infrastructure**:
    ```bash
    az deployment group create \
-     --resource-group focus-billing-rg \
+     --resource-group openchargeback-rg \
      --template-file infra/main.bicep
    ```
 
@@ -439,7 +439,7 @@ az keyvault secret set --vault-name focus-billing-prod-kv \
 View logs in Azure Portal under **App Service** > **Log stream**, or query via CLI:
 
 ```bash
-az webapp log tail --name focus-billing-prod --resource-group focus-billing-rg
+az webapp log tail --name openchargeback-prod --resource-group openchargeback-rg
 ```
 
 Enable Application Insights for advanced monitoring (optional, adds ~$2-5/month).

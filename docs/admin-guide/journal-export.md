@@ -143,10 +143,10 @@ Total debits ($2,250) = Total credits ($2,250) ✓
 
 ```bash
 # Default format (Standard Detail)
-focus-billing export-journal --period 2025-01
+openchargeback export-journal --period 2025-01
 
 # Custom output path
-focus-billing export-journal --period 2025-01 --output ./accounting/jan.csv
+openchargeback export-journal --period 2025-01 --output ./accounting/jan.csv
 ```
 
 ### Output Location

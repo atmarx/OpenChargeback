@@ -78,7 +78,7 @@ If the schema is corrupted or needs reset:
 ```bash
 # Delete and let app recreate
 rm instance/billing.db
-focus-billing web  # Will create new database
+openchargeback web  # Will create new database
 ```
 
 > **Warning**: This deletes all data. Use only in development or after backup.

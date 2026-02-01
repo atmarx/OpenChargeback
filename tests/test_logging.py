@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from focus_billing.logging import (
+from openchargeback.logging import (
     splunk_processor,
     json_processor,
 )
