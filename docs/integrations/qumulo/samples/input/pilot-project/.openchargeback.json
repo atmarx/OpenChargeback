@@ -1,0 +1,15 @@
+{
+  "pi_email": "tarn.voxley@example.edu",
+  "project_id": "pilot-project",
+  "fund_org": "DEPT-PILOT-2025",
+  "cost_center": "CC-99999",
+  "reference_1": "",
+  "reference_2": "PILOT-001",
+  "end_date": "2025-06-30",
+  "reconciliation_end": "2025-09-30",
+  "active": true,
+  "free_gb": 0,
+  "subsidy_percent": 100,
+  "daily_credit": 0.00,
+  "notes": "Fully subsidized pilot project, expires June 2025"
+}

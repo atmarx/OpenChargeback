@@ -68,21 +68,22 @@ Enterprise FinOps tools exist, but they're designed for organizations spending m
 python -m venv .venv && source .venv/bin/activate
 pip install -e .
 
-# Copy and edit configuration
-cp config.example.yaml config.yaml
+# Set up instance directory with config
+mkdir -p instance
+cp config.example.yaml instance/config.yaml
 
 # Import sample data
-openchargeback ingest sample_data/inputs/aws_2025-01.csv -s aws -p 2025-01 -c config.yaml
-openchargeback ingest sample_data/inputs/hpc_2025-01.csv -s hpc -p 2025-01 -c config.yaml
+openchargeback ingest sample_data/inputs/aws_2025-01.csv -s aws -p 2025-01 -c instance/config.yaml
+openchargeback ingest sample_data/inputs/hpc_2025-01.csv -s hpc -p 2025-01 -c instance/config.yaml
 
 # Generate statements (dry run)
-openchargeback generate -p 2025-01 -c config.yaml --dry-run
+openchargeback generate -p 2025-01 -c instance/config.yaml --dry-run
 
 # Or start the web UI
-openchargeback serve -c config.yaml
+openchargeback serve -c instance/config.yaml
 ```
 
-Open http://localhost:8000 and log in with credentials from `config.yaml`.
+Open http://localhost:8000 and log in with credentials from `instance/config.yaml`.
 
 ## CLI Automation
 

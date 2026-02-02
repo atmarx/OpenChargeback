@@ -1,0 +1,15 @@
+{
+  "pi_email": "quib.flannister@example.edu",
+  "project_id": "climate-modeling",
+  "fund_org": "NSF-ATM-2024",
+  "cost_center": "CC-12345",
+  "reference_1": "ATM-2024-78901",
+  "reference_2": "REQ-2024-0042",
+  "end_date": "2026-06-30",
+  "reconciliation_end": "2026-09-30",
+  "active": true,
+  "free_gb": 500,
+  "subsidy_percent": 0,
+  "daily_credit": 0.00,
+  "notes": "NSF Climate Modeling grant, expires June 2026"
+}

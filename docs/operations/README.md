@@ -95,7 +95,7 @@ scripts/service.sh --start --env prod
 
 ## Configuration
 
-Copy `config.example.yaml` to `config.yaml` and customize:
+Copy `config.example.yaml` to `instance/config.yaml` and customize:
 
 ```yaml
 # Development mode - emails go to files instead of SMTP
@@ -105,7 +105,7 @@ dev_mode: false
 currency: "$"
 
 database:
-  path: ./billing.db
+  path: ./instance/billing.db
 
 # SMTP settings for email delivery
 smtp:
@@ -549,7 +549,7 @@ This creates balanced double-entry accounting where charges to PIs are offset by
 
 ## Database
 
-SQLite database (`billing.db` by default) with tables:
+SQLite database (`instance/billing.db` by default) with tables:
 
 | Table | Purpose |
 |-------|---------|

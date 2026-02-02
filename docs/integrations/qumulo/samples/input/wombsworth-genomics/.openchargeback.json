@@ -1,0 +1,15 @@
+{
+  "pi_email": "plex.wombsworth@example.edu",
+  "project_id": "wombsworth-genomics",
+  "fund_org": "NSF-BIO-2024",
+  "cost_center": "CC-11111",
+  "reference_1": "BIO-2024-55555",
+  "reference_2": "REQ-2024-0099",
+  "end_date": "2025-12-31",
+  "reconciliation_end": "2026-03-31",
+  "active": true,
+  "free_gb": 1000,
+  "subsidy_percent": 0,
+  "daily_credit": 0.00,
+  "notes": "Large genomics project, 1TB free allocation"
+}

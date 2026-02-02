@@ -2,7 +2,30 @@
 
 This guide provides instructions for generating FOCUS-format billing data from Qumulo file server storage usage. The export should run nightly to enable daily-granularity billing (GB-days or TB-days).
 
-> **Don't panic.** This document is detailed, but you don't need to write everything from scratch. After reviewing the key sections below, you can use your institutional AI assistant (Copilot) to generate the implementation. See [Using AI Assistance](#using-ai-assistance-for-implementation) at the end.
+## Reference Implementation
+
+A complete reference implementation is provided:
+
+- **[Export-QumuloBilling.ps1](Export-QumuloBilling.ps1)** — PowerShell script with:
+  - `--init force` / `--init interactive` modes to create `.openchargeback.json` metadata files
+  - SMB directory enumeration or Qumulo REST API for usage data
+  - Automatic ACL protection on metadata files
+  - SIEM-compatible audit logging (Text, JSON, Splunk formats)
+
+Quick start:
+```powershell
+# Initialize metadata files for all projects
+.\Export-QumuloBilling.ps1 -Init interactive -RootPath "\\files.example.edu\research_projects"
+
+# Export billing data
+.\Export-QumuloBilling.ps1 -BillingPeriod "2025-01" -RootPath "\\files.example.edu\research_projects"
+```
+
+See [config/](config/) for rates and template files, [samples/](samples/) for example data, [Logs/](Logs/) for audit log formats.
+
+---
+
+> **Note:** This document is detailed, but you don't need to write everything from scratch. The reference script above handles most cases. Use this guide to understand the underlying logic or customize for your environment.
 
 ### Must-Read Sections
 
@@ -366,24 +389,44 @@ Each project folder must contain a `.openchargeback.json` file with billing meta
 
 #### Sample `.openchargeback.json`
 
+See [config/template.openchargeback.json](config/template.openchargeback.json) for the full template. Minimal example:
+
 ```json
 {
-  "pi_email": "martinez.sofia@example.edu",
+  "pi_email": "quib.flannister@example.edu",
   "project_id": "climate-modeling",
   "fund_org": "NSF-ATM-2024",
+  "cost_center": "CC-12345",
+  "reference_1": "ATM-2024-78901",
+  "reference_2": "",
+  "end_date": "2026-06-30",
+  "reconciliation_end": "2026-09-30",
   "active": true,
+  "free_gb": 500,
+  "subsidy_percent": 0,
+  "daily_credit": 0.00,
   "notes": "NSF grant ATM-2024123, expires 2026-08-31"
 }
 ```
 
 #### Field Reference
 
+See [TAG-SPECIFICATION.md](../TAG-SPECIFICATION.md) for the complete schema shared across all integrations.
+
 | Field | Required | Description |
 |-------|----------|-------------|
 | `pi_email` | Yes | PI's university email address |
 | `project_id` | Yes | Should match the folder name exactly |
 | `fund_org` | Yes | Fund/org code for journal entries |
+| `cost_center` | No | Institutional cost center code |
+| `reference_1` | No | Custom field (e.g., grant number) |
+| `reference_2` | No | Custom field (e.g., request ID) |
+| `end_date` | No | Project/grant end date (YYYY-MM-DD) |
+| `reconciliation_end` | No | Final date for charges (YYYY-MM-DD) |
 | `active` | No | Set to `false` to skip billing (default: `true`) |
+| `free_gb` | No | Free allocation in GB (default: from config) |
+| `subsidy_percent` | No | Percentage subsidy (0-100, default: 0) |
+| `daily_credit` | No | Daily credit amount in dollars |
 | `notes` | No | Free-form notes (not exported to billing) |
 
 #### File Permissions

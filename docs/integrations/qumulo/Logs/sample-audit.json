@@ -1,0 +1,22 @@
+{
+  "eventType": "QumuloBillingExport",
+  "timestamp": "2025-01-31T14:30:00Z",
+  "user": "YOURDOM\\svc-billing",
+  "computer": "STORAGE-MGMT-01",
+  "parameters": {
+    "billingPeriod": "2025-01",
+    "rootPath": "\\\\files.example.edu\\research_projects",
+    "mode": "SMB"
+  },
+  "results": {
+    "duration": "00:05:42",
+    "projectsProcessed": 4,
+    "projectsSkipped": 1,
+    "totalListCost": 921.60,
+    "totalBilledCost": 732.25,
+    "totalSubsidyAmount": 189.35,
+    "errors": 0,
+    "warnings": 1
+  },
+  "outputFile": "C:\\BillingExports\\qumulo_2025-01.csv"
+}

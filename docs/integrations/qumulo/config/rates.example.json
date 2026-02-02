@@ -1,0 +1,7 @@
+{
+  "serviceName": "Research Storage - Projects",
+  "monthlyRatePerGB": 0.05,
+  "defaultFreeGB": 500,
+  "description": "Qumulo file storage for research projects",
+  "notes": "Customize these values for your institution's pricing model."
+}

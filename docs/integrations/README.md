@@ -11,8 +11,9 @@ Before implementing any integration, review the [TAG-SPECIFICATION.md](TAG-SPECI
 | Integration | Guide | Description |
 |-------------|-------|-------------|
 | Azure Local | [azure-local/](azure-local/) | Azure Stack HCI/Azure Local VM billing |
-| Slurm/HPC | [slurm/](slurm/) | HPC cluster job accounting with Isilon storage |
-| Qumulo | [qumulo/](qumulo/) | Storage billing from Qumulo NAS |
+| Isilon | [isilon/](isilon/) | Dell/EMC Isilon storage quota billing |
+| Qumulo | [qumulo/](qumulo/) | Qumulo NAS storage billing with `.openchargeback.json` metadata |
+| Slurm/HPC | [slurm/](slurm/) | HPC cluster job accounting |
 | OpenAI Tokens | [openai-tokens/](openai-tokens/) | OpenAI EDU billing with subsidy support |
 | AWS | Planned | AWS Cost Explorer integration |
 | Azure (Cloud) | Planned | Azure Cost Management integration |

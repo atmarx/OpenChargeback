@@ -1,0 +1,15 @@
+{
+  "pi_email": "",
+  "project_id": "",
+  "fund_org": "",
+  "cost_center": "",
+  "reference_1": "",
+  "reference_2": "",
+  "end_date": "",
+  "reconciliation_end": "",
+  "active": true,
+  "free_gb": 500,
+  "subsidy_percent": 0,
+  "daily_credit": 0.00,
+  "notes": ""
+}

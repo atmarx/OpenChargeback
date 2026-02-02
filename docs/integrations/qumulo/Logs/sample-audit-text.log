@@ -1,0 +1,16 @@
+=== Qumulo Storage Billing Export - Audit Log ===
+Timestamp: 2025-01-31T14:30:00Z
+User: YOURDOM\svc-billing
+Computer: STORAGE-MGMT-01
+BillingPeriod: 2025-01
+RootPath: \\files.example.edu\research_projects
+Mode: SMB
+Duration: 00:05:42
+ProjectsProcessed: 4
+ProjectsSkipped: 1
+TotalListCost: 921.60
+TotalBilledCost: 732.25
+TotalSubsidyAmount: 189.35
+Errors: 0
+Warnings: 1
+OutputFile: C:\BillingExports\qumulo_2025-01.csv

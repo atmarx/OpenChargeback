@@ -1,0 +1,15 @@
+{
+  "pi_email": "frin.bumberly@example.edu",
+  "project_id": "bumberly-lab",
+  "fund_org": "NIH-2024-001",
+  "cost_center": "CC-67890",
+  "reference_1": "R01-GM-123456",
+  "reference_2": "",
+  "end_date": "2027-03-31",
+  "reconciliation_end": "2027-06-30",
+  "active": true,
+  "free_gb": 500,
+  "subsidy_percent": 25,
+  "daily_credit": 0.00,
+  "notes": "NIH R01 grant, core facility gets 25% subsidy"
+}
