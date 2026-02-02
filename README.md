@@ -41,6 +41,14 @@ Enterprise FinOps tools exist, but they're designed for organizations spending m
              └──────────┘  └──────────┘  └──────────┘
 ```
 
+## Screenshots
+
+[![Dashboard](docs/images/Dashboard-OpenChargeback-thumb.webp)](docs/images/Dashboard-OpenChargeback.webp)
+[![Billing Period](docs/images/Period-2025-01-OpenChargeback-thumb.webp)](docs/images/Period-2025-01-OpenChargeback.webp)
+[![Projects](docs/images/Projects-OpenChargeback-thumb.webp)](docs/images/Projects-OpenChargeback.webp)
+[![Statements](docs/images/Statements-OpenChargeback-thumb.webp)](docs/images/Statements-OpenChargeback.webp)
+[![Settings](docs/images/Settings-OpenChargeback-thumb.webp)](docs/images/Settings-OpenChargeback.webp)
+
 ## Features
 
 - **Multi-source billing** — Combine AWS, Azure, GCP, HPC, and storage in one view
