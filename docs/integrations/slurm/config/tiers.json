@@ -1,0 +1,36 @@
+{
+  "serviceName": "HPC Compute",
+  "partitions": {
+    "def": {
+      "suMultiplier": 1,
+      "subsidyPercent": 0,
+      "description": "Standard CPU"
+    },
+    "def-sm": {
+      "suMultiplier": 1,
+      "subsidyPercent": 100,
+      "description": "Free-tier CPU"
+    },
+    "gpu": {
+      "suMultiplier": 20,
+      "subsidyPercent": 0,
+      "description": "GPU"
+    },
+    "gpu-sm": {
+      "suMultiplier": 20,
+      "subsidyPercent": 100,
+      "description": "Free-tier GPU"
+    },
+    "largemem": {
+      "suMultiplier": 10,
+      "subsidyPercent": 0,
+      "description": "High Memory"
+    }
+  },
+  "rates": {
+    "suRate": 0.01,
+    "unit": "per SU"
+  },
+  "billableStates": ["COMPLETED", "TIMEOUT", "OUT_OF_MEMORY"],
+  "excludeAccounts": ["root", "admin"]
+}

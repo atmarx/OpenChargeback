@@ -1,0 +1,49 @@
+{
+  "_comment": "Copy this file to tiers.json and customize for your institution",
+  "defaults": {
+    "serviceName": "Azure Local - Virtual Machines",
+    "subsidyPercent": 0,
+    "active": true
+  },
+  "tiers": {
+    "small": {
+      "annualCost": 600.00,
+      "description": "2 vCPU, 8GB RAM - Light workloads"
+    },
+    "standard": {
+      "annualCost": 1200.00,
+      "description": "4 vCPU, 16GB RAM - General purpose"
+    },
+    "large": {
+      "annualCost": 2400.00,
+      "description": "8 vCPU, 32GB RAM - Memory intensive"
+    },
+    "highmem": {
+      "annualCost": 3600.00,
+      "description": "8 vCPU, 64GB RAM - High memory"
+    },
+    "gpu-t4": {
+      "annualCost": 4800.00,
+      "description": "NVIDIA T4 GPU - ML inference"
+    },
+    "gpu-a100": {
+      "annualCost": 9600.00,
+      "description": "NVIDIA A100 GPU - ML training"
+    }
+  },
+  "fieldMapping": {
+    "vmNotes": {
+      "piEmail": "FinOpsPiEmail",
+      "projectId": "FinOpsProjectId",
+      "fundOrg": "FinOpsFundOrg",
+      "vmTier": "FinOpsVmTier",
+      "subsidyPercent": "FinOpsSubsidyPercent",
+      "active": "FinOpsActive"
+    },
+    "focusTags": {
+      "piEmail": "pi_email",
+      "projectId": "project_id",
+      "fundOrg": "fund_org"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "serviceName": "HPC Storage - Project",
+  "ratePerTBMonth": 10.00,
+  "freeGBPerProject": 500,
+  "quotaCommand": "isi quota quotas list --format=json"
+}

@@ -1,0 +1,44 @@
+{
+  "defaults": {
+    "serviceName": "Azure Local - Virtual Machines",
+    "subsidyPercent": 0,
+    "active": true
+  },
+  "tiers": {
+    "standard": {
+      "annualCost": 1200.00,
+      "description": "4 vCPU, 16GB RAM"
+    },
+    "large": {
+      "annualCost": 2400.00,
+      "description": "8 vCPU, 32GB RAM"
+    },
+    "highmem": {
+      "annualCost": 3600.00,
+      "description": "8 vCPU, 64GB RAM"
+    },
+    "gpu-t4": {
+      "annualCost": 4800.00,
+      "description": "NVIDIA T4 GPU"
+    },
+    "gpu-a100": {
+      "annualCost": 9600.00,
+      "description": "NVIDIA A100 GPU"
+    }
+  },
+  "fieldMapping": {
+    "vmNotes": {
+      "piEmail": "FinOpsPiEmail",
+      "projectId": "FinOpsProjectId",
+      "fundOrg": "FinOpsFundOrg",
+      "vmTier": "FinOpsVmTier",
+      "subsidyPercent": "FinOpsSubsidyPercent",
+      "active": "FinOpsActive"
+    },
+    "focusTags": {
+      "piEmail": "pi_email",
+      "projectId": "project_id",
+      "fundOrg": "fund_org"
+    }
+  }
+}

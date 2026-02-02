@@ -1,0 +1,19 @@
+{
+  "accounts": {
+    "bumberlyPrj": {
+      "piEmail": "frin.bumberly@example.edu",
+      "projectId": "bumberly-lab",
+      "fundOrg": "NIH-2024-001"
+    },
+    "wombsworthGenomicsPrj": {
+      "piEmail": "plex.wombsworth@example.edu",
+      "projectId": "wombsworth-genomics",
+      "fundOrg": "NSF-BIO-2024"
+    },
+    "martinezClimatePrj": {
+      "piEmail": "quib.flannister@example.edu",
+      "projectId": "climate-modeling",
+      "fundOrg": "NSF-ATM-2024"
+    }
+  }
+}

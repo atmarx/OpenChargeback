@@ -49,6 +49,9 @@ htmlcov/
 instance/
 output/
 
+# Integration runtime files
+docs/integrations/*/Logs/
+
 # Planning/internal docs (not published)
 planning/
 

@@ -1,0 +1,106 @@
+{
+  "metadata": {
+    "generatedAt": "2025-02-01T09:00:00Z",
+    "billingPeriod": "2025-01",
+    "clusterName": "azurelocal.example.edu",
+    "mode": "WhatIf",
+    "tierConfigPath": ".\\config\\tiers.json",
+    "totalVMs": 5,
+    "vmsProcessed": 4,
+    "vmsSkipped": 1
+  },
+  "vms": [
+    {
+      "vmName": "climate-vm-01",
+      "tier": "standard",
+      "piEmail": "quib.flannister@example.edu",
+      "projectId": "climate-modeling",
+      "fundOrg": "NSF-ATM-2024",
+      "creationDate": "2024-06-15",
+      "prorationDays": 31,
+      "prorationFactor": 1.0,
+      "subsidyPercent": 0,
+      "listCost": 100.00,
+      "billedCost": 100.00,
+      "status": "processed"
+    },
+    {
+      "vmName": "ml-training-01",
+      "tier": "gpu-a100",
+      "piEmail": "zorp.blinkman@example.edu",
+      "projectId": "neural-net-research",
+      "fundOrg": "DOE-SC-2024",
+      "creationDate": "2024-09-01",
+      "prorationDays": 31,
+      "prorationFactor": 1.0,
+      "subsidyPercent": 50,
+      "listCost": 800.00,
+      "billedCost": 400.00,
+      "status": "processed"
+    },
+    {
+      "vmName": "genomics-analysis",
+      "tier": "highmem",
+      "piEmail": "grix.mottershaw@example.edu",
+      "projectId": "genome-sequencing",
+      "fundOrg": "NIH-R01-2024",
+      "creationDate": "2024-11-20",
+      "prorationDays": 31,
+      "prorationFactor": 1.0,
+      "subsidyPercent": 25,
+      "listCost": 300.00,
+      "billedCost": 225.00,
+      "status": "processed"
+    },
+    {
+      "vmName": "web-portal-dev",
+      "tier": "standard",
+      "piEmail": "drix.kelvington@example.edu",
+      "projectId": "student-portal",
+      "fundOrg": "IT-OPS-2024",
+      "creationDate": "2024-03-10",
+      "prorationDays": 31,
+      "prorationFactor": 1.0,
+      "subsidyPercent": 100,
+      "listCost": 100.00,
+      "billedCost": 0.00,
+      "status": "processed"
+    },
+    {
+      "vmName": "legacy-app-01",
+      "tier": "large",
+      "piEmail": "tarn.voxley@example.edu",
+      "projectId": "legacy-migration",
+      "fundOrg": "ADMIN-2024",
+      "creationDate": "2023-08-01",
+      "prorationDays": null,
+      "prorationFactor": null,
+      "subsidyPercent": 0,
+      "listCost": null,
+      "billedCost": null,
+      "status": "skipped",
+      "skipReason": "FinOpsActive is false"
+    }
+  ],
+  "skipped": [
+    {
+      "vmName": "infra-dc01",
+      "reason": "Matched exclude pattern: ^infra-*"
+    },
+    {
+      "vmName": "template-win2022",
+      "reason": "Matched exclude pattern: ^template-*"
+    }
+  ],
+  "warnings": [
+    {
+      "vmName": "test-vm-01",
+      "warning": "VM Notes field is empty - cannot determine billing metadata"
+    }
+  ],
+  "totals": {
+    "totalListCost": 1300.00,
+    "totalBilledCost": 725.00,
+    "totalSubsidyAmount": 575.00
+  }
+}

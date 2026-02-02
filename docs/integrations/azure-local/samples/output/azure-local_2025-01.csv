@@ -1,0 +1,5 @@
+BillingPeriodStart,BillingPeriodEnd,ChargePeriodStart,ChargePeriodEnd,ListCost,BilledCost,ResourceId,ResourceName,ServiceName,Tags
+2025-01-01,2025-01-31,2025-01-01,2025-01-31,100.00,100.00,climate-vm-01,climate-vm-01,Azure Local - Virtual Machines,"{""pi_email"":""quib.flannister@example.edu"",""project_id"":""climate-modeling"",""fund_org"":""NSF-ATM-2024""}"
+2025-01-01,2025-01-31,2025-01-01,2025-01-31,800.00,400.00,ml-training-01,ml-training-01,Azure Local - Virtual Machines,"{""pi_email"":""zorp.blinkman@example.edu"",""project_id"":""neural-net-research"",""fund_org"":""DOE-SC-2024""}"
+2025-01-01,2025-01-31,2025-01-01,2025-01-31,300.00,225.00,genomics-analysis,genomics-analysis,Azure Local - Virtual Machines,"{""pi_email"":""grix.mottershaw@example.edu"",""project_id"":""genome-sequencing"",""fund_org"":""NIH-R01-2024""}"
+2025-01-01,2025-01-31,2025-01-01,2025-01-31,100.00,0.00,web-portal-dev,web-portal-dev,Azure Local - Virtual Machines,"{""pi_email"":""drix.kelvington@example.edu"",""project_id"":""student-portal"",""fund_org"":""IT-OPS-2024""}"

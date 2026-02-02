@@ -1,0 +1,60 @@
+{
+  "_comment": "Example VM Notes JSON structure stored in the Hyper-V VM Notes field",
+  "examples": [
+    {
+      "vmName": "climate-vm-01",
+      "notes": {
+        "FinOpsPiEmail": "quib.flannister@example.edu",
+        "FinOpsProjectId": "climate-modeling",
+        "FinOpsFundOrg": "NSF-ATM-2024",
+        "FinOpsVmTier": "standard",
+        "FinOpsSubsidyPercent": 0,
+        "FinOpsActive": true
+      }
+    },
+    {
+      "vmName": "ml-training-01",
+      "notes": {
+        "FinOpsPiEmail": "zorp.blinkman@example.edu",
+        "FinOpsProjectId": "neural-net-research",
+        "FinOpsFundOrg": "DOE-SC-2024",
+        "FinOpsVmTier": "gpu-a100",
+        "FinOpsSubsidyPercent": 50,
+        "FinOpsActive": true
+      }
+    },
+    {
+      "vmName": "genomics-analysis",
+      "notes": {
+        "FinOpsPiEmail": "grix.mottershaw@example.edu",
+        "FinOpsProjectId": "genome-sequencing",
+        "FinOpsFundOrg": "NIH-R01-2024",
+        "FinOpsVmTier": "highmem",
+        "FinOpsSubsidyPercent": 25,
+        "FinOpsActive": true
+      }
+    },
+    {
+      "vmName": "web-portal-dev",
+      "notes": {
+        "FinOpsPiEmail": "drix.kelvington@example.edu",
+        "FinOpsProjectId": "student-portal",
+        "FinOpsFundOrg": "IT-OPS-2024",
+        "FinOpsVmTier": "standard",
+        "FinOpsSubsidyPercent": 100,
+        "FinOpsActive": true
+      }
+    },
+    {
+      "vmName": "legacy-app-01",
+      "notes": {
+        "FinOpsPiEmail": "tarn.voxley@example.edu",
+        "FinOpsProjectId": "legacy-migration",
+        "FinOpsFundOrg": "ADMIN-2024",
+        "FinOpsVmTier": "large",
+        "FinOpsSubsidyPercent": 0,
+        "FinOpsActive": false
+      }
+    }
+  ]
+}
