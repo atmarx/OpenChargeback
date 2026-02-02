@@ -1,0 +1,1 @@
+{"timestamp":"2025-01-31T14:30:00Z","event":"billing_export","user":"YOURDOM\\svc-billing","hostname":"HCI-MGMT-01","period":"2025-01","vms_processed":47,"vms_exported":42,"vms_skipped":5,"total_list_cost":12450.00,"total_billed_cost":8925.00,"total_subsidy":3525.00,"output_file":"C:\\BillingExports\\azure-local_2025-01.csv","duration_seconds":154,"exit_code":0}

@@ -1,0 +1,14 @@
+=== Azure Local Billing Export - Audit Log ===
+Timestamp: 2025-01-31T14:30:00Z
+User: YOURDOM\svc-billing
+Hostname: HCI-MGMT-01
+Period: 2025-01
+VMs Processed: 47
+VMs Exported: 42
+VMs Skipped: 5 (inactive or missing tags)
+Total List Cost: $12,450.00
+Total Billed Cost: $8,925.00
+Total Subsidy: $3,525.00
+Output File: C:\BillingExports\azure-local_2025-01.csv
+Export Duration: 00:02:34
+Exit Code: 0
