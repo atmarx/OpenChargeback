@@ -1,38 +1,40 @@
 # OpenChargeback CI/CD Pipeline
 # Runs tests on every push, deploys to projects.xram.net on main
+#
+# Pip cache mounted at /opt/cache/pip for faster builds
 
 steps:
-  - name: test
+  - name: test-and-lint
     image: python:3.12-slim
     commands:
       - apt-get update && apt-get install -y --no-install-recommends git
-      - pip install --no-cache-dir -e ".[dev]"
-      - pytest -v --tb=short
-
-  - name: lint
-    image: python:3.12-slim
-    commands:
-      - pip install ruff
+      - pip install --cache-dir /cache/pip -e ".[dev]"
       - ruff check src/
+      - pytest -v --tb=short
+    volumes:
+      - /opt/cache/pip:/cache/pip
 
   - name: typecheck
     image: python:3.12-slim
     commands:
-      - pip install --no-cache-dir -e ".[dev]"
+      - pip install --cache-dir /cache/pip -e ".[dev]" types-PyYAML
       - mypy src/ --ignore-missing-imports
+    volumes:
+      - /opt/cache/pip:/cache/pip
     failure: ignore  # Don't fail build on type errors (yet)
 
   - name: sbom
     image: python:3.12-slim
     commands:
-      - pip install cyclonedx-bom
-      - pip install --no-cache-dir -e .
+      - pip install --cache-dir /cache/pip cyclonedx-bom
+      - pip install --cache-dir /cache/pip -e .
       - cyclonedx-py environment --of json -o src/openchargeback/web/static/sbom.json
+    volumes:
+      - /opt/cache/pip:/cache/pip
     when:
       branch: main
     depends_on:
-      - test
-      - lint
+      - test-and-lint
 
   - name: deploy
     image: docker:cli
