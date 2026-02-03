@@ -12,11 +12,10 @@ services:
     ports:
       - "${WEB_PORT:-8000}:3000"  # Map external 8000 to internal 3000
     volumes:
-      - ../instance/config.yaml:/app/config.yaml:ro
-      - ../instance:/app/data
-      - ../instance/output:/app/output
+      # Mount instance directory to match local paths (instance/billing.db, etc.)
+      - ../instance:/app/instance
     environment:
-      - CONFIG_PATH=/app/config.yaml
+      - CONFIG_PATH=/app/instance/config.yaml
       - WEB_SECRET_KEY=${WEB_SECRET_KEY:-}
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASSWORD=${SMTP_PASSWORD:-}

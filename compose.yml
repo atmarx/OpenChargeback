@@ -11,13 +11,11 @@ services:
       dockerfile: docker/Dockerfile
     restart: unless-stopped
     environment:
-      - CONFIG_PATH=/app/config.yaml
+      - CONFIG_PATH=/app/instance/config.yaml
       - WEB_SECRET_KEY=${WEB_SECRET_KEY:-changeme-in-production}
     volumes:
-      # Mount config and data from persistent location
-      - ./instance/config.yaml:/app/config.yaml:ro
-      - ./instance:/app/data
-      - ./instance/output:/app/output
+      # Mount instance directory to match local paths (instance/billing.db, etc.)
+      - ./instance:/app/instance
     expose:
       - "3000"
     networks:
