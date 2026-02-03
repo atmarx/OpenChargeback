@@ -24,7 +24,6 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 
 def get_config_path(request: Request) -> Path | None:
     """Get the config file path from app state."""
-    config = request.app.state.config
     # Try to find the config path - check common locations
     for path in [Path("instance/config.yaml"), Path("instance/config.yml"), Path("config.yaml"), Path("config.yml")]:
         if path.exists():
@@ -139,7 +138,6 @@ async def test_patterns(
     db: Database = Depends(get_db),
 ):
     """Test current patterns against existing charges."""
-    templates = request.app.state.templates
     config = request.app.state.config
 
     flag_patterns = config.review.flag_patterns if hasattr(config, "review") else []

@@ -1,12 +1,11 @@
 """Dashboard route."""
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 
 from openchargeback.db import Database
 from openchargeback.web.auth import User
 from openchargeback.web.deps import (
-    add_flash_message,
     get_current_period_id,
     get_current_user,
     get_db,

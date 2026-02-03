@@ -1,10 +1,8 @@
 """Period service for period management operations."""
 
-from datetime import datetime
 
 from openchargeback.db import Database
 from openchargeback.db.repository import BillingPeriod
-from openchargeback.web.schemas import PeriodStats
 
 
 class PeriodWithStats:

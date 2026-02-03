@@ -52,7 +52,7 @@ async def list_emails(
 
     # Get unique recipients for filter dropdown
     all_logs = db.get_email_logs(limit=500)
-    recipients = sorted(set(e.recipient for e in all_logs))
+    recipients = sorted({e.recipient for e in all_logs})
 
     return templates.TemplateResponse(
         "pages/emails.html",
@@ -83,6 +83,7 @@ async def resend_email(
 ):
     """Resend a failed email."""
     from pathlib import Path
+
     from openchargeback.delivery.email import EmailSender
 
     config = request.app.state.config

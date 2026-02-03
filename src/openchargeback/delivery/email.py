@@ -6,7 +6,6 @@ from ..config import Config
 from ..db import Database
 from .smtp import send_email_with_logging
 
-
 STATEMENT_EMAIL_TEMPLATE = """<!DOCTYPE html>
 <html>
 <head>

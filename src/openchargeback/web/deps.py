@@ -1,6 +1,6 @@
 """FastAPI dependency injection for the web interface."""
 
-from typing import Generator
+from collections.abc import Generator
 
 from fastapi import Depends, HTTPException, Request, status
 

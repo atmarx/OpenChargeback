@@ -10,7 +10,6 @@ from ..config import Config
 from ..db.repository import Charge, Database, Import
 from .base import BaseIngester, IngestResult
 
-
 # FOCUS specification column names
 FOCUS_COLUMNS = {
     "BillingPeriodStart": "billing_period_start",
@@ -196,7 +195,6 @@ class FocusIngester(BaseIngester):
 
         # Track periods and charges
         periods_seen: set[str] = set()
-        charges_to_insert: list[Charge] = []
         period_charges: dict[str, list[Charge]] = {}
 
         # Process each row

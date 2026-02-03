@@ -10,7 +10,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from openchargeback import audit
-from openchargeback.config import Config, load_config
+from openchargeback.config import load_config
 
 
 def simple_markdown(text: str) -> str:

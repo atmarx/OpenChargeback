@@ -188,6 +188,7 @@ async def download_statement(
 ):
     """Download a statement PDF."""
     from sqlalchemy import select
+
     from openchargeback.db.tables import statements as stmt_table
 
     with db.engine.connect() as conn:
@@ -238,7 +239,9 @@ async def send_statement(
 
     # Get statement
     from sqlalchemy import select
-    from openchargeback.db.tables import statements as stmt_table, billing_periods
+
+    from openchargeback.db.tables import billing_periods
+    from openchargeback.db.tables import statements as stmt_table
 
     with db.engine.connect() as conn:
         result = conn.execute(

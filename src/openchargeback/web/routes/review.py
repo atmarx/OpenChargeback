@@ -12,7 +12,6 @@ from openchargeback.web.deps import (
     get_current_user,
     get_db,
     get_flash_messages,
-    get_global_flagged_count,
     require_reviewer,
 )
 

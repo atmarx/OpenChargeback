@@ -138,6 +138,7 @@ async def export_journal(
     period = db.get_period_by_id(period_id)
     if not period:
         from fastapi.responses import RedirectResponse
+
         from openchargeback.web.deps import add_flash_message
         add_flash_message(request, "error", "Period not found.")
         return RedirectResponse(url="/journal", status_code=303)

@@ -6,7 +6,6 @@ from fastapi.responses import HTMLResponse
 from openchargeback.web.auth import User
 from openchargeback.web.deps import get_current_user, get_flash_messages
 
-
 router = APIRouter(prefix="/help", tags=["help"])
 
 

@@ -324,6 +324,7 @@ def generate_pdf_statement(
         Path to generated PDF file.
     """
     from datetime import datetime
+
     from weasyprint import HTML
 
     env = get_template_env(config)

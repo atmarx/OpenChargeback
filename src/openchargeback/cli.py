@@ -1,7 +1,7 @@
 """Command-line interface for FOCUS Billing."""
 
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -32,7 +32,7 @@ console = Console()
 
 # Global options
 ConfigOption = Annotated[
-    Optional[Path],
+    Path | None,
     typer.Option("--config", "-c", help="Path to config file"),
 ]
 
@@ -65,7 +65,7 @@ def ingest(
     file: Annotated[Path, typer.Argument(help="FOCUS CSV file to import")],
     source: Annotated[str, typer.Option("--source", "-s", help="Source name (e.g., aws, azure)")],
     period: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--period", "-p", help="Expected billing period (YYYY-MM) for validation"),
     ] = None,
     dry_run: Annotated[
@@ -178,7 +178,7 @@ def export_journal(
     period: Annotated[str, typer.Option("--period", "-p", help="Billing period (YYYY-MM)")],
     format: Annotated[str, typer.Option("--format", "-f", help="Export format")] = "default",
     output: Annotated[
-        Optional[Path],
+        Path | None,
         typer.Option("--output", "-o", help="Output file path"),
     ] = None,
     config_path: ConfigOption = None,
@@ -319,7 +319,7 @@ def periods_open(
 @periods_app.command("close")
 def periods_close(
     period: Annotated[str, typer.Argument(help="Period to close (YYYY-MM)")],
-    notes: Annotated[Optional[str], typer.Option("--notes", "-n", help="Notes")] = None,
+    notes: Annotated[str | None, typer.Option("--notes", "-n", help="Notes")] = None,
     config_path: ConfigOption = None,
 ):
     """Close a billing period (no more imports allowed)."""
@@ -340,7 +340,7 @@ def periods_close(
 @periods_app.command("finalize")
 def periods_finalize(
     period: Annotated[str, typer.Argument(help="Period to finalize (YYYY-MM)")],
-    notes: Annotated[Optional[str], typer.Option("--notes", "-n", help="Notes")] = None,
+    notes: Annotated[str | None, typer.Option("--notes", "-n", help="Notes")] = None,
     config_path: ConfigOption = None,
 ):
     """Finalize a billing period (sent to accounting)."""
@@ -408,7 +408,7 @@ def sources_list(config_path: ConfigOption = None):
 def sources_add(
     name: Annotated[str, typer.Argument(help="Source name (e.g., aws, azure)")],
     display_name: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--display-name", "-d", help="Display name"),
     ] = None,
     source_type: Annotated[
@@ -441,7 +441,7 @@ def sources_sync_status(config_path: ConfigOption = None):
 @review_app.command("list")
 def review_list(
     period: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--period", "-p", help="Filter by billing period (YYYY-MM)"),
     ] = None,
     config_path: ConfigOption = None,
@@ -491,11 +491,11 @@ def review_list(
 @review_app.command("approve")
 def review_approve(
     period: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--period", "-p", help="Approve all in billing period"),
     ] = None,
     charge_id: Annotated[
-        Optional[int],
+        int | None,
         typer.Option("--id", help="Approve specific charge ID"),
     ] = None,
     config_path: ConfigOption = None,
@@ -545,11 +545,11 @@ def review_reject(
 @app.command()
 def serve(
     host: Annotated[
-        Optional[str],
+        str | None,
         typer.Option("--host", "-h", help="Host to bind to"),
     ] = None,
     port: Annotated[
-        Optional[int],
+        int | None,
         typer.Option("--port", "-p", help="Port to bind to"),
     ] = None,
     reload: Annotated[
@@ -571,7 +571,7 @@ def serve(
     server_host = host or config.web.host or "127.0.0.1"
     server_port = port or config.web.port or 8000
 
-    console.print(f"[cyan]Starting OpenChargeback web server...[/cyan]")
+    console.print("[cyan]Starting OpenChargeback web server...[/cyan]")
     console.print(f"  Host: {server_host}")
     console.print(f"  Port: {server_port}")
     console.print(f"  Config: {config_path or 'config.yaml'}")

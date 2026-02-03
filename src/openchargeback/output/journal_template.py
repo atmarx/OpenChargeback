@@ -188,7 +188,7 @@ def build_journal_entries(
 
     # Build credit entries (one per source with charges)
     source_totals: dict[str, float] = {}
-    for (pi_fund_org, source_name), data in aggregated.items():
+    for (_pi_fund_org, source_name), data in aggregated.items():
         if source_name not in source_totals:
             source_totals[source_name] = 0.0
         source_totals[source_name] += data["amount"]

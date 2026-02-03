@@ -10,7 +10,6 @@ from openchargeback import audit
 from openchargeback.db import Database
 from openchargeback.web.auth import User
 from openchargeback.web.deps import (
-    get_config,
     get_current_period_id,
     get_current_user,
     get_db,
@@ -93,6 +92,7 @@ async def upload_files(
     """
     import json
     import traceback
+
     from openchargeback.ingest.focus import ingest_focus_file
 
     try:
@@ -224,6 +224,7 @@ async def import_detail(
 ):
     """Show details for a specific import."""
     from fastapi.responses import RedirectResponse
+
     from openchargeback.web.deps import add_flash_message
 
     templates = request.app.state.templates

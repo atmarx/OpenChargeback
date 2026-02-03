@@ -151,9 +151,9 @@ def generate_statements(
     Returns:
         GenerateResult with statistics.
     """
-    from ..output.pdf import generate_pdf_statement
-    from ..output.email import generate_email_html
     from ..delivery.smtp import send_email_with_logging
+    from ..output.email import generate_email_html
+    from ..output.pdf import generate_pdf_statement
 
     result = GenerateResult()
 
@@ -184,7 +184,7 @@ def generate_statements(
     for pi_email, summary in pi_summaries.items():
         # Generate PDF for each project
         pdf_paths: list[str] = []
-        for project_id, project_summary in summary.projects.items():
+        for _project_id, project_summary in summary.projects.items():
             pdf_path = generate_pdf_statement(
                 period=period,
                 pi_email=pi_email,
