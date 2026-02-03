@@ -1,0 +1,37 @@
+# OpenChargeback Deployment Configuration
+# Deployed via Woodpecker CI to openchargeback.projects.xram.net
+#
+# Service naming follows Caddy wildcard routing convention:
+#   openchargeback-app → https://openchargeback.projects.xram.net
+
+services:
+  openchargeback-app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    environment:
+      - CONFIG_PATH=/app/config.yaml
+      - WEB_SECRET_KEY=${WEB_SECRET_KEY:-changeme-in-production}
+    volumes:
+      # Mount config and data from persistent location
+      - ./instance/config.yaml:/app/config.yaml:ro
+      - ./instance:/app/data
+      - ./instance/output:/app/output
+    expose:
+      - "3000"
+    networks:
+      - default
+      - gateway
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3000/login')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+networks:
+  default:
+  gateway:
+    external: true
+    name: gateway-stack_gateway

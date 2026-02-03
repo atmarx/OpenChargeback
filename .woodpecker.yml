@@ -1,0 +1,39 @@
+# OpenChargeback CI/CD Pipeline
+# Runs tests on every push, deploys to projects.xram.net on main
+
+steps:
+  - name: test
+    image: python:3.12-slim
+    commands:
+      - apt-get update && apt-get install -y --no-install-recommends git
+      - pip install --no-cache-dir -e ".[dev]"
+      - pytest -v --tb=short
+
+  - name: lint
+    image: python:3.12-slim
+    commands:
+      - pip install ruff
+      - ruff check src/
+
+  - name: typecheck
+    image: python:3.12-slim
+    commands:
+      - pip install --no-cache-dir -e ".[dev]"
+      - mypy src/ --ignore-missing-imports
+    failure: ignore  # Don't fail build on type errors (yet)
+
+  - name: deploy
+    image: docker:cli
+    commands:
+      - cd /projects/${CI_REPO_NAME} || git clone ${CI_REPO_CLONE_URL} /projects/${CI_REPO_NAME}
+      - cd /projects/${CI_REPO_NAME} && git fetch && git checkout ${CI_COMMIT_BRANCH} && git pull
+      - cd /projects/${CI_REPO_NAME} && docker compose up -d --build
+      - docker image prune -f
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/projects:/projects
+    when:
+      branch: main
+    depends_on:
+      - test
+      - lint

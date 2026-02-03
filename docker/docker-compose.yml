@@ -1,5 +1,7 @@
-# OpenChargeback Docker Compose Configuration
-# Usage: scripts/service.sh --start [--env dev|prod]
+# OpenChargeback Docker Compose Configuration (Local Development)
+# Usage: docker compose -f docker/docker-compose.yml up -d --build
+#
+# For production deployment, use the root compose.yml with Woodpecker CI.
 
 services:
   app:
@@ -8,11 +10,11 @@ services:
       dockerfile: docker/Dockerfile
     container_name: openchargeback
     ports:
-      - "${WEB_PORT:-8000}:8000"
+      - "${WEB_PORT:-8000}:3000"  # Map external 8000 to internal 3000
     volumes:
-      - ../config.yaml:/app/config.yaml:ro
-      - ../data:/app/data
-      - ../output:/app/output
+      - ../instance/config.yaml:/app/config.yaml:ro
+      - ../instance:/app/data
+      - ../instance/output:/app/output
     environment:
       - CONFIG_PATH=/app/config.yaml
       - WEB_SECRET_KEY=${WEB_SECRET_KEY:-}
@@ -20,7 +22,7 @@ services:
       - SMTP_PASSWORD=${SMTP_PASSWORD:-}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/login')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3000/login')"]
       interval: 30s
       timeout: 10s
       retries: 3
