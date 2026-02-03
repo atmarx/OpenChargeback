@@ -7,10 +7,28 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from openchargeback import audit
 from openchargeback.config import load_config
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Add security headers including CSP that allows our static assets."""
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        # Allow our own static files and inline styles (for htmx)
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:; "
+            "font-src 'self'; "
+            "connect-src 'self'"
+        )
+        return response
 
 
 def simple_markdown(text: str) -> str:
@@ -86,6 +104,9 @@ def create_app(config_path: Path | None = None) -> FastAPI:
 
     # Store config in app state
     app.state.config = config
+
+    # Security headers middleware (CSP, etc.)
+    app.add_middleware(SecurityHeadersMiddleware)
 
     # Session middleware for authentication
     secret_key = config.web.secret_key or secrets.token_hex(32)
