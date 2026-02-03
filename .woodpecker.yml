@@ -22,6 +22,18 @@ steps:
       - mypy src/ --ignore-missing-imports
     failure: ignore  # Don't fail build on type errors (yet)
 
+  - name: sbom
+    image: python:3.12-slim
+    commands:
+      - pip install cyclonedx-bom
+      - pip install --no-cache-dir -e .
+      - cyclonedx-py environment --of json -o src/openchargeback/web/static/sbom.json
+    when:
+      branch: main
+    depends_on:
+      - test
+      - lint
+
   - name: deploy
     image: docker:cli
     commands:
@@ -35,5 +47,4 @@ steps:
     when:
       branch: main
     depends_on:
-      - test
-      - lint
+      - sbom

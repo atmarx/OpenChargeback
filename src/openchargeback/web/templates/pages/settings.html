@@ -236,6 +236,10 @@
         <table>
             <tbody>
                 <tr>
+                    <td class="text-muted">Version</td>
+                    <td class="font-mono">{{ version }}</td>
+                </tr>
+                <tr>
                     <td class="text-muted">Database Path</td>
                     <td class="font-mono">{{ config.database.path }}</td>
                 </tr>
@@ -262,6 +266,10 @@
                         <span class="text-muted">Disabled</span>
                         {% endif %}
                     </td>
+                </tr>
+                <tr>
+                    <td class="text-muted">Software Bill of Materials</td>
+                    <td><a href="/static/sbom.json" target="_blank" class="font-mono">sbom.json</a> (CycloneDX)</td>
                 </tr>
             </tbody>
         </table>

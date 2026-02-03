@@ -7,6 +7,7 @@ import yaml
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
+from openchargeback import __version__
 from openchargeback.db import Database
 from openchargeback.web.auth import User
 from openchargeback.web.deps import (
@@ -60,6 +61,7 @@ async def settings_page(
             "fund_org_patterns": fund_org_patterns,
             "tag_mapping": config.tag_mapping,
             "config": config,
+            "version": __version__,
             "page_title": "Settings",
         },
     )
