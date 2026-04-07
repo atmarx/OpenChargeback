@@ -131,7 +131,7 @@ async def generate_statements_route(
         add_flash_message(request, "error", "Period not found.")
         return RedirectResponse(url="/statements", status_code=303)
 
-    # Check if period is still open
+    # Only closed periods can have statements generated
     if period.status == "open":
         add_flash_message(
             request,
@@ -139,6 +139,14 @@ async def generate_statements_route(
             f"Cannot generate statements: period {period.period} is still open. Close the period first to finalize charges.",
         )
         return RedirectResponse(url=f"/statements/generate?period={period_id}", status_code=303)
+
+    if period.status == "finalized":
+        add_flash_message(
+            request,
+            "error",
+            f"Cannot regenerate statements: period {period.period} is finalized.",
+        )
+        return RedirectResponse(url=f"/statements?period={period_id}", status_code=303)
 
     # Check for flagged charges
     flagged = db.get_flagged_charges(period_id)

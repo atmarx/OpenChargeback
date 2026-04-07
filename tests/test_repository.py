@@ -130,8 +130,9 @@ class TestBillingPeriodOperations:
         assert period.closed_at is not None
 
     def test_update_period_status_finalized(self, db):
-        """Finalize a period."""
+        """Finalize a period (must close first)."""
         db.get_or_create_period("2025-01")
+        db.update_period_status("2025-01", "closed")
         period = db.update_period_status("2025-01", "finalized")
 
         assert period.status == "finalized"
@@ -160,6 +161,7 @@ class TestBillingPeriodOperations:
     def test_reopen_finalized_period_fails(self, db):
         """Cannot reopen a finalized period - finalization is permanent."""
         period = db.get_or_create_period("2025-01")
+        db.update_period_status("2025-01", "closed")
         db.update_period_status("2025-01", "finalized")
 
         result = db.reopen_period(period.id, "Trying to reopen")
@@ -168,6 +170,28 @@ class TestBillingPeriodOperations:
         # Verify period is still finalized
         period = db.get_period_by_id(period.id)
         assert period.status == "finalized"
+
+    def test_invalid_transition_open_to_finalized(self, db):
+        """Cannot skip closed and go straight to finalized."""
+        db.get_or_create_period("2025-01")
+        with pytest.raises(ValueError, match="Cannot transition"):
+            db.update_period_status("2025-01", "finalized")
+
+    def test_invalid_transition_finalized_to_open(self, db):
+        """Cannot reopen a finalized period via update_period_status."""
+        db.get_or_create_period("2025-01")
+        db.update_period_status("2025-01", "closed")
+        db.update_period_status("2025-01", "finalized")
+        with pytest.raises(ValueError, match="Cannot transition"):
+            db.update_period_status("2025-01", "open")
+
+    def test_invalid_transition_finalized_to_closed(self, db):
+        """Cannot go from finalized back to closed."""
+        db.get_or_create_period("2025-01")
+        db.update_period_status("2025-01", "closed")
+        db.update_period_status("2025-01", "finalized")
+        with pytest.raises(ValueError, match="Cannot transition"):
+            db.update_period_status("2025-01", "closed")
 
 
 class TestSourceOperations:

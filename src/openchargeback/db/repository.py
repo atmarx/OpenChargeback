@@ -354,6 +354,13 @@ class Database:
                 result.append(BillingPeriod(**row_dict))
             return result
 
+    # Valid period status transitions
+    VALID_TRANSITIONS: dict[str, set[str]] = {
+        "open": {"closed"},
+        "closed": {"finalized", "open"},  # open = reopen
+        "finalized": set(),  # terminal state
+    }
+
     def update_period_status(
         self,
         period: str,
@@ -361,7 +368,19 @@ class Database:
         notes: str | None = None,
         performed_by: str | None = None,
     ) -> BillingPeriod | None:
-        """Update billing period status."""
+        """Update billing period status with transition validation.
+
+        Raises ValueError if the transition is not allowed.
+        """
+        # Validate transition (same-status is allowed for updating notes)
+        current = self.get_period(period)
+        if current and status != current.status:
+            allowed = self.VALID_TRANSITIONS.get(current.status, set())
+            if status not in allowed:
+                raise ValueError(
+                    f"Cannot transition period from '{current.status}' to '{status}'"
+                )
+
         now = datetime.now()
         with self.engine.begin() as conn:
             values: dict[str, Any] = {"status": status, "notes": notes}
