@@ -1,6 +1,7 @@
 """Settings routes for configuration management."""
 
 import re
+from html import escape
 from pathlib import Path
 
 import yaml
@@ -277,9 +278,9 @@ def _render_flag_matches(matches: list[dict]) -> str:
         rows += f"""
         <tr>
             <td>{m['charge_id']}</td>
-            <td class="font-mono">{m['pattern']}</td>
-            <td>{m['matched_field'][:50]}...</td>
-            <td>{m['pi_email']}</td>
+            <td class="font-mono">{escape(str(m['pattern']))}</td>
+            <td>{escape(str(m['matched_field'][:50]))}...</td>
+            <td>{escape(str(m['pi_email']))}</td>
         </tr>
         """
 
@@ -308,8 +309,8 @@ def _render_fund_org_failures(failures: list[dict]) -> str:
         rows += f"""
         <tr>
             <td>{f['charge_id']}</td>
-            <td class="font-mono">{f['fund_org']}</td>
-            <td>{f['pi_email']}</td>
+            <td class="font-mono">{escape(str(f['fund_org']))}</td>
+            <td>{escape(str(f['pi_email']))}</td>
         </tr>
         """
 

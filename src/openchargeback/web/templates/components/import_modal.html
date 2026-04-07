@@ -921,6 +921,12 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
 function showResults(result) {
     document.getElementById('upload-progress').style.display = 'none';
     const resultsDiv = document.getElementById('upload-results');
@@ -934,7 +940,7 @@ function showResults(result) {
                 <div class="result-item-header">
                     <span class="result-item-name">Upload Failed</span>
                 </div>
-                <div class="result-item-stats">${errorMsg}</div>
+                <div class="result-item-stats">${escapeHtml(errorMsg)}</div>
             </div>
         `;
         return;
@@ -943,7 +949,7 @@ function showResults(result) {
     resultsDiv.innerHTML = result.results.map(r => `
         <div class="result-item ${r.success ? 'success' : 'error'}">
             <div class="result-item-header">
-                <span class="result-item-name">${r.filename}</span>
+                <span class="result-item-name">${escapeHtml(r.filename)}</span>
                 <span>${r.success ? '&#10003;' : '&#10005;'}</span>
             </div>
             <div class="result-item-stats">
@@ -951,7 +957,7 @@ function showResults(result) {
                     ? `${r.inserted_rows} new, ${r.updated_rows} updated, ${r.skipped_rows} unchanged` +
                       (r.flagged_rows ? `, ${r.flagged_rows} flagged` : '') +
                       ` — $${r.total_cost.toFixed(2)} total`
-                    : r.error
+                    : escapeHtml(r.error)
                 }
             </div>
         </div>
