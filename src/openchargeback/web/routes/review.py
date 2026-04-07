@@ -111,7 +111,16 @@ async def approve_charge(
     charge = db.get_charge_by_id(charge_id)
     period = db.get_period_by_id(charge.billing_period_id) if charge else None
 
-    db.approve_charge(charge_id, performed_by=user.display_name)
+    approved = db.approve_charge(charge_id, performed_by=user.display_name)
+
+    if not approved:
+        if request.headers.get("HX-Request"):
+            return Response(
+                content='<div class="alert alert-warning">Charge is not in the review queue.</div>',
+                media_type="text/html",
+            )
+        add_flash_message(request, "warning", "Charge is not in the review queue.")
+        return RedirectResponse(url="/review", status_code=303)
 
     # Log to database and emit audit log
     if charge and period:
@@ -156,12 +165,25 @@ async def reject_charge(
     user: User = Depends(require_reviewer),
     db: Database = Depends(get_db),
 ):
-    """Reject (delete) a flagged charge."""
+    """Reject a flagged charge (soft-delete — charge stays in DB for audit)."""
     # Get charge details for audit log before rejection
     charge = db.get_charge_by_id(charge_id)
     period = db.get_period_by_id(charge.billing_period_id) if charge else None
 
-    # Log to database BEFORE deleting the charge
+    rejected = db.reject_charge(
+        charge_id, performed_by=user.display_name, note=note.strip() if note else None
+    )
+
+    if not rejected:
+        if request.headers.get("HX-Request"):
+            return Response(
+                content='<div class="alert alert-warning">Charge is not in the review queue.</div>',
+                media_type="text/html",
+            )
+        add_flash_message(request, "warning", "Charge is not in the review queue.")
+        return RedirectResponse(url="/review", status_code=303)
+
+    # Log to database
     if charge and period:
         db.log_review_action(
             billing_period_id=period.id,
@@ -174,8 +196,6 @@ async def reject_charge(
             note=note.strip() if note else None,
             performed_by=user.display_name,
         )
-
-    db.reject_charge(charge_id, performed_by=user.display_name)
 
     # Emit audit log
     if charge and period:
@@ -197,7 +217,7 @@ async def reject_charge(
             headers={"HX-Trigger": "chargeRejected"},
         )
 
-    add_flash_message(request, "success", "Charge rejected and removed.")
+    add_flash_message(request, "success", "Charge rejected.")
     return RedirectResponse(url="/review", status_code=303)
 
 
@@ -245,12 +265,16 @@ async def approve_selected_charges(
         add_flash_message(request, "warning", "No charges selected.")
         return RedirectResponse(url="/review", status_code=303)
 
+    approved_count = 0
     for charge_id in charge_ids:
         # Get charge details for audit log
         charge = db.get_charge_by_id(charge_id)
         period = db.get_period_by_id(charge.billing_period_id) if charge else None
 
-        db.approve_charge(charge_id, performed_by=user.display_name)
+        if not db.approve_charge(charge_id, performed_by=user.display_name):
+            continue  # Skip charges not in review queue
+
+        approved_count += 1
 
         # Log to database and emit audit log for each charge
         if charge and period:
@@ -274,7 +298,7 @@ async def approve_selected_charges(
                 user=user.display_name,
             )
 
-    add_flash_message(request, "success", f"Approved {len(charge_ids)} charge{'s' if len(charge_ids) != 1 else ''}.")
+    add_flash_message(request, "success", f"Approved {approved_count} charge{'s' if approved_count != 1 else ''}.")
     return RedirectResponse(url="/review", status_code=303)
 
 
@@ -294,12 +318,20 @@ async def reject_selected_charges(
         add_flash_message(request, "warning", "No charges selected.")
         return RedirectResponse(url="/review", status_code=303)
 
+    rejected_count = 0
     for charge_id in charge_ids:
         # Get charge details for audit log
         charge = db.get_charge_by_id(charge_id)
         period = db.get_period_by_id(charge.billing_period_id) if charge else None
 
-        # Log to database BEFORE deleting the charge
+        if not db.reject_charge(
+            charge_id, performed_by=user.display_name, note=note if note else None
+        ):
+            continue  # Skip charges not in review queue
+
+        rejected_count += 1
+
+        # Log to database
         if charge and period:
             db.log_review_action(
                 billing_period_id=period.id,
@@ -313,8 +345,6 @@ async def reject_selected_charges(
                 performed_by=user.display_name,
             )
 
-        db.reject_charge(charge_id, performed_by=user.display_name)
-
         # Emit audit log for each charge
         if charge and period:
             audit.log_charge_rejected(
@@ -326,5 +356,5 @@ async def reject_selected_charges(
                 user=user.display_name,
             )
 
-    add_flash_message(request, "success", f"Rejected {len(charge_ids)} charge{'s' if len(charge_ids) != 1 else ''}.")
+    add_flash_message(request, "success", f"Rejected {rejected_count} charge{'s' if rejected_count != 1 else ''}.")
     return RedirectResponse(url="/review", status_code=303)

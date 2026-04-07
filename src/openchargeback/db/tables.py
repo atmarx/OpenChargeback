@@ -118,6 +118,9 @@ charges = Table(
     Column("reviewed_at", DateTime),
     Column("reviewed_by", String(200)),  # User who approved/rejected
     Column("imported_at", DateTime, server_default=func.now()),
+    Column("rejected_at", DateTime),  # Soft-delete: when rejected
+    Column("rejected_by", String(200)),  # User who rejected
+    Column("rejection_note", Text),  # Reason for rejection
     UniqueConstraint(
         "billing_period_id",
         "source_id",
@@ -290,4 +293,4 @@ review_logs = Table(
 Index("idx_review_logs_period", review_logs.c.billing_period_id)
 Index("idx_review_logs_performed_at", review_logs.c.performed_at)
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9

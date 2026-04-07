@@ -546,8 +546,8 @@ class TestChargeOperations:
         flagged = db.get_flagged_charges(period.id)
         assert len(flagged) == 0
 
-    def test_reject_charge(self, db, period, source):
-        """Reject (delete) a charge."""
+    def test_reject_charge_soft_delete(self, db, period, source):
+        """Reject a charge — soft-delete, stays in DB but excluded from queries."""
         charge = Charge(
             id=None,
             billing_period_id=period.id,
@@ -572,10 +572,85 @@ class TestChargeOperations:
         charges = db.get_charges_for_period(period.id, include_flagged=True)
         assert len(charges) == 1
 
-        db.reject_charge(charges[0].id)
+        result = db.reject_charge(charges[0].id, performed_by="admin", note="Bad data")
+        assert result is True
 
+        # Excluded from normal queries
         charges_after = db.get_charges_for_period(period.id, include_flagged=True)
         assert len(charges_after) == 0
+
+        # Still in DB via get_charge_by_id
+        rejected = db.get_charge_by_id(charges[0].id)
+        assert rejected is not None
+        assert rejected.rejected_at is not None
+        assert rejected.rejected_by == "admin"
+        assert rejected.rejection_note == "Bad data"
+        assert rejected.needs_review is False
+
+        # Visible via get_rejected_charges
+        rejected_list = db.get_rejected_charges(period.id)
+        assert len(rejected_list) == 1
+
+    def test_approve_non_review_charge_fails(self, db, period, source):
+        """Cannot approve a charge that isn't flagged for review."""
+        charge = Charge(
+            id=None,
+            billing_period_id=period.id,
+            source_id=source.id,
+            charge_period_start="2025-01-01",
+            charge_period_end="2025-01-02",
+            list_cost=None,
+            contracted_cost=None,
+            billed_cost=100.00,
+            effective_cost=None,
+            resource_id="res-1",
+            resource_name="server",
+            service_name="EC2",
+            pi_email="test@example.edu",
+            project_id=None,
+            fund_org="12345",
+            raw_tags=None,
+            needs_review=False,
+        )
+        db.insert_charges([charge])
+        charges = db.get_charges_for_period(period.id)
+        assert len(charges) == 1
+
+        result = db.approve_charge(charges[0].id, performed_by="admin")
+        assert result is False
+
+    def test_reject_non_review_charge_fails(self, db, period, source):
+        """Cannot reject a charge that isn't flagged for review."""
+        charge = Charge(
+            id=None,
+            billing_period_id=period.id,
+            source_id=source.id,
+            charge_period_start="2025-01-01",
+            charge_period_end="2025-01-02",
+            list_cost=None,
+            contracted_cost=None,
+            billed_cost=100.00,
+            effective_cost=None,
+            resource_id="res-1",
+            resource_name="server",
+            service_name="EC2",
+            pi_email="test@example.edu",
+            project_id=None,
+            fund_org="12345",
+            raw_tags=None,
+            needs_review=False,
+        )
+        db.insert_charges([charge])
+        charges = db.get_charges_for_period(period.id)
+        assert len(charges) == 1
+
+        result = db.reject_charge(charges[0].id, performed_by="admin")
+        assert result is False
+
+        # Charge should still be there, unchanged
+        charges_after = db.get_charges_for_period(period.id)
+        assert len(charges_after) == 1
+        assert charges_after[0].rejected_at is None
 
 
 class TestStatementOperations:

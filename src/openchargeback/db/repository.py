@@ -85,6 +85,9 @@ class Charge:
     reviewed_at: str | None = None
     reviewed_by: str | None = None
     imported_at: str | None = None
+    rejected_at: str | None = None
+    rejected_by: str | None = None
+    rejection_note: str | None = None
 
     @property
     def discount_amount(self) -> float:
@@ -602,6 +605,7 @@ class Database:
         row_dict["needs_review"] = bool(row_dict["needs_review"])
         row_dict["reviewed_at"] = _format_datetime(row_dict["reviewed_at"])
         row_dict["imported_at"] = _format_datetime(row_dict["imported_at"])
+        row_dict["rejected_at"] = _format_datetime(row_dict.get("rejected_at"))
         if row_dict["raw_tags"]:
             row_dict["raw_tags"] = json.loads(row_dict["raw_tags"])
         return Charge(**row_dict)
@@ -611,35 +615,39 @@ class Database:
         billing_period_id: int,
         include_flagged: bool = False,
     ) -> list[Charge]:
-        """Get charges for a billing period."""
+        """Get charges for a billing period (excludes rejected charges)."""
         with self.engine.connect() as conn:
             stmt = select(charges).where(charges.c.billing_period_id == billing_period_id)
+            stmt = stmt.where(charges.c.rejected_at.is_(None))
             if not include_flagged:
                 stmt = stmt.where(charges.c.needs_review == False)  # noqa: E712
             rows = conn.execute(stmt).fetchall()
             return [self._charge_from_row(row) for row in rows]
 
     def get_flagged_charges(self, billing_period_id: int | None = None) -> list[Charge]:
-        """Get charges flagged for review."""
+        """Get charges flagged for review (excludes already-rejected charges)."""
         with self.engine.connect() as conn:
             stmt = select(charges).where(charges.c.needs_review == True)  # noqa: E712
+            stmt = stmt.where(charges.c.rejected_at.is_(None))
             if billing_period_id:
                 stmt = stmt.where(charges.c.billing_period_id == billing_period_id)
             rows = conn.execute(stmt).fetchall()
             return [self._charge_from_row(row) for row in rows]
 
-    def approve_charge(self, charge_id: int, performed_by: str | None = None) -> None:
-        """Approve a flagged charge."""
+    def approve_charge(self, charge_id: int, performed_by: str | None = None) -> bool:
+        """Approve a flagged charge. Returns True if a charge was actually approved."""
         with self.engine.begin() as conn:
-            conn.execute(
+            result = conn.execute(
                 update(charges)
                 .where(charges.c.id == charge_id)
+                .where(charges.c.needs_review == True)  # noqa: E712
                 .values(
                     needs_review=False,
                     reviewed_at=datetime.now(),
                     reviewed_by=performed_by,
                 )
             )
+            return result.rowcount > 0
 
     def approve_all_charges(self, billing_period_id: int, performed_by: str | None = None) -> int:
         """Approve all flagged charges for a period."""
@@ -656,14 +664,40 @@ class Database:
             )
             return result.rowcount
 
-    def reject_charge(self, charge_id: int, performed_by: str | None = None) -> None:
-        """Remove a charge from the database.
+    def reject_charge(
+        self, charge_id: int, performed_by: str | None = None, note: str | None = None
+    ) -> bool:
+        """Soft-delete a charge by marking it rejected.
 
-        Note: The performed_by parameter is accepted for API consistency
-        but rejected charges are deleted, so the info is not stored.
+        Returns True if a charge was actually rejected (was in review queue).
+        Rejected charges stay in the database for audit but are excluded
+        from aggregation, statements, and journal exports.
         """
         with self.engine.begin() as conn:
-            conn.execute(delete(charges).where(charges.c.id == charge_id))
+            result = conn.execute(
+                update(charges)
+                .where(charges.c.id == charge_id)
+                .where(charges.c.needs_review == True)  # noqa: E712
+                .values(
+                    needs_review=False,
+                    rejected_at=datetime.now(),
+                    rejected_by=performed_by,
+                    rejection_note=note,
+                    reviewed_at=datetime.now(),
+                    reviewed_by=performed_by,
+                )
+            )
+            return result.rowcount > 0
+
+    def get_rejected_charges(self, billing_period_id: int | None = None) -> list[Charge]:
+        """Get rejected charges, optionally filtered by period."""
+        with self.engine.connect() as conn:
+            stmt = select(charges).where(charges.c.rejected_at.isnot(None))
+            if billing_period_id:
+                stmt = stmt.where(charges.c.billing_period_id == billing_period_id)
+            stmt = stmt.order_by(charges.c.rejected_at.desc())
+            rows = conn.execute(stmt).fetchall()
+            return [self._charge_from_row(row) for row in rows]
 
     # Statement operations
 
@@ -876,9 +910,9 @@ class Database:
         from sqlalchemy import func, or_
 
         with self.engine.connect() as conn:
-            # Base query
-            stmt = select(charges)
-            count_stmt = select(func.count(charges.c.id))
+            # Base query — always exclude rejected charges
+            stmt = select(charges).where(charges.c.rejected_at.is_(None))
+            count_stmt = select(func.count(charges.c.id)).where(charges.c.rejected_at.is_(None))
 
             # Apply filters
             if billing_period_id:

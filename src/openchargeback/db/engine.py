@@ -63,7 +63,7 @@ def create_db_engine(connection_string: str | Path) -> Engine:
 
 
 def initialize_schema(engine: Engine) -> None:
-    """Create all tables if they don't exist.
+    """Create all tables if they don't exist, and run migrations.
 
     Args:
         engine: SQLAlchemy engine.
@@ -74,13 +74,29 @@ def initialize_schema(engine: Engine) -> None:
     from .tables import SCHEMA_VERSION, schema_version
 
     with engine.begin() as conn:
-        # Check if version exists
+        # Check current version
         result = conn.execute(
             text("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1")
         )
         row = result.fetchone()
-        if row is None:
+        current_version = row[0] if row else 0
+
+        if current_version == 0:
             conn.execute(schema_version.insert().values(version=SCHEMA_VERSION))
+        elif current_version < SCHEMA_VERSION:
+            _run_migrations(conn, current_version, SCHEMA_VERSION)
+            conn.execute(schema_version.insert().values(version=SCHEMA_VERSION))
+
+
+def _run_migrations(conn, from_version: int, to_version: int) -> None:
+    """Run incremental schema migrations."""
+    if from_version < 9 <= to_version:
+        # v9: Add soft-delete columns for charge rejection
+        for col in ("rejected_at", "rejected_by", "rejection_note"):
+            try:
+                conn.execute(text(f"ALTER TABLE charges ADD COLUMN {col} TEXT"))
+            except Exception:
+                pass  # Column may already exist
 
 
 def get_dialect(engine: Engine) -> str:
