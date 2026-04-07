@@ -109,14 +109,23 @@ def create_app(config_path: Path | None = None) -> FastAPI:
     app.add_middleware(SecurityHeadersMiddleware)
 
     # Session middleware for authentication
-    secret_key = config.web.secret_key or secrets.token_hex(32)
+    secret_key = config.web.secret_key
+    if not secret_key or secret_key == "changeme-in-production":
+        if config.dev_mode:
+            # Generate ephemeral key in dev mode (sessions won't survive restarts)
+            secret_key = secrets.token_hex(32)
+        else:
+            raise RuntimeError(
+                "web.secret_key must be set to a strong random value in production. "
+                "Generate one with: python -c 'import secrets; print(secrets.token_hex(32))'"
+            )
     app.add_middleware(
         SessionMiddleware,
         secret_key=secret_key,
         session_cookie="openchargeback_session",
         max_age=config.web.session_lifetime_hours * 3600,
         same_site="lax",
-        https_only=False,  # Set to True in production with HTTPS
+        https_only=not config.dev_mode,
     )
 
     # Mount static files
