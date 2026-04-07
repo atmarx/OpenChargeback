@@ -13,6 +13,7 @@ from openchargeback.web.deps import (
     get_db,
     get_flash_messages,
     get_global_flagged_count,
+    require_reviewer,
 )
 
 router = APIRouter(prefix="/emails", tags=["emails"])
@@ -78,7 +79,7 @@ async def list_emails(
 async def resend_email(
     request: Request,
     email_id: int,
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_reviewer),
     db: Database = Depends(get_db),
 ):
     """Resend a failed email."""
