@@ -106,16 +106,18 @@ class Charge:
 
 @dataclass
 class Statement:
-    """Statement record."""
+    """Statement record (one per project per PI per period)."""
 
     id: int | None
     billing_period_id: int
     pi_email: str
     total_cost: float
-    project_count: int
+    project_count: int  # Legacy; always 1 for new records
     generated_at: str | None = None
     sent_at: str | None = None
     pdf_path: str | None = None
+    project_id: str | None = None
+    fund_org: str | None = None
 
 
 @dataclass
@@ -726,6 +728,8 @@ class Database:
             values = {
                 "billing_period_id": statement.billing_period_id,
                 "pi_email": statement.pi_email,
+                "project_id": statement.project_id,
+                "fund_org": statement.fund_org,
                 "total_cost": statement.total_cost,
                 "project_count": statement.project_count,
                 "pdf_path": statement.pdf_path,
@@ -734,8 +738,8 @@ class Database:
             stmt = self._upsert(
                 statements,
                 values,
-                index_elements=["billing_period_id", "pi_email"],
-                update_columns=["total_cost", "project_count", "pdf_path", "generated_at"],
+                index_elements=["billing_period_id", "pi_email", "project_id"],
+                update_columns=["total_cost", "fund_org", "project_count", "pdf_path", "generated_at"],
             )
             result = conn.execute(stmt)
             return result.inserted_primary_key[0] if result.inserted_primary_key else 0

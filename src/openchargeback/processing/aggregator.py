@@ -180,11 +180,12 @@ def generate_statements(
     # Ensure output directories exist
     config.output.pdf_dir.mkdir(parents=True, exist_ok=True)
 
-    # Generate statements for each PI
+    # Generate statements for each PI — one statement per project
     for pi_email, summary in pi_summaries.items():
-        # Generate PDF for each project
         pdf_paths: list[str] = []
-        for _project_id, project_summary in summary.projects.items():
+        statement_ids: list[int] = []
+
+        for project_id, project_summary in summary.projects.items():
             pdf_path = generate_pdf_statement(
                 period=period,
                 pi_email=pi_email,
@@ -193,42 +194,44 @@ def generate_statements(
             )
             pdf_paths.append(str(pdf_path))
 
-        # Generate email HTML
-        email_html = generate_email_html(
-            period=period,
-            pi_summary=summary,
-            config=config,
-        )
-
-        # Create/update statement record
-        if not dry_run:
-            statement = Statement(
-                id=None,
-                billing_period_id=billing_period.id,
-                pi_email=pi_email,
-                total_cost=summary.total_cost,
-                project_count=summary.project_count,
-                pdf_path=";".join(pdf_paths),  # Store multiple paths
-            )
-            statement_id = db.upsert_statement(statement)
-            result.statements_generated += 1
-
-            # Send email if requested
-            if send_emails and config.smtp and config.email:
-                success = send_email_with_logging(
-                    to_email=pi_email,
-                    subject=config.email.subject_template.format(billing_period=period),
-                    html_body=email_html,
-                    attachments=pdf_paths,
-                    config=config,
-                    db=db,
-                    sent_by="system",
-                    statement_id=statement_id,
+            # One statement record per project
+            if not dry_run:
+                statement = Statement(
+                    id=None,
+                    billing_period_id=billing_period.id,
+                    pi_email=pi_email,
+                    project_id=project_id,
+                    fund_org=project_summary.fund_org,
+                    total_cost=project_summary.total_cost,
+                    project_count=1,
+                    pdf_path=str(pdf_path),
                 )
-                if success:
-                    db.mark_statement_sent(statement_id)
-                    result.emails_sent += 1
-        else:
-            result.statements_generated += 1
+                statement_id = db.upsert_statement(statement)
+                statement_ids.append(statement_id)
+                result.statements_generated += 1
+            else:
+                result.statements_generated += 1
+
+        # Send one email per PI with all project PDFs attached
+        if not dry_run and send_emails and config.smtp and config.email:
+            email_html = generate_email_html(
+                period=period,
+                pi_summary=summary,
+                config=config,
+            )
+            success = send_email_with_logging(
+                to_email=pi_email,
+                subject=config.email.subject_template.format(billing_period=period),
+                html_body=email_html,
+                attachments=pdf_paths,
+                config=config,
+                db=db,
+                sent_by="system",
+                statement_id=statement_ids[0] if statement_ids else None,
+            )
+            if success:
+                for sid in statement_ids:
+                    db.mark_statement_sent(sid)
+                result.emails_sent += 1
 
     return result

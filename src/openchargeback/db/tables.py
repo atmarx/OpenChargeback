@@ -140,7 +140,7 @@ Index(
     sqlite_where=(charges.c.needs_review == True),  # noqa: E712
 )
 
-# Statements
+# Statements (one per project per PI per period)
 statements = Table(
     "statements",
     metadata,
@@ -152,15 +152,18 @@ statements = Table(
         nullable=False,
     ),
     Column("pi_email", String(254), nullable=False),
+    Column("project_id", String(200)),
+    Column("fund_org", String(100)),
     Column("total_cost", Float, nullable=False),
-    Column("project_count", Integer),
+    Column("project_count", Integer),  # Legacy; always 1 for new records
     Column("generated_at", DateTime, server_default=func.now()),
     Column("sent_at", DateTime),
     Column("pdf_path", String(500)),
     UniqueConstraint(
         "billing_period_id",
         "pi_email",
-        name="uq_statements_period_pi",
+        "project_id",
+        name="uq_statements_period_pi_project",
     ),
 )
 
@@ -293,4 +296,4 @@ review_logs = Table(
 Index("idx_review_logs_period", review_logs.c.billing_period_id)
 Index("idx_review_logs_performed_at", review_logs.c.performed_at)
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10

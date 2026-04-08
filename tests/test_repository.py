@@ -699,39 +699,61 @@ class TestStatementOperations:
             billing_period_id=period.id,
             pi_email="researcher@example.edu",
             total_cost=500.00,
-            project_count=3,
+            project_count=1,
             pdf_path="/output/statement.pdf",
+            project_id="proj-1",
+            fund_org="123456-7890",
         )
 
         statement_id = db.upsert_statement(statement)
         assert statement_id is not None
 
     def test_upsert_statement_update(self, db, period):
-        """Update existing statement."""
+        """Update existing statement (same PI/period/project)."""
         statement1 = Statement(
             id=None,
             billing_period_id=period.id,
             pi_email="researcher@example.edu",
             total_cost=500.00,
-            project_count=3,
+            project_count=1,
             pdf_path="/output/statement.pdf",
+            project_id="proj-1",
+            fund_org="123456-7890",
         )
         db.upsert_statement(statement1)
 
-        # Update same PI/period
+        # Update same PI/period/project
         statement2 = Statement(
             id=None,
             billing_period_id=period.id,
             pi_email="researcher@example.edu",
             total_cost=750.00,
-            project_count=4,
+            project_count=1,
             pdf_path="/output/statement-v2.pdf",
+            project_id="proj-1",
+            fund_org="123456-7890",
         )
         db.upsert_statement(statement2)
 
         statements = db.get_statements_for_period(period.id)
         assert len(statements) == 1
         assert statements[0].total_cost == pytest.approx(750.00)
+
+    def test_upsert_statement_per_project(self, db, period):
+        """Same PI with different projects creates separate statements."""
+        for proj, cost in [("proj-1", 300.00), ("proj-2", 200.00)]:
+            db.upsert_statement(Statement(
+                id=None,
+                billing_period_id=period.id,
+                pi_email="researcher@example.edu",
+                total_cost=cost,
+                project_count=1,
+                project_id=proj,
+                fund_org="123456-7890",
+            ))
+
+        statements = db.get_statements_for_period(period.id)
+        assert len(statements) == 2
 
     def test_get_statements_for_period(self, db, period):
         """Get all statements for a period."""
@@ -742,6 +764,7 @@ class TestStatementOperations:
                 pi_email=email,
                 total_cost=100.00,
                 project_count=1,
+                project_id="proj-1",
             )
             db.upsert_statement(statement)
 
@@ -755,7 +778,8 @@ class TestStatementOperations:
             billing_period_id=period.id,
             pi_email="researcher@example.edu",
             total_cost=500.00,
-            project_count=3,
+            project_count=1,
+            project_id="proj-1",
         )
         statement_id = db.upsert_statement(statement)
 
@@ -882,8 +906,9 @@ class TestEmailLogOperations:
             billing_period_id=period.id,
             pi_email="researcher@example.edu",
             total_cost=500.00,
-            project_count=3,
+            project_count=1,
             pdf_path="/output/statement.pdf",
+            project_id="proj-1",
         )
         stmt_id = db.upsert_statement(stmt)
         return db.get_statement_by_id(stmt_id)
@@ -1030,8 +1055,10 @@ class TestStatementByIdOperations:
             billing_period_id=period.id,
             pi_email="researcher@example.edu",
             total_cost=500.00,
-            project_count=3,
+            project_count=1,
             pdf_path="/output/statement.pdf",
+            project_id="proj-1",
+            fund_org="123456-7890",
         )
         statement_id = db.upsert_statement(statement)
 
@@ -1042,6 +1069,8 @@ class TestStatementByIdOperations:
         assert result.pi_email == "researcher@example.edu"
         assert result.total_cost == pytest.approx(500.00)
         assert result.pdf_path == "/output/statement.pdf"
+        assert result.project_id == "proj-1"
+        assert result.fund_org == "123456-7890"
 
     def test_get_statement_by_id_nonexistent(self, db):
         """Get nonexistent statement returns None."""
@@ -1055,7 +1084,8 @@ class TestStatementByIdOperations:
             billing_period_id=period.id,
             pi_email="researcher@example.edu",
             total_cost=500.00,
-            project_count=3,
+            project_count=1,
+            project_id="proj-1",
         )
         statement_id = db.upsert_statement(statement)
 

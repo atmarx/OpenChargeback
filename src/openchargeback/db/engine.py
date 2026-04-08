@@ -98,6 +98,39 @@ def _run_migrations(conn, from_version: int, to_version: int) -> None:
             except Exception:
                 pass  # Column may already exist
 
+    if from_version < 10 <= to_version:
+        # v10: Per-project statements — add project_id/fund_org, change unique constraint.
+        # SQLite can't alter constraints, so recreate the table.
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS statements_new (
+                id INTEGER PRIMARY KEY,
+                billing_period_id INTEGER NOT NULL REFERENCES billing_periods(id) ON DELETE CASCADE,
+                pi_email VARCHAR(254) NOT NULL,
+                project_id VARCHAR(200),
+                fund_org VARCHAR(100),
+                total_cost FLOAT NOT NULL,
+                project_count INTEGER,
+                generated_at DATETIME DEFAULT (CURRENT_TIMESTAMP),
+                sent_at DATETIME,
+                pdf_path VARCHAR(500),
+                UNIQUE (billing_period_id, pi_email, project_id)
+            )
+        """))
+        conn.execute(text("""
+            INSERT OR IGNORE INTO statements_new
+                (id, billing_period_id, pi_email, project_id, fund_org,
+                 total_cost, project_count, generated_at, sent_at, pdf_path)
+            SELECT id, billing_period_id, pi_email, NULL, NULL,
+                   total_cost, project_count, generated_at, sent_at, pdf_path
+            FROM statements
+        """))
+        conn.execute(text("DROP TABLE statements"))
+        conn.execute(text("ALTER TABLE statements_new RENAME TO statements"))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS idx_statements_billing_period "
+            "ON statements (billing_period_id)"
+        ))
+
 
 def get_dialect(engine: Engine) -> str:
     """Get the database dialect name (sqlite, postgresql)."""
