@@ -1,6 +1,6 @@
 """Dashboard route."""
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse
 
 from openchargeback.db import Database
@@ -76,10 +76,10 @@ async def dashboard(
     )
 
 
-@router.get("/set-period")
+@router.post("/set-period")
 async def set_period(
     request: Request,
-    period: int,
+    period: int = Form(...),
     user: User = Depends(get_current_user),
 ):
     """Set the current period in session."""

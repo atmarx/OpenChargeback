@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
+from openchargeback import audit
 from openchargeback.db import Database
 from openchargeback.web.auth import User, hash_password
 from openchargeback.web.deps import (
@@ -130,6 +131,12 @@ async def create_user(
             is_config_user=False,
             created_by=user.username,
         )
+        audit.log_user_created(
+            username=username.strip(),
+            email=email.strip(),
+            role=role,
+            created_by=user.display_name,
+        )
         add_flash_message(request, "success", f"User '{username}' created successfully.")
     except Exception as e:
         add_flash_message(request, "error", f"Error creating user: {str(e)}")
@@ -208,6 +215,14 @@ async def update_user(
         display_name=display_name.strip() or None,
         role=role,
     )
+    changes = f"email={email.strip()}, role={role}"
+    if display_name.strip():
+        changes += f", display_name={display_name.strip()}"
+    audit.log_user_updated(
+        username=edit_user.username,
+        changes=changes,
+        user=user.display_name,
+    )
     add_flash_message(request, "success", f"User '{edit_user.username}' updated.")
     return RedirectResponse(url="/settings/users", status_code=303)
 
@@ -240,6 +255,10 @@ async def reset_user_password(
         return RedirectResponse(url=f"/settings/users/{user_id}/edit", status_code=303)
 
     db.update_user_password(user_id, hash_password(password))
+    audit.log_user_password_reset(
+        username=edit_user.username,
+        user=user.display_name,
+    )
     add_flash_message(request, "success", f"Password reset for '{edit_user.username}'.")
     return RedirectResponse(url="/settings/users", status_code=303)
 
@@ -279,6 +298,10 @@ async def delete_user(
             return RedirectResponse(url="/settings/users", status_code=303)
 
     db.delete_user(user_id)
+    audit.log_user_deleted(
+        username=delete_user_obj.username,
+        user=user.display_name,
+    )
     add_flash_message(request, "success", f"User '{delete_user_obj.username}' deleted.")
     return RedirectResponse(url="/settings/users", status_code=303)
 
@@ -350,5 +373,6 @@ async def change_password(
         return RedirectResponse(url="/settings/users/change-password", status_code=303)
 
     db.update_user_password(user.db_id, hash_password(new_password))
+    audit.log_user_password_changed(username=user.username)
     add_flash_message(request, "success", "Password changed successfully.")
     return RedirectResponse(url="/", status_code=303)

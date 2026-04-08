@@ -8,6 +8,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
 
+from .. import audit
 from ..config import Config
 from ..db import Database
 
@@ -58,6 +59,14 @@ def send_email_with_logging(
     except Exception as e:
         status = "error"
         error_message = str(e)
+
+    # Audit log
+    audit.log_email_sent(
+        recipient=to_email,
+        subject=subject,
+        status=status,
+        error=error_message,
+    )
 
     # Log to database if available
     if db:

@@ -9,7 +9,7 @@ This document describes how OpenChargeback handles and protects data.
 | Data Type | Storage | Protection |
 |-----------|---------|------------|
 | User passwords | Database | bcrypt hash (never stored plaintext) |
-| Session tokens | Server memory | Cryptographic random, short-lived |
+| Session tokens | Client-side signed cookie | Signed with secret_key (itsdangerous), short-lived |
 | SMTP credentials | Config file | Environment variable substitution |
 | Secret key | Config file | Environment variable substitution |
 | PI email addresses | Database | Application access control |

@@ -227,8 +227,8 @@ Request → FastAPI Router → Dependency Injection → Route Handler
 Session-based with bcrypt:
 
 1. Login validates credentials against bcrypt hash
-2. Session ID stored in cookie
-3. Session data stored server-side
+2. Session data signed and stored in client-side cookie (Starlette SessionMiddleware)
+3. Cookie signature validated on each request — tampered cookies rejected
 4. Session timeout configurable
 
 ### Templates

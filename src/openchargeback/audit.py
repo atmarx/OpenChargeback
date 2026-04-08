@@ -271,3 +271,88 @@ def log_period_finalized(
         statement_count=statement_count,
         user=user or "system",
     )
+
+
+def log_period_reopened(
+    period: str,
+    reason: str,
+    user: str | None = None,
+) -> None:
+    """Log a period reopen event."""
+    _emit(
+        "period",
+        "reopened",
+        period=period,
+        reason=reason,
+        user=user or "system",
+    )
+
+
+# User events
+def log_user_created(
+    username: str,
+    email: str,
+    role: str,
+    created_by: str | None = None,
+) -> None:
+    """Log a user creation event."""
+    _emit(
+        "user",
+        "created",
+        username=username,
+        email=email,
+        role=role,
+        created_by=created_by or "system",
+    )
+
+
+def log_user_updated(
+    username: str,
+    changes: str,
+    user: str | None = None,
+) -> None:
+    """Log a user update event."""
+    _emit(
+        "user",
+        "updated",
+        username=username,
+        changes=changes,
+        user=user or "system",
+    )
+
+
+def log_user_deleted(
+    username: str,
+    user: str | None = None,
+) -> None:
+    """Log a user deletion event."""
+    _emit(
+        "user",
+        "deleted",
+        username=username,
+        user=user or "system",
+    )
+
+
+def log_user_password_reset(
+    username: str,
+    user: str | None = None,
+) -> None:
+    """Log an admin password reset event."""
+    _emit(
+        "user",
+        "password_reset",
+        username=username,
+        user=user or "system",
+    )
+
+
+def log_user_password_changed(
+    username: str,
+) -> None:
+    """Log a self-service password change event."""
+    _emit(
+        "user",
+        "password_changed",
+        username=username,
+    )

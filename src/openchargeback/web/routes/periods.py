@@ -219,6 +219,11 @@ async def reopen_period(
     )
 
     if period:
+        audit.log_period_reopened(
+            period=period.period,
+            reason=reason.strip(),
+            user=user.display_name,
+        )
         add_flash_message(request, "success", f"Period {period.period} reopened.")
     else:
         add_flash_message(

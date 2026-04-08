@@ -72,10 +72,9 @@ When requirements are tightened, existing users are prompted to update their pas
 
 1. User submits credentials
 2. Server validates password against bcrypt hash
-3. Session cookie is set with session ID
-4. Session stored server-side (in-memory or database)
-5. Cookie validated on each request
-6. Session expires after `session_lifetime_hours`
+3. Session data is serialized, signed with `secret_key`, and stored in a client-side cookie (Starlette SessionMiddleware with itsdangerous signing)
+4. Cookie signature is validated on each request — tampered cookies are rejected
+5. Session expires after `session_lifetime_hours`
 
 ### Configuration
 
@@ -87,11 +86,11 @@ web:
 
 ### Session Security
 
-- Sessions are server-side (not JWT)
+- Sessions are client-side signed cookies (Starlette SessionMiddleware, not JWT)
+- Cookie contents are signed with `secret_key` — the app refuses to start without a real key
 - Cookie is HTTP-only (not accessible to JavaScript)
-- Cookie is Secure when served over HTTPS
+- Cookie is Secure when `https_only` is enabled (default in production, disabled only in dev_mode)
 - SameSite attribute prevents CSRF
-- Session ID is cryptographically random
 
 ## Roles and Permissions
 

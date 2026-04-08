@@ -9,7 +9,7 @@
         <div class="period-selector">
             <span>Period:</span>
             <select name="period"
-                    hx-get="/set-period"
+                    hx-post="/set-period"
                     hx-trigger="change"
                     hx-swap="none"
                     hx-on::after-request="location.reload()">

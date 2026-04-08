@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 
+from .. import audit
 from ..config import Config
 from ..db.repository import Charge, Database, Statement
 
@@ -194,6 +195,14 @@ def generate_statements(
             )
             pdf_paths.append(str(pdf_path))
 
+            audit.log_statement_generated(
+                period=period,
+                pi_email=pi_email,
+                total_cost=project_summary.total_cost,
+                charge_count=len(project_summary.charges),
+                pdf_path=str(pdf_path),
+            )
+
             # One statement record per project
             if not dry_run:
                 statement = Statement(
@@ -233,5 +242,10 @@ def generate_statements(
                 for sid in statement_ids:
                     db.mark_statement_sent(sid)
                 result.emails_sent += 1
+                audit.log_statement_sent(
+                    period=period,
+                    pi_email=pi_email,
+                    total_cost=summary.total_cost,
+                )
 
     return result
