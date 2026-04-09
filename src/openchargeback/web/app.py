@@ -1,6 +1,5 @@
 """FastAPI application factory for the web interface."""
 
-import os
 import re
 import secrets
 from pathlib import Path
