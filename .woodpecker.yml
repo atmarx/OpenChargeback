@@ -1,7 +1,10 @@
 # OpenChargeback CI/CD Pipeline
-# Runs tests on every push, deploys to projects.xram.net on main
+# Runs tests on every push, deploys to openchargeback.dev.xram.net on main
 #
 # Pip cache mounted at /opt/cache/pip for faster builds
+
+when:
+  - event: push
 
 steps:
   - name: test-and-lint
@@ -41,6 +44,7 @@ steps:
     commands:
       - cd /projects/${CI_REPO_NAME} || git clone ${CI_REPO_CLONE_URL} /projects/${CI_REPO_NAME}
       - cd /projects/${CI_REPO_NAME} && git fetch && git checkout ${CI_COMMIT_BRANCH} && git pull
+      - docker network inspect gateway-stack_gateway >/dev/null 2>&1 || docker network create gateway-stack_gateway
       - cd /projects/${CI_REPO_NAME} && docker compose up -d --build
       - docker image prune -f
     volumes:
