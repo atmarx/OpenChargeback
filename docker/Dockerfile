@@ -10,12 +10,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy and install dependencies
+# Install pinned dependencies first (cached unless lock file changes)
+COPY requirements.lock .
+RUN pip install --no-cache-dir -r requirements.lock
+
+# Install the project package (no dep resolution — already pinned above)
 COPY pyproject.toml .
 COPY src/ src/
 COPY README.md .
-
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir --no-deps .
 
 # Production image
 FROM python:3.12-slim
