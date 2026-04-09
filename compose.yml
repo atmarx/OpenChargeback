@@ -1,8 +1,8 @@
 # OpenChargeback Deployment Configuration
-# Deployed via Woodpecker CI to openchargeback.projects.xram.net
+# Deployed via Woodpecker CI to openchargeback.dev.xram.net
 #
 # Service naming follows Caddy wildcard routing convention:
-#   openchargeback-app → https://openchargeback.projects.xram.net
+#   openchargeback-app → https://openchargeback.dev.xram.net
 
 services:
   openchargeback-app:
