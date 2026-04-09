@@ -1,0 +1,384 @@
+
+
+Review project guardrails
+No tasks in progress
+
+
+this is a project I built to help us with tracking and processing our cloud and on-prem usage in a consistent and centralized way.  i think it's a great project, but i'm biased.  i would like for you to do a full adversarial review -- what's fragile?  what's insecure?  where should we have more guardrails or auditing that we haven't accounted for?  are our unit tests actually carrying weight or are they just making sure 1==1 to turn green?  please do a full review of the project, with a report broken down by actionable items (could fix now) vs conceptual ideas (need to rethink a core assumption).
+
+
+
+
+Worked for 16m 19s
+I’m treating this as a true adversarial review: I’ll map the architecture, inspect auth/data flows and execution paths, then pressure-test the tests to see whether they would actually catch regressions. After that I’ll turn it into a report split into “actionable now” versus “core assumptions to revisit.”
+
+Ran Get-ChildItem -Force
+
+
+Ran git status --short
+
+
+Ran rg --files
+
+
+I’ve got the shape of the repo now: a Python app with CLI, FastAPI web UI, SQLite-backed persistence, ingest/aggregation/output pipelines, and a moderate test suite. Next I’m reading the architecture and the highest-risk modules first: auth, database access, imports, output generation, and anything that writes an audit trail.
+
+Ran Get-Content pyproject.toml
+
+
+Ran Get-Content README.md
+
+
+Ran Get-Content docs\development\architecture.md
+
+
+Ran Get-Content docs\security\README.md
+
+
+Ran rg -n "secret_key|session|csrf|upload|UploadFile|File\(|subprocess|Popen|system\(|eval\(|exec\(|pickle|yaml\.load|safe_load|Template\(|Jinja|SMTP|ssl|password|bcrypt|cookie|SameSite|httponly|secure" src tests
+
+
+Ran rg -n "TODO|FIXME|XXX|HACK|BUG|SECURITY|audit|logging|log" src tests docs
+
+
+Ran rg -n "select\(|insert\(|update\(|delete\(|text\(" src\openchargeback\db src\openchargeback\web
+
+
+The docs promise more security and audit coverage than the grep results suggest, so I’m now checking where the implementation and the security docs diverge. I’m also looking for “admin-only” or “finalized means immutable” assumptions that the code may not actually enforce everywhere.
+
+Ran Get-ChildItem tests -Recurse -Filter *.py | Select-Object FullName,Length | Sort-Object FullName
+
+
+Ran Get-ChildItem src\openchargeback -Recurse -Filter *.py | Select-Object FullName,Length | Sort-Object FullName
+
+
+Ran $i=1; Get-Content src\openchargeback\config.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content src\openchargeback\web\app.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content src\openchargeback\web\auth.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content src\openchargeback\web\deps.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran rg -n "Depends\((require_admin|require_reviewer|get_current_user)\)|user: User = Depends|get_current_user_optional|require_admin|require_reviewer" src\openchargeback\web\routes
+
+
+Ran rg -n "finalized|immutable|closed" src\openchargeback\web src\openchargeback\db src\openchargeback\cli src\openchargeback\processing
+
+
+Ran $i=1; Get-Content src\openchargeback\web\routes\users.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content src\openchargeback\web\routes\imports.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content src\openchargeback\web\routes\settings.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content src\openchargeback\web\routes\statements.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content src\openchargeback\web\routes\periods.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content src\openchargeback\web\routes\review.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content src\openchargeback\web\routes\emails.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content src\openchargeback\web\routes\auth_routes.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+A few things are already standing out: mutating routes appear to have no CSRF protection, several sensitive actions are open to any authenticated user instead of admin-only, and the implementation looks looser than the docs claim around audit completeness and immutability. I’m digging into the database/repository layer now to confirm whether those are just route-level gaps or deeper invariants missing at the data layer too.
+
+Ran $i=1; Get-Content src\openchargeback\ingest\focus.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content src\openchargeback\processing\aggregator.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content src\openchargeback\web\services\period_service.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content src\openchargeback\delivery\smtp.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content src\openchargeback\db\tables.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content src\openchargeback\db\engine.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content src\openchargeback\db\schema.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran rg -n "def (insert_charges|get_or_create_period|update_period_status|reopen_period|get_charges_for_period|get_flagged_charges|approve_charge|approve_all_charges|reject_charge|upsert_statement|get_statements_for_period|get_statement_by_id|mark_statement_sent|get_recent_imports|get_period_stats|get_charges_paginated|clear_|log_review_action|get_review_logs|get_user_by_username|get_user_by_id|list_users|create_user|update_user|update_user_password|delete_user|sync_config_users)" src\openchargeback\db\repository.py
+
+
+Ran $content = Get-Content src\openchargeback\db\repository.py; for($i=1;$i -le 260;$i++){ '{0,4}: {1}' -f $i, $content[$i-1] }
+
+
+Ran $content = Get-Content src\openchargeback\db\repository.py; for($i=260;$i -le 760;$i++){ '{0,4}: {1}' -f $i, $content[$i-1] }
+
+
+Ran $content = Get-Content src\openchargeback\db\repository.py; for($i=760;$i -le 1288;$i++){ '{0,4}: {1}' -f $i, $content[$i-1] }
+
+
+Ran $content = Get-Content src\openchargeback\db\repository.py; for($i=1288;$i -le $content.Length;$i++){ '{0,4}: {1}' -f $i, $content[$i-1] }
+
+
+Ran $i=1; Get-Content src\openchargeback\output\email.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content src\openchargeback\output\pdf.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content src\openchargeback\output\journal_template.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content src\openchargeback\output\journal.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content src\openchargeback\cli.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran rg -n "@app\.command|def (ingest|generate|export_journal|serve|review|create_period|close|finalize|reopen|send)" src\openchargeback\cli.py
+
+
+Ran $i=1; Get-Content src\openchargeback\audit.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content docs\security\audit-trail.md | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content src\openchargeback\logging.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content docs\security\authentication.md | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content src\openchargeback\web\routes\help.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content src\openchargeback\web\routes\journal.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content src\openchargeback\web\routes\projects.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content src\openchargeback\web\routes\charges.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+I’m at the point where the risk picture is getting concrete, so I’m switching from code reading to validation: I’m running the test suite and then I’ll compare what the tests actually assert against the risky paths I’ve found. That should let me separate “well-covered but brittle” from “completely unguarded.”
+
+Ran pytest --cov=src/openchargeback --cov-report=term-missing
+
+
+The first test run failed because pytest isn’t on PATH in this shell. I’m retrying through python -m pytest so we can still get a real signal on coverage and failure modes.
+
+Ran python -m pytest --cov=src/openchargeback --cov-report=term-missing
+
+
+Ran $i=1; Get-Content tests\conftest.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content tests\test_repository.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content tests\test_aggregator.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content tests\test_ingest.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content tests\test_config.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content tests\test_output.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content tests\test_logging.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content tests\test_period_service.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content tests\test_journal_template.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran rg -n "configure_logging\(|get_logger\(" src tests
+
+
+Ran rg -n "from openchargeback\.logging import|import openchargeback\.logging|configure_logging" src tests
+
+
+Ran rg -n "login|logout|session_expired|authenticate|audit\.log_" src\openchargeback | Select-String -Pattern "login_|logout|session_expired|audit\.log"
+
+
+Ran rg -n "user_created|user_modified|settings_changed|log_.*user|log_.*settings|review_logs|email_logs|journal_exports" src\openchargeback\web src\openchargeback\audit.py
+
+
+Ran $i=1; Get-Content src\openchargeback\web\routes\review_logs.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran rg -n "innerHTML|insertAdjacentHTML|textContent|showResults|filename|error" src\openchargeback\web\templates\components\import_modal.html
+
+
+Ran $content = Get-Content src\openchargeback\web\templates\components\import_modal.html; for($i=924;$i -le 980;$i++){ '{0,4}: {1}' -f $i, $content[$i-1] }
+
+
+I’ve moved from code defects into data-model assumptions now. One especially important thread is the import dedupe key: if the “same resource + same period-start” assumption is too weak, the system can silently overwrite legitimate line items and the rest of the workflow will look clean while the bill is wrong. I’m checking the sample data and the tests against that assumption next.
+
+Ran @' import csv, glob, os from collections import Counter, defaultdict files = glob.glob('sample_data/inputs/*.csv') for path in files: with open(path, newline='', encoding='utf-8') as f: r = csv.DictReader(f) ctr = Counter() rows=0 for row in r: key=(row.get('BillingPeriodStart') or row.get('billingperiodstart') or '', row.get('ResourceId') or row.get('resourceid') or '', row.get('ChargePeriodStart') or row.get('chargeperiodstart') or '') ctr[key]+=1 rows+=1 dups = sum(1 for c in ctr.values() if c>1) maxdup = max(ctr.values()) if ctr else 0 print(os.path.basename(path), 'rows=', rows, 'duplicate_keys=', dups, 'maxdup=', maxdup) '@ | python -
+
+
+Ran rg -n "upsert|duplicate|natural key|resource_id|charge_period_start" docs README.md src\openchargeback
+
+
+Ran Get-Content compose.yml
+
+
+Ran Get-Content docker\Dockerfile
+
+
+Ran Get-Content docker\docker-compose.yml
+
+
+A larger functional bug just surfaced in the statement flow: generation stores multiple PDF paths in one field, but download/send treat that field as a single filesystem path. I’m verifying the call chain now, because if that’s what it looks like, any PI with more than one project gets a “generated successfully” result and then a broken statement workflow.
+
+Ran $i=1; Get-Content src\openchargeback\delivery\email.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran rg -n "pdf_path=.*;|join\(pdf_paths|attachments=pdf_paths|send_statement\(|download_statement\(|mark_statement_sent" src tests
+
+
+Ran rg -n "generate_statements|EmailSender|create_app|auth_routes|login_submit|upload_files|export_journal|download_statement|send_statement|review_list|approve_charge|reset_data" tests
+
+
+Ran Get-Content config.example.yaml
+
+
+Ran Get-Content docs\getting-started\configuration.md
+
+
+Ran Get-Content docs\security\data-protection.md
+
+
+Ran @' import re, pathlib for path in sorted(pathlib.Path('tests').glob('test_*.py')): text = path.read_text(encoding='utf-8') count = len(re.findall(r'^\s*def test_', text, re.M)) print(path.name, count) print('total', sum(len(re.findall(r'^\s*def test_', p.read_text(encoding='utf-8'), re.M)) for p in pathlib.Path('tests').glob('test_*.py'))) '@ | python -
+
+
+Ran rg -n "openchargeback\.web|create_app|TestClient|fastapi|starlette|auth|routes" tests
+
+
+Ran Get-Content templates\journal_gl.csv
+
+
+Ran Get-Content templates\statement.html
+
+
+Ran Get-Content templates\email_summary.html
+
+
+Ran rg -n "openchargeback\.(web\.routes|web\.app|web\.auth|web\.deps|delivery\.email|delivery\.smtp|output\.pdf|processing\.aggregator.*generate_statements|audit)" tests
+
+
+I found another place where the “happy path once” behavior is probably masking a real regression: statement upserts may lose the statement ID on updates, which would break resend/send auditing on regenerated statements. I’m validating that with a quick direct repository check instead of guessing.
+
+Ran @' from pathlib import Path import tempfile from openchargeback.db.repository import Database, Statement tmp = tempfile.NamedTemporaryFile(suffix='.db', delete=False) path = Path(tmp.name) tmp.close() db = Database(path) db.initialize() period = db.get_or_create_period('2025-01') stmt1 = Statement(id=None,billing_period_id=period.id,pi_email='pi@example.edu',total_cost=1.0,project_count=1,pdf_path='a.pdf') first = db.upsert_statement(stmt1) stmt2 = Statement(id=None,billing_period_id=period.id,pi_email='pi@example.edu',total_cost=2.0,project_count=2,pdf_path='b.pdf') second = db.upsert_statement(stmt2) print('first', first) print('second', second) print('statement', db.get_statements_for_period(period.id)[0]) db.close() path.unlink() '@ | python -
+
+
+Ran $env:PYTHONPATH='src'; @' from pathlib import Path import tempfile from openchargeback.db.repository import Database, Statement tmp = tempfile.NamedTemporaryFile(suffix='.db', delete=False) path = Path(tmp.name) tmp.close() db = Database(path) db.initialize() period = db.get_or_create_period('2025-01') stmt1 = Statement(id=None,billing_period_id=period.id,pi_email='pi@example.edu',total_cost=1.0,project_count=1,pdf_path='a.pdf') first = db.upsert_statement(stmt1) stmt2 = Statement(id=None,billing_period_id=period.id,pi_email='pi@example.edu',total_cost=2.0,project_count=2,pdf_path='b.pdf') second = db.upsert_statement(stmt2) print('first', first) print('second', second) print('statement_id_in_db', db.get_statements_for_period(period.id)[0].id) db.close() path.unlink() '@ | python -
+
+
+Ran rg -n "needs_review|review_reason" src\openchargeback\web\routes\review.py src\openchargeback\db\repository.py
+
+
+Ran rg -n "pdf_path|split\(';\)|download" src\openchargeback\web\templates\pages\statements.html src\openchargeback\web\templates\pages\period_detail.html src\openchargeback\web\templates\pages\statement_generate.html src\openchargeback\web\templates\pages\emails.html
+
+
+Ran $i=1; Get-Content src\openchargeback\web\routes\dashboard.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran rg -n "log_statement_generated|log_statement_sent|log_email_sent" src tests
+
+
+Ran $i=1; Get-Content compose.yml | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content docker\Dockerfile | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content tests\test_output.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Ran $i=1; Get-Content tests\test_aggregator.py | ForEach-Object { '{0,4}: {1}' -f $i, $_; $i++ }
+
+
+Context automatically compacted
+I’ve finished the main pass and I’m tightening the report with precise file references so the findings are easy to act on. I’m doing one last verification sweep over the highest-risk paths before I hand you the review.
+
+Ran $files = @( 'src/openchargeback/web/app.py', 'src/openchargeback/web/routes/review.py', 'src/openchargeback/db/repository.py', 'src/openchargeback/web/routes/imports.py', 'src/openchargeback/processing/aggregator.py', 'src/openchargeback/web/routes/statements.py', 'src/openchargeback/delivery/email.py', 'src/openchargeback/audit.py', 'src/openchargeback/web/routes/settings.py', 'src/openchargeback/web/templates/components/import_modal.html', 'src/openchargeback/web/routes/emails.py', 'src/openchargeback/db/tables.py', 'src/openchargeback/web/routes/auth_routes.py', 'compose.yml', 'docker/Dockerfile', 'docs/security/authentication.md', 'docs/security/audit-trail.md', 'docs/security/data-protection.md' ) foreach ($f in $files) { Write-Output "--- $f ---" $i = 1 Get-Content $f | ForEach-Object { "{0,4}: $_" -f $i; $i++ } }
+
+
+Ran rg -n "TestClient|create_app\(|openchargeback\.web|log_statement_generated|log_statement_sent|log_email_sent|configure_logging\(|approve_selected|reject_selected|set-period|tmp_path|pytest" tests src/openchargeback
+
+
+I’ve verified the highest-risk paths and a few of the docs claims are overstating what the code actually enforces. I’m pulling the exact route and repository lines for the final report now so the handoff is directly actionable.
+
+Ran $targets = @( @{f='compose.yml'; p='WEB_SECRET_KEY'}, @{f='src/openchargeback/web/app.py'; p='SessionMiddleware|https_only|audit.configure'}, @{f='src/openchargeback/web/deps.py'; p='request.session|user_id'}, @{f='docs/security/authentication.md'; p='server-side|session'}, @{f='docs/security/data-protection.md'; p='Session security|Secure cookies|session'}, @{f='src/openchargeback/web/routes/review.py'; p='approve_charge|reject_charge|approve-selected|reject-selected|approve-all'}, @{f='src/openchargeback/db/repository.py'; p='def approve_charge|def reject_charge|def approve_all_charges|def upsert_charges|def update_period_status|def create_statement_record'}, @{f='src/openchargeback/web/routes/imports.py'; p='finalized|NamedTemporaryFile|tmp_path.unlink|read\(\)'}, @{f='src/openchargeback/web/routes/help.py'; p='closed periods prevent|closed period|imports'}, @{f='src/openchargeback/web/routes/statements.py'; p='status == "open"|pdf_path|send|download'}, @{f='src/openchargeback/processing/aggregator.py'; p='";".join|create_statement_record|project_pdf|generate_statements'}, @{f='src/openchargeback/delivery/email.py'; p='pdf_path|open\('}, @{f='src/openchargeback/audit.py'; p='def log_statement_generated|def log_statement_sent|def log_email_sent|def log_period_'}, @{f='src/openchargeback/web/routes/periods.py'; p='reopen|close|finalize'}, @{f='src/openchargeback/web/routes/users.py'; p='@router.post|@router.delete'}, @{f='src/openchargeback/web/routes/settings.py'; p='_render_flag_matches|_render_fund_org_failures|get_config_path|f"|return HTMLResponse'}, @{f='src/openchargeback/web/templates/components/import_modal.html'; p='innerHTML|filename|errorMsg|r.error'}, @{f='src/openchargeback/web/routes/emails.py'; p='resend|get_current_user|require_admin|require_reviewer'}, @{f='src/openchargeback/db/tables.py'; p='UniqueConstraint|review_logs'}, @{f='src/openchargeback/web/routes/auth_routes.py'; p='login|authenticate_user|logout'}, @{f='src/openchargeback/logging.py'; p='def configure_logging'}, @{f='src/openchargeback/output/pdf.py'; p='templates|statement.html'}, @{f='src/openchargeback/output/email.py'; p='templates|email_summary.html'}, @{f='src/openchargeback/output/journal_template.py'; p='template_dir|templates'}, @{f='docker/Dockerfile'; p='COPY .*templates'}, @{f='src/openchargeback/web/routes/dashboard.py'; p='set-period'} ) foreach ($t in $targets) { Write-Output "--- $($t.f) :: $($t.p) ---" Select-String -Path $t.f -Pattern $t.p | ForEach-Object { "{0}:{1}: {2}" -f $_.Path.Replace((Get-Location).Path + '\\',''), $_.LineNumber, $_.Line.Trim() } }
+
+
+Ran $tests = Get-ChildItem tests -Filter 'test_*.py' | Sort-Object Name $tests | ForEach-Object { $count = (Select-String -Path $_.FullName -Pattern '^def test_|^class Test' | Measure-Object).Count "{0}: {1}" -f $_.Name, $count } $total = (Get-ChildItem tests -Filter 'test_*.py' | ForEach-Object { (Select-String -Path $_.FullName -Pattern '^def test_' | Measure-Object).Count } | Measure-Object -Sum).Sum "TOTAL_TEST_FUNCTIONS: $total"
+
+
+The test scan confirms the gap I suspected: there are repo and parsing tests, but essentially no TestClient or web-route coverage around auth, review, imports, or statement delivery. I’m doing a final count pass on the test functions themselves, then I’ll package the report cleanly.
+
+Ran $files = Get-ChildItem tests -Filter 'test_*.py' | Sort-Object Name foreach ($f in $files) { $count = (Select-String -Path $f.FullName -Pattern '^\s*def test_' | Measure-Object).Count "{0}: {1}" -f $f.Name, $count } $total = ($files | ForEach-Object { (Select-String -Path $_.FullName -Pattern '^\s*def test_' | Measure-Object).Count } | Measure-Object -Sum).Sum "TOTAL_TEST_FUNCTIONS: $total"
+
+
+Ran Select-String -Path 'src/openchargeback/db/repository.py' -Pattern 'charge_period_start|billing_period_id,\s*charge_data\["source_id"\]|on_conflict|do_update|set_=|where\(' | ForEach-Object { "{0}:{1}: {2}" -f $_.Path.Replace((Get-Location).Path + '\\',''), $_.LineNumber, $_.Line.Trim() } Select-String -Path 'src/openchargeback/db/tables.py' -Pattern 'billing_period_id,|source_id,|resource_id,|charge_period_start,' | ForEach-Object { "{0}:{1}: {2}" -f $_.Path.Replace((Get-Location).Path + '\\',''), $_.LineNumber, $_.Line.Trim() }
+
+
+I have what I need now. The strongest issues are consistent across the UI, repo layer, and docs, so the report can point to concrete fixes instead of just general concerns.
+
+Ran Select-String -Path 'src/openchargeback/db/repository.py' -Pattern 'def create_statement|def log_review_action|def get_charge_by_id|def get_statement_by_id' | ForEach-Object { "{0}:{1}: {2}" -f $_.Path.Replace((Get-Location).Path + '\\',''), $_.LineNumber, $_.Line.Trim() } Select-String -Path 'src/openchargeback/db/repository.py' -Pattern 'insert\(statements\)|values\(' | Where-Object { $_.LineNumber -ge 680 -and $_.LineNumber -le 760 } | ForEach-Object { "{0}:{1}: {2}" -f $_.Path.Replace((Get-Location).Path + '\\',''), $_.LineNumber, $_.Line.Trim() }
+
+
+Ran Get-Content 'src/openchargeback/db/tables.py' | Select-Object -Index (120..130) Get-Content 'src/openchargeback/db/tables.py' | Select-Object -Index (265..288)
+
+
+Final message
+Actionable Now
+
+Critical: Session auth is forgeable in the default/container path. compose.yml ships a fallback secret, the app uses Starlette client-side signed cookies, and https_only is hardcoded off; the docs currently describe these as server-side sessions, which is inaccurate. If that secret is reused or leaks, an attacker can mint privileged cookies. compose.yml (line 15) web/app.py (line 112) web/app.py (line 119) web/deps.py (line 36) docs/security/authentication.md (line 76) docs/security/authentication.md (line 90) docs/security/data-protection.md (line 12)
+Critical: Review endpoints can approve or delete arbitrary charges by ID, not just flagged charges in the review queue. The route layer never revalidates needs_review, and the repository mutators update/delete by id alone. web/routes/review.py (line 114) web/routes/review.py (line 178) web/routes/review.py (line 253) web/routes/review.py (line 316) db/repository.py (line 631) db/repository.py (line 659)
+High: Period state is not a hard invariant. Imports block only finalized, help text says closed blocks imports, statements can still be regenerated for finalized periods, and the repository status updater/mutators do not enforce immutability. web/routes/imports.py (line 145) web/routes/help.py (line 41) web/routes/statements.py (line 135) db/repository.py (line 354) db/repository.py (line 631)
+High: Multi-project statements are modeled inconsistently. Generation stores multiple PDFs as a semicolon-joined string, but download/send paths and the email sender expect a single file path, so some statements will be undownloadable or unsendable. processing/aggregator.py (line 211) web/routes/statements.py (line 203) web/routes/statements.py (line 257) delivery/email.py (line 53) delivery/email.py (line 84)
+High: Auditing is much thinner than the docs suggest. Statement/email audit helpers exist but appear unused, period reopen has no matching audit event, user-management mutations are not audited, and the app boots audit.configure but not the logger setup. audit.py (line 114) audit.py (line 133) audit.py (line 151) web/routes/periods.py (line 198) web/routes/users.py (line 78) web/routes/users.py (line 176) web/routes/users.py (line 247) logging.py (line 63) web/app.py (line 94) docs/security/audit-trail.md
+High: There are two direct XSS surfaces in admin flows. The settings “test patterns” response builds raw HTML with imported values and regex text, and the upload modal writes filenames/errors into innerHTML; CSP also allows inline scripts, which weakens containment. web/routes/settings.py (line 234) web/routes/settings.py (line 270) web/routes/settings.py (line 301) import_modal.html (line 932) import_modal.html (line 943) web/app.py (line 23)
+Medium: Any authenticated user can resend statement emails. That is a privileged write action with external side effects and should likely be reviewer/admin only. web/routes/emails.py (line 77) web/routes/emails.py (line 81)
+Medium: The dedupe/upsert key is too weak and can silently merge distinct charges that share period, source, resource, and start time. The current tests validate the existing behavior, but they do not protect against collision cases. db/tables.py (line 121) db/repository.py (line 517) db/repository.py (line 576)
+Medium: Review rejection is destructive, and bulk approval loses row-level provenance. Rejections delete the charge outright, and approve-all emits aggregate audit info instead of one review record per charge. db/repository.py (line 659) db/tables.py (line 265) web/routes/review.py (line 216) db/repository.py (line 644)
+Medium: Several operational guardrails are missing. Uploads read whole files into memory and only delete temp files on the success path, /set-period mutates session state via GET, login has no visible throttling/lockout/audit, and settings edits guess the config path instead of using the loaded one. web/routes/imports.py (line 155) web/routes/imports.py (line 156) web/routes/imports.py (line 172) web/routes/dashboard.py (line 79) web/routes/auth_routes.py (line 38) web/routes/settings.py (line 25)
+Medium: Template resolution is deployment-fragile. Output code first looks for a cwd templates/ directory, while the Docker image only copies web templates into /app/templates; statement/email/journal templates can drift or disappear depending on launch context. output/pdf.py (line 290) output/email.py (line 175) output/journal_template.py (line 303) docker/Dockerfile (line 40)
+Conceptual Ideas
+
+Treat billing-period state as a data-layer contract, not a UI workflow. open -> closed -> finalized should be enforced by repository and database invariants so web, CLI, and future jobs all obey the same immutability rules.
+Separate imported facts from review decisions. For finance-like workflows, rejected items should usually become dispositions on immutable source rows, not deletions.
+Decide what a “statement” is in the data model. The code sometimes treats it as one PI artifact and sometimes as many project artifacts; that mismatch is why pdf_path turned into a semicolon string.
+Make auditability a first-class feature with a coverage map. Every privileged mutation should answer the same questions: who, what record, before/after, why, and where it originated.
+Tests
+
+The tests are not fake. There are 239 test functions, and files like tests/test_ingest.py, tests/test_repository.py, and tests/test_journal_template.py do real work around parsing, flagging, repository behavior, and export rendering.
+The gap is coverage shape, not effort. I found essentially no web-layer/auth/route integration coverage: no TestClient tests for login/session handling, review authorization, imports, statement delivery, or email resend.
+The suite mostly proves happy-path business logic and helpers. It does not meaningfully defend the security boundaries or the core invariants that are currently drifting between docs, routes, and repository code.
+I could not execute the suite here because pytest and runtime deps like sqlalchemy are not installed in this environment, so the test assessment is static rather than runtime-verified.
+Assumptions
+
+I assumed the Docker/Compose path is a real deployment path, not just local scaffolding; if so, the session-secret issue is urgent.
+I assumed the security docs are meant as operational truth. If that’s right, the doc/code mismatches are themselves a risk because they create false assurance during incidents and audits.
