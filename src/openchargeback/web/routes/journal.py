@@ -59,9 +59,9 @@ async def journal_logs(
     flagged_count = get_global_flagged_count(db, period_id)
 
     return templates.TemplateResponse(
+        request,
         "pages/journal_logs.html",
         {
-            "request": request,
             "user": user,
             "flash_messages": flash_messages,
             "exports": exports,
@@ -109,9 +109,9 @@ async def journal_form(
     recent_exports = db.get_journal_exports(limit=10)
 
     return templates.TemplateResponse(
+        request,
         "pages/journal.html",
         {
-            "request": request,
             "user": user,
             "flash_messages": flash_messages,
             "periods": periods,

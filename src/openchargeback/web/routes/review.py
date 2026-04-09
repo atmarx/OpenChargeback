@@ -77,9 +77,9 @@ async def review_list(
     flagged_count = total
 
     return templates.TemplateResponse(
+        request,
         "pages/review.html",
         {
-            "request": request,
             "user": user,
             "flash_messages": flash_messages,
             "charges": charges_list,

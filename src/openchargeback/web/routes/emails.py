@@ -56,9 +56,9 @@ async def list_emails(
     recipients = sorted({e.recipient for e in all_logs})
 
     return templates.TemplateResponse(
+        request,
         "pages/emails.html",
         {
-            "request": request,
             "user": user,
             "flash_messages": flash_messages,
             "email_logs": email_logs,

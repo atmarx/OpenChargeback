@@ -51,9 +51,9 @@ async def settings_page(
     fund_org_patterns = config.review.fund_org_patterns if hasattr(config, "review") else []
 
     return templates.TemplateResponse(
+        request,
         "pages/settings.html",
         {
-            "request": request,
             "user": user,
             "flash_messages": flash_messages,
             "flagged_count": flagged_count,

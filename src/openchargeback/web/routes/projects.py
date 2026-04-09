@@ -62,9 +62,9 @@ async def list_projects(
     flagged_count = get_global_flagged_count(db, period_id)
 
     return templates.TemplateResponse(
+        request,
         "pages/projects.html",
         {
-            "request": request,
             "user": user,
             "flash_messages": flash_messages,
             "projects": projects,
@@ -118,9 +118,9 @@ async def project_detail(
     flagged_count = get_global_flagged_count(db, period_id)
 
     return templates.TemplateResponse(
+        request,
         "pages/project_detail.html",
         {
-            "request": request,
             "user": user,
             "flash_messages": flash_messages,
             "project_id": project_id,

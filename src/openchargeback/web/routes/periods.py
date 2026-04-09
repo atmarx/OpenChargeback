@@ -38,9 +38,9 @@ async def list_periods(
     flagged_count = get_global_flagged_count(db, period_id)
 
     return templates.TemplateResponse(
+        request,
         "pages/periods.html",
         {
-            "request": request,
             "user": user,
             "flash_messages": flash_messages,
             "periods": periods,
@@ -68,9 +68,9 @@ async def new_period_form(
     flagged_count = get_global_flagged_count(db, period_id)
 
     return templates.TemplateResponse(
+        request,
         "pages/period_new.html",
         {
-            "request": request,
             "user": user,
             "flash_messages": flash_messages,
             "suggested_period": suggested_period,
@@ -142,9 +142,9 @@ async def view_period(
     known_sources = config.imports.known_sources
 
     return templates.TemplateResponse(
+        request,
         "pages/period_detail.html",
         {
-            "request": request,
             "user": user,
             "flash_messages": flash_messages,
             "period": period,

@@ -75,9 +75,9 @@ async def list_charges(
     flagged_count = get_global_flagged_count(db, period_id)
 
     return templates.TemplateResponse(
+        request,
         "pages/charges.html",
         {
-            "request": request,
             "user": user,
             "flash_messages": flash_messages,
             "charges": charges_list,
@@ -127,9 +127,9 @@ async def view_charge(
     flagged_count = get_global_flagged_count(db, current_period_id)
 
     return templates.TemplateResponse(
+        request,
         "pages/charge_detail.html",
         {
-            "request": request,
             "user": user,
             "flash_messages": flash_messages,
             "charge": charge,

@@ -36,9 +36,9 @@ async def list_users(
     flagged_count = get_global_flagged_count(db, current_period_id)
 
     return templates.TemplateResponse(
+        request,
         "pages/users.html",
         {
-            "request": request,
             "user": user,
             "flash_messages": flash_messages,
             "users": users_list,
@@ -63,9 +63,9 @@ async def new_user_form(
     flagged_count = get_global_flagged_count(db, current_period_id)
 
     return templates.TemplateResponse(
+        request,
         "pages/user_new.html",
         {
-            "request": request,
             "user": user,
             "flash_messages": flash_messages,
             "roles": VALID_ROLES,
@@ -166,9 +166,9 @@ async def edit_user_form(
     flagged_count = get_global_flagged_count(db, current_period_id)
 
     return templates.TemplateResponse(
+        request,
         "pages/user_edit.html",
         {
-            "request": request,
             "user": user,
             "flash_messages": flash_messages,
             "edit_user": edit_user,
@@ -321,9 +321,9 @@ async def change_password_form(
     flagged_count = get_global_flagged_count(db, current_period_id)
 
     return templates.TemplateResponse(
+        request,
         "pages/change_password.html",
         {
-            "request": request,
             "user": user,
             "flash_messages": flash_messages,
             "flagged_count": flagged_count,

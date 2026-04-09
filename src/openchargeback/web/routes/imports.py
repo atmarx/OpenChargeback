@@ -58,9 +58,9 @@ async def list_imports(
     known_sources = config.imports.known_sources
 
     return templates.TemplateResponse(
+        request,
         "pages/imports.html",
         {
-            "request": request,
             "user": user,
             "flash_messages": flash_messages,
             "imports": imports,
@@ -244,9 +244,9 @@ async def import_detail(
     flagged_count = get_global_flagged_count(db, current_period_id)
 
     return templates.TemplateResponse(
+        request,
         "pages/import_detail.html",
         {
-            "request": request,
             "user": user,
             "flash_messages": flash_messages,
             "import_record": import_record,

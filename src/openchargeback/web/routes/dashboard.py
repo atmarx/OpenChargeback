@@ -59,9 +59,9 @@ async def dashboard(
     known_sources = config.imports.known_sources
 
     return templates.TemplateResponse(
+        request,
         "pages/dashboard.html",
         {
-            "request": request,
             "user": user,
             "flash_messages": flash_messages,
             "periods": periods,

@@ -178,9 +178,9 @@ async def help_index(
     templates = request.app.state.templates
     flash_messages = get_flash_messages(request)
     return templates.TemplateResponse(
+        request,
         "pages/help.html",
         {
-            "request": request,
             "user": user,
             "flash_messages": flash_messages,
             "sections": HELP_SECTIONS,
@@ -201,9 +201,9 @@ async def help_section(
 
     if section not in HELP_SECTIONS:
         return templates.TemplateResponse(
+            request,
             "pages/help.html",
             {
-                "request": request,
                 "user": user,
                 "flash_messages": flash_messages,
                 "sections": HELP_SECTIONS,
@@ -213,9 +213,9 @@ async def help_section(
         )
 
     return templates.TemplateResponse(
+        request,
         "pages/help_section.html",
         {
-            "request": request,
             "user": user,
             "flash_messages": flash_messages,
             "section_key": section,

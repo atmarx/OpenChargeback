@@ -31,9 +31,9 @@ async def list_sources(
     flagged_count = get_global_flagged_count(db, period_id)
 
     return templates.TemplateResponse(
+        request,
         "pages/sources.html",
         {
-            "request": request,
             "user": user,
             "flash_messages": flash_messages,
             "sources": sources,

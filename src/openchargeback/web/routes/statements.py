@@ -49,9 +49,9 @@ async def list_statements(
     flagged_count = get_global_flagged_count(db, period_id)
 
     return templates.TemplateResponse(
+        request,
         "pages/statements.html",
         {
-            "request": request,
             "user": user,
             "flash_messages": flash_messages,
             "statements": statements,
@@ -96,9 +96,9 @@ async def generate_form(
     global_flagged = get_global_flagged_count(db, period_id)
 
     return templates.TemplateResponse(
+        request,
         "pages/statement_generate.html",
         {
-            "request": request,
             "user": user,
             "flash_messages": flash_messages,
             "periods": periods,

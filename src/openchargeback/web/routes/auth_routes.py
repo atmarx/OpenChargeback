@@ -25,9 +25,9 @@ async def login_page(
     flash_messages = get_flash_messages(request)
 
     return templates.TemplateResponse(
+        request,
         "pages/login.html",
         {
-            "request": request,
             "flash_messages": flash_messages,
             "error": None,
             "username": "",
@@ -50,9 +50,9 @@ async def login_submit(
     db_users = db.list_users()
     if not db_users and not config.web.users:
         return templates.TemplateResponse(
+            request,
             "pages/login.html",
             {
-                "request": request,
                 "flash_messages": [],
                 "error": "No users configured. Add users to config.yaml.",
                 "username": username,
@@ -64,9 +64,9 @@ async def login_submit(
 
     if user is None:
         return templates.TemplateResponse(
+            request,
             "pages/login.html",
             {
-                "request": request,
                 "flash_messages": [],
                 "error": "Invalid username or password.",
                 "username": username,

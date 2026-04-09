@@ -53,9 +53,9 @@ async def list_review_logs(
     flagged_count = get_global_flagged_count(db, current_period_id)
 
     return templates.TemplateResponse(
+        request,
         "pages/review_logs.html",
         {
-            "request": request,
             "user": user,
             "flash_messages": flash_messages,
             "logs": logs,
