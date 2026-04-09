@@ -1,5 +1,6 @@
 """FastAPI application factory for the web interface."""
 
+import os
 import re
 import secrets
 from pathlib import Path
@@ -109,7 +110,8 @@ def create_app(config_path: Path | None = None) -> FastAPI:
     app.add_middleware(SecurityHeadersMiddleware)
 
     # Session middleware for authentication
-    secret_key = config.web.secret_key
+    # Check config first, then fall back to WEB_SECRET_KEY env var
+    secret_key = config.web.secret_key or os.environ.get("WEB_SECRET_KEY", "")
     if not secret_key or secret_key == "changeme-in-production":
         if config.dev_mode:
             # Generate ephemeral key in dev mode (sessions won't survive restarts)
