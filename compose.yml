@@ -12,7 +12,7 @@ services:
     restart: unless-stopped
     environment:
       - CONFIG_PATH=/app/instance/config.yaml
-      - WEB_SECRET_KEY=${WEB_SECRET_KEY:?Set WEB_SECRET_KEY in .env — generate with: python -c 'import secrets; print(secrets.token_hex(32))'}
+      - "WEB_SECRET_KEY=${WEB_SECRET_KEY:?Set WEB_SECRET_KEY in .env — generate with python -c 'import secrets; print(secrets.token_hex(32))'}"
     volumes:
       # Mount instance directory to match local paths (instance/billing.db, etc.)
       - ./instance:/app/instance
