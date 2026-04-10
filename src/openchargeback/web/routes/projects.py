@@ -11,6 +11,7 @@ from openchargeback.web.deps import (
     get_db,
     get_flash_messages,
     get_global_flagged_count,
+    get_templates,
 )
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -26,7 +27,7 @@ async def list_projects(
     db: Database = Depends(get_db),
 ) -> HTMLResponse:
     """List all projects with optional filtering."""
-    templates = request.app.state.templates
+    templates = get_templates(request)
     flash_messages = get_flash_messages(request)
 
     # Convert period to int, handling empty strings
@@ -91,7 +92,7 @@ async def project_detail(
     db: Database = Depends(get_db),
 ) -> HTMLResponse:
     """Show details for a specific project."""
-    templates = request.app.state.templates
+    templates = get_templates(request)
     flash_messages = get_flash_messages(request)
 
     # Convert period to int, handling empty strings

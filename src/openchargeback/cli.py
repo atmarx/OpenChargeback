@@ -9,7 +9,7 @@ from rich.table import Table
 
 from . import __version__
 from .config import Config, load_config
-from .db.repository import Database
+from .db.repository import Charge, Database
 
 # Create Typer app with subcommands
 app = typer.Typer(
@@ -226,7 +226,7 @@ def show(
             raise typer.Exit(0)
 
         # Group by project
-        projects: dict[str, list[object]] = {}
+        projects: dict[str, list[Charge]] = {}
         for charge in pi_charges:
             proj = charge.project_id or "(no project)"
             if proj not in projects:

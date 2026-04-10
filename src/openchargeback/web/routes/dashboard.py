@@ -10,6 +10,7 @@ from openchargeback.web.deps import (
     get_current_user,
     get_db,
     get_flash_messages,
+    get_templates,
 )
 from openchargeback.web.services.stats_service import StatsService
 
@@ -23,7 +24,7 @@ async def dashboard(
     db: Database = Depends(get_db),
 ) -> HTMLResponse:
     """Render the main dashboard."""
-    templates = request.app.state.templates
+    templates = get_templates(request)
     flash_messages = get_flash_messages(request)
 
     # Get stats service

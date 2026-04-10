@@ -12,6 +12,7 @@ from openchargeback.web.deps import (
     get_current_user,
     get_db,
     get_flash_messages,
+    get_templates,
     require_reviewer,
 )
 
@@ -29,7 +30,7 @@ async def review_list(
     db: Database = Depends(get_db),
 ) -> HTMLResponse:
     """List all flagged charges for review."""
-    templates = request.app.state.templates
+    templates = get_templates(request)
     flash_messages = get_flash_messages(request)
 
     # Convert period/source to int, handling empty strings
@@ -258,8 +259,9 @@ async def approve_selected_charges(
     """Approve selected flagged charges."""
     # Parse form data manually to handle list of charge_ids
     form_data = await request.form()
-    charge_ids = [int(v) for v in form_data.getlist("charge_ids") if v]
-    note = form_data.get("note", "").strip()
+    charge_ids = [int(v) for v in form_data.getlist("charge_ids") if isinstance(v, str) and v]
+    note_val = form_data.get("note", "")
+    note = note_val.strip() if isinstance(note_val, str) else ""
 
     if not charge_ids:
         add_flash_message(request, "warning", "No charges selected.")
@@ -311,8 +313,9 @@ async def reject_selected_charges(
     """Reject selected flagged charges."""
     # Parse form data manually to handle list of charge_ids
     form_data = await request.form()
-    charge_ids = [int(v) for v in form_data.getlist("charge_ids") if v]
-    note = form_data.get("note", "").strip()
+    charge_ids = [int(v) for v in form_data.getlist("charge_ids") if isinstance(v, str) and v]
+    note_val = form_data.get("note", "")
+    note = note_val.strip() if isinstance(note_val, str) else ""
 
     if not charge_ids:
         add_flash_message(request, "warning", "No charges selected.")

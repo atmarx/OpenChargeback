@@ -11,6 +11,7 @@ from openchargeback.web.deps import (
     get_db,
     get_flash_messages,
     get_global_flagged_count,
+    get_templates,
 )
 
 router = APIRouter(prefix="/review/logs", tags=["review-logs"])
@@ -25,7 +26,7 @@ async def list_review_logs(
     db: Database = Depends(get_db),
 ) -> HTMLResponse:
     """List review action logs."""
-    templates = request.app.state.templates
+    templates = get_templates(request)
     flash_messages = get_flash_messages(request)
 
     # Convert period to int, handling empty strings

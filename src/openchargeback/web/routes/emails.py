@@ -15,6 +15,7 @@ from openchargeback.web.deps import (
     get_db,
     get_flash_messages,
     get_global_flagged_count,
+    get_templates,
     require_reviewer,
 )
 
@@ -31,7 +32,7 @@ async def list_emails(
     db: Database = Depends(get_db),
 ) -> HTMLResponse:
     """List email send history."""
-    templates = request.app.state.templates
+    templates = get_templates(request)
     flash_messages = get_flash_messages(request)
     config = get_config(request)
 

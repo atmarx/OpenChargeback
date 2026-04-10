@@ -15,6 +15,7 @@ from openchargeback.web.deps import (
     get_db,
     get_flash_messages,
     get_global_flagged_count,
+    get_templates,
     require_admin,
 )
 from openchargeback.web.services.period_service import PeriodService
@@ -29,7 +30,7 @@ async def list_periods(
     db: Database = Depends(get_db),
 ) -> HTMLResponse:
     """List all billing periods."""
-    templates = request.app.state.templates
+    templates = get_templates(request)
     flash_messages = get_flash_messages(request)
     service = PeriodService(db)
 
@@ -57,7 +58,7 @@ async def new_period_form(
     db: Database = Depends(get_db),
 ) -> HTMLResponse:
     """Show form to create a new period."""
-    templates = request.app.state.templates
+    templates = get_templates(request)
     flash_messages = get_flash_messages(request)
 
     # Suggest next period based on current date
@@ -119,7 +120,7 @@ async def view_period(
     db: Database = Depends(get_db),
 ) -> Response:
     """View a single billing period."""
-    templates = request.app.state.templates
+    templates = get_templates(request)
     flash_messages = get_flash_messages(request)
     service = PeriodService(db)
 

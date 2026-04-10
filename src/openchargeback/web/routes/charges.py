@@ -11,6 +11,7 @@ from openchargeback.web.deps import (
     get_db,
     get_flash_messages,
     get_global_flagged_count,
+    get_templates,
 )
 
 router = APIRouter(prefix="/charges", tags=["charges"])
@@ -29,7 +30,7 @@ async def list_charges(
     db: Database = Depends(get_db),
 ) -> HTMLResponse:
     """List all charges with filtering and pagination."""
-    templates = request.app.state.templates
+    templates = get_templates(request)
     flash_messages = get_flash_messages(request)
 
     # Convert period/source to int, handling empty strings
@@ -107,7 +108,7 @@ async def view_charge(
     db: Database = Depends(get_db),
 ) -> Response:
     """View a single charge detail."""
-    templates = request.app.state.templates
+    templates = get_templates(request)
     flash_messages = get_flash_messages(request)
 
     charge = db.get_charge_by_id(charge_id)

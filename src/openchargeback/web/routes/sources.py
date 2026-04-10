@@ -11,6 +11,7 @@ from openchargeback.web.deps import (
     get_db,
     get_flash_messages,
     get_global_flagged_count,
+    get_templates,
 )
 
 router = APIRouter(prefix="/sources", tags=["sources"])
@@ -23,7 +24,7 @@ async def list_sources(
     db: Database = Depends(get_db),
 ) -> HTMLResponse:
     """List all data sources."""
-    templates = request.app.state.templates
+    templates = get_templates(request)
     flash_messages = get_flash_messages(request)
 
     sources = db.list_sources()

@@ -1,8 +1,10 @@
 """FastAPI dependency injection for the web interface."""
 
 from collections.abc import Generator
+from typing import Any
 
 from fastapi import Depends, HTTPException, Request, status
+from starlette.templating import Jinja2Templates
 
 from openchargeback.config import Config
 from openchargeback.db import Database
@@ -11,7 +13,12 @@ from openchargeback.web.auth import User, get_user_by_id
 
 def get_config(request: Request) -> Config:
     """Get the application configuration from app state."""
-    return request.app.state.config
+    return request.app.state.config  # type: ignore[return-value]
+
+
+def get_templates(request: Request) -> Jinja2Templates:
+    """Get the Jinja2Templates instance from app state."""
+    return request.app.state.templates  # type: ignore[return-value]
 
 
 def get_db(config: Config = Depends(get_config)) -> Generator[Database, None, None]:
@@ -93,10 +100,10 @@ def get_current_period_id(request: Request) -> int | None:
     return request.session.get("current_period_id")
 
 
-def get_flash_messages(request: Request) -> list[dict]:
+def get_flash_messages(request: Request) -> list[dict[str, Any]]:
     """Get and clear flash messages from session."""
     messages = request.session.pop("flash_messages", [])
-    return messages
+    return messages  # type: ignore[return-value]
 
 
 def add_flash_message(request: Request, category: str, message: str) -> None:

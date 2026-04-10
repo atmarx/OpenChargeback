@@ -16,6 +16,7 @@ from openchargeback.web.deps import (
     get_db,
     get_flash_messages,
     get_global_flagged_count,
+    get_templates,
     require_admin,
 )
 
@@ -30,7 +31,7 @@ async def list_imports(
     db: Database = Depends(get_db),
 ) -> HTMLResponse:
     """Show import history."""
-    templates = request.app.state.templates
+    templates = get_templates(request)
     flash_messages = get_flash_messages(request)
 
     # Convert period to int, handling empty strings
@@ -109,7 +110,7 @@ async def upload_files(
                 return JSONResponse({"error": "Invalid files_metadata JSON"}, status_code=400)
 
         for i, file in enumerate(files):
-            if not file.filename.endswith(".csv"):
+            if not (file.filename and file.filename.endswith(".csv")):
                 results.append({
                     "filename": file.filename,
                     "success": False,
@@ -182,7 +183,7 @@ async def upload_files(
                 else:
                     # Log successful import for audit trail
                     audit.log_import(
-                        filename=file.filename,
+                        filename=file.filename or "",
                         source=file_source,
                         period=file_period,
                         row_count=result.total_rows,
@@ -228,7 +229,7 @@ async def import_detail(
 
     from openchargeback.web.deps import add_flash_message
 
-    templates = request.app.state.templates
+    templates = get_templates(request)
     flash_messages = get_flash_messages(request)
 
     # Get the import record

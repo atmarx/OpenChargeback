@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 
 from openchargeback.web.auth import User
-from openchargeback.web.deps import get_current_user, get_flash_messages
+from openchargeback.web.deps import get_current_user, get_flash_messages, get_templates
 
 router = APIRouter(prefix="/help", tags=["help"])
 
@@ -175,7 +175,7 @@ async def help_index(
     user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Help index page."""
-    templates = request.app.state.templates
+    templates = get_templates(request)
     flash_messages = get_flash_messages(request)
     return templates.TemplateResponse(
         request,
@@ -196,7 +196,7 @@ async def help_section(
     user: User = Depends(get_current_user),
 ) -> HTMLResponse:
     """Help section detail page."""
-    templates = request.app.state.templates
+    templates = get_templates(request)
     flash_messages = get_flash_messages(request)
 
     if section not in HELP_SECTIONS:

@@ -1,5 +1,6 @@
 """Period service for period management operations."""
 
+from typing import Any
 
 from openchargeback.db import Database
 from openchargeback.db.repository import BillingPeriod
@@ -110,7 +111,7 @@ class PeriodService:
         """Get imports for a period."""
         return self.db.get_imports_for_period(period_id)
 
-    def get_period_statements(self, period_id: int) -> list:
+    def get_period_statements(self, period_id: int) -> list[Any]:
         """Get statements for a period."""
         return self.db.get_statements_for_period(period_id)
 

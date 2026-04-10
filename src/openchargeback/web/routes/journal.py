@@ -2,8 +2,10 @@
 
 import csv
 import io
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
@@ -18,6 +20,7 @@ from openchargeback.web.deps import (
     get_db,
     get_flash_messages,
     get_global_flagged_count,
+    get_templates,
 )
 
 router = APIRouter(prefix="/journal", tags=["journal"])
@@ -33,7 +36,7 @@ async def journal_logs(
     db: Database = Depends(get_db),
 ) -> HTMLResponse:
     """Show journal export history."""
-    templates = request.app.state.templates
+    templates = get_templates(request)
     flash_messages = get_flash_messages(request)
 
     # Get all periods for filter dropdown
@@ -85,7 +88,7 @@ async def journal_form(
     db: Database = Depends(get_db),
 ) -> HTMLResponse:
     """Show journal export form."""
-    templates = request.app.state.templates
+    templates = get_templates(request)
     flash_messages = get_flash_messages(request)
 
     # Convert period to int, handling empty strings
@@ -182,9 +185,7 @@ async def export_journal(
 
     elif format == "summary":
         # Summary format: aggregated by PI and project
-        from collections import defaultdict
-
-        summary = defaultdict(lambda: {"total": 0.0, "charge_count": 0})
+        summary: defaultdict[tuple[str, str, str], dict[str, Any]] = defaultdict(lambda: {"total": 0.0, "charge_count": 0})
         for charge in charges:
             key = (charge.pi_email, charge.project_id or "N/A", charge.fund_org or "N/A")
             summary[key]["total"] += charge.billed_cost
@@ -206,10 +207,8 @@ async def export_journal(
 
     elif format == "gl":
         # General Ledger format: debit/credit entries
-        from collections import defaultdict
-
         # Group by fund_org
-        by_fund = defaultdict(float)
+        by_fund: defaultdict[str, float] = defaultdict(float)
         for charge in charges:
             fund = charge.fund_org or "UNKNOWN"
             by_fund[fund] += charge.billed_cost

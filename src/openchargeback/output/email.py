@@ -1,6 +1,7 @@
 """Email HTML generation."""
 
 from pathlib import Path
+from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -182,7 +183,7 @@ def get_template_env(config: Config) -> Environment:
     from jinja2 import BaseLoader
 
     class StringLoader(BaseLoader):
-        def get_source(self, environment, template):
+        def get_source(self, environment: Any, template: str) -> tuple[str, None, Any]:
             if template == "email_summary.html":
                 return DEFAULT_EMAIL_TEMPLATE, None, lambda: True
             raise Exception(f"Template not found: {template}")

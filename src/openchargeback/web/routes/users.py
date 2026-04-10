@@ -13,6 +13,7 @@ from openchargeback.web.deps import (
     get_db,
     get_flash_messages,
     get_global_flagged_count,
+    get_templates,
     require_admin,
 )
 
@@ -28,7 +29,7 @@ async def list_users(
     db: Database = Depends(get_db),
 ) -> HTMLResponse:
     """List all users."""
-    templates = request.app.state.templates
+    templates = get_templates(request)
     flash_messages = get_flash_messages(request)
 
     users_list = db.list_users()
@@ -55,7 +56,7 @@ async def new_user_form(
     db: Database = Depends(get_db),
 ) -> HTMLResponse:
     """Show form to create a new user."""
-    templates = request.app.state.templates
+    templates = get_templates(request)
     flash_messages = get_flash_messages(request)
     config = request.app.state.config
 
@@ -153,7 +154,7 @@ async def edit_user_form(
     db: Database = Depends(get_db),
 ) -> Response:
     """Show form to edit a user."""
-    templates = request.app.state.templates
+    templates = get_templates(request)
     flash_messages = get_flash_messages(request)
     config = request.app.state.config
 
@@ -313,7 +314,7 @@ async def change_password_form(
     db: Database = Depends(get_db),
 ) -> HTMLResponse:
     """Show self-service password change form."""
-    templates = request.app.state.templates
+    templates = get_templates(request)
     flash_messages = get_flash_messages(request)
     config = request.app.state.config
 

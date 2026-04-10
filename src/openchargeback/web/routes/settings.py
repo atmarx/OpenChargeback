@@ -17,6 +17,7 @@ from openchargeback.web.deps import (
     get_db,
     get_flash_messages,
     get_global_flagged_count,
+    get_templates,
     require_admin,
 )
 
@@ -39,7 +40,7 @@ async def settings_page(
     db: Database = Depends(get_db),
 ) -> HTMLResponse:
     """Display settings page."""
-    templates = request.app.state.templates
+    templates = get_templates(request)
     flash_messages = get_flash_messages(request)
     config = request.app.state.config
 
@@ -195,7 +196,6 @@ async def test_patterns(
                     charge.service_name or "",
                     charge.resource_id or "",
                     charge.resource_name or "",
-                    charge.provider or "",
                 ]
                 for field in fields_to_check:
                     if regex.search(field):
@@ -268,7 +268,7 @@ async def test_patterns(
     """
 
 
-def _render_flag_matches(matches: list[dict[str, object]]) -> str:
+def _render_flag_matches(matches: list[dict[str, str | int | None]]) -> str:
     """Render flag matches as HTML."""
     if not matches:
         return '<p class="text-muted">No matches found.</p>'
@@ -279,7 +279,7 @@ def _render_flag_matches(matches: list[dict[str, object]]) -> str:
         <tr>
             <td>{m['charge_id']}</td>
             <td class="font-mono">{escape(str(m['pattern']))}</td>
-            <td>{escape(str(m['matched_field'][:50]))}...</td>
+            <td>{escape(str(m['matched_field'])[:50])}...</td>
             <td>{escape(str(m['pi_email']))}</td>
         </tr>
         """
@@ -299,7 +299,7 @@ def _render_flag_matches(matches: list[dict[str, object]]) -> str:
     """
 
 
-def _render_fund_org_failures(failures: list[dict[str, object]]) -> str:
+def _render_fund_org_failures(failures: list[dict[str, str | int | None]]) -> str:
     """Render fund/org failures as HTML."""
     if not failures:
         return '<p class="text-muted">All fund/org codes match the required patterns.</p>'
