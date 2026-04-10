@@ -1,5 +1,7 @@
 """Email logs routes for viewing sent email history."""
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse
 
@@ -27,7 +29,7 @@ async def list_emails(
     page: int = Query(1, ge=1),
     user: User = Depends(get_current_user),
     db: Database = Depends(get_db),
-):
+) -> HTMLResponse:
     """List email send history."""
     templates = request.app.state.templates
     flash_messages = get_flash_messages(request)
@@ -81,7 +83,7 @@ async def resend_email(
     email_id: int,
     user: User = Depends(require_reviewer),
     db: Database = Depends(get_db),
-):
+) -> dict[str, Any]:
     """Resend a failed email."""
     from pathlib import Path
 

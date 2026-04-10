@@ -21,7 +21,7 @@ async def dashboard(
     request: Request,
     user: User = Depends(get_current_user),
     db: Database = Depends(get_db),
-):
+) -> HTMLResponse:
     """Render the main dashboard."""
     templates = request.app.state.templates
     flash_messages = get_flash_messages(request)
@@ -81,7 +81,7 @@ async def set_period(
     request: Request,
     period: int = Form(...),
     user: User = Depends(get_current_user),
-):
+) -> dict[str, str]:
     """Set the current period in session."""
     request.session["current_period_id"] = period
     return {"status": "ok"}

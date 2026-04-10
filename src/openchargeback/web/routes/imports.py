@@ -2,9 +2,10 @@
 
 import tempfile
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 
 from openchargeback import audit
 from openchargeback.db import Database
@@ -27,7 +28,7 @@ async def list_imports(
     period: str | None = Query(None),
     user: User = Depends(get_current_user),
     db: Database = Depends(get_db),
-):
+) -> HTMLResponse:
     """Show import history."""
     templates = request.app.state.templates
     flash_messages = get_flash_messages(request)
@@ -83,7 +84,7 @@ async def upload_files(
     files_metadata: str = Form(None),
     user: User = Depends(require_admin),
     db: Database = Depends(get_db),
-):
+) -> JSONResponse:
     """Handle CSV file uploads.
 
     Supports two modes:
@@ -97,7 +98,7 @@ async def upload_files(
 
     try:
         config = request.app.state.config
-        results = []
+        results: list[dict[str, Any]] = []
 
         # Parse per-file metadata if provided
         per_file_meta = None
@@ -221,7 +222,7 @@ async def import_detail(
     import_id: int,
     user: User = Depends(get_current_user),
     db: Database = Depends(get_db),
-):
+) -> Response:
     """Show details for a specific import."""
     from fastapi.responses import RedirectResponse
 

@@ -173,7 +173,7 @@ When dev_mode is enabled, you can selectively clear data for testing.
 async def help_index(
     request: Request,
     user: User = Depends(get_current_user),
-):
+) -> HTMLResponse:
     """Help index page."""
     templates = request.app.state.templates
     flash_messages = get_flash_messages(request)
@@ -194,7 +194,7 @@ async def help_section(
     request: Request,
     section: str,
     user: User = Depends(get_current_user),
-):
+) -> HTMLResponse:
     """Help section detail page."""
     templates = request.app.state.templates
     flash_messages = get_flash_messages(request)

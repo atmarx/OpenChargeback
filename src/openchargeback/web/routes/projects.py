@@ -24,7 +24,7 @@ async def list_projects(
     page: int = Query(1, ge=1),
     user: User = Depends(get_current_user),
     db: Database = Depends(get_db),
-):
+) -> HTMLResponse:
     """List all projects with optional filtering."""
     templates = request.app.state.templates
     flash_messages = get_flash_messages(request)
@@ -89,7 +89,7 @@ async def project_detail(
     period: str | None = Query(None),
     user: User = Depends(get_current_user),
     db: Database = Depends(get_db),
-):
+) -> HTMLResponse:
     """Show details for a specific project."""
     templates = request.app.state.templates
     flash_messages = get_flash_messages(request)

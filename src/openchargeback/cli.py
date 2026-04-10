@@ -55,7 +55,7 @@ def get_db(config: Config) -> Database:
 
 
 @app.command()
-def version():
+def version() -> None:
     """Show version information."""
     console.print(f"openchargeback version {__version__}")
 
@@ -73,7 +73,7 @@ def ingest(
         typer.Option("--dry-run", help="Parse and validate without committing to database"),
     ] = False,
     config_path: ConfigOption = None,
-):
+) -> None:
     """Import billing data from a FOCUS CSV file."""
     from .ingest.focus import ingest_focus_file
 
@@ -133,7 +133,7 @@ def generate(
         typer.Option("--send", help="Send emails after generating"),
     ] = False,
     config_path: ConfigOption = None,
-):
+) -> None:
     """Generate statements for a billing period."""
     from .processing.aggregator import generate_statements
 
@@ -182,7 +182,7 @@ def export_journal(
         typer.Option("--output", "-o", help="Output file path"),
     ] = None,
     config_path: ConfigOption = None,
-):
+) -> None:
     """Export accounting journal for a billing period."""
     from .output.journal import export_journal_csv
 
@@ -207,7 +207,7 @@ def show(
     pi_email: Annotated[str, typer.Argument(help="PI email address")],
     period: Annotated[str, typer.Option("--period", "-p", help="Billing period (YYYY-MM)")],
     config_path: ConfigOption = None,
-):
+) -> None:
     """Show summary for a specific PI."""
     config = get_config(config_path)
     db = get_db(config)
@@ -226,7 +226,7 @@ def show(
             raise typer.Exit(0)
 
         # Group by project
-        projects: dict[str, list] = {}
+        projects: dict[str, list[object]] = {}
         for charge in pi_charges:
             proj = charge.project_id or "(no project)"
             if proj not in projects:
@@ -260,7 +260,7 @@ def show(
 
 
 @periods_app.command("list")
-def periods_list(config_path: ConfigOption = None):
+def periods_list(config_path: ConfigOption = None) -> None:
     """List all billing periods."""
     config = get_config(config_path)
     db = get_db(config)
@@ -304,7 +304,7 @@ def periods_list(config_path: ConfigOption = None):
 def periods_open(
     period: Annotated[str, typer.Argument(help="Period to open (YYYY-MM)")],
     config_path: ConfigOption = None,
-):
+) -> None:
     """Open a new billing period."""
     config = get_config(config_path)
     db = get_db(config)
@@ -321,7 +321,7 @@ def periods_close(
     period: Annotated[str, typer.Argument(help="Period to close (YYYY-MM)")],
     notes: Annotated[str | None, typer.Option("--notes", "-n", help="Notes")] = None,
     config_path: ConfigOption = None,
-):
+) -> None:
     """Close a billing period (no more imports allowed)."""
     config = get_config(config_path)
     db = get_db(config)
@@ -342,7 +342,7 @@ def periods_finalize(
     period: Annotated[str, typer.Argument(help="Period to finalize (YYYY-MM)")],
     notes: Annotated[str | None, typer.Option("--notes", "-n", help="Notes")] = None,
     config_path: ConfigOption = None,
-):
+) -> None:
     """Finalize a billing period (sent to accounting)."""
     config = get_config(config_path)
     db = get_db(config)
@@ -362,7 +362,7 @@ def periods_finalize(
 
 
 @sources_app.command("list")
-def sources_list(config_path: ConfigOption = None):
+def sources_list(config_path: ConfigOption = None) -> None:
     """List all data sources."""
     config = get_config(config_path)
     db = get_db(config)
@@ -416,7 +416,7 @@ def sources_add(
         typer.Option("--type", "-t", help="Source type (file or api)"),
     ] = "file",
     config_path: ConfigOption = None,
-):
+) -> None:
     """Add a new data source."""
     config = get_config(config_path)
     db = get_db(config)
@@ -429,7 +429,7 @@ def sources_add(
 
 
 @sources_app.command("sync-status")
-def sources_sync_status(config_path: ConfigOption = None):
+def sources_sync_status(config_path: ConfigOption = None) -> None:
     """Show sync status for all sources."""
     # Same as list but focused on sync info
     sources_list(config_path)
@@ -445,7 +445,7 @@ def review_list(
         typer.Option("--period", "-p", help="Filter by billing period (YYYY-MM)"),
     ] = None,
     config_path: ConfigOption = None,
-):
+) -> None:
     """List charges flagged for review."""
     config = get_config(config_path)
     db = get_db(config)
@@ -499,7 +499,7 @@ def review_approve(
         typer.Option("--id", help="Approve specific charge ID"),
     ] = None,
     config_path: ConfigOption = None,
-):
+) -> None:
     """Approve flagged charges."""
     if not period and not charge_id:
         console.print("[red]Must specify --period or --id[/red]")
@@ -527,7 +527,7 @@ def review_approve(
 def review_reject(
     charge_id: Annotated[int, typer.Option("--id", help="Charge ID to reject")],
     config_path: ConfigOption = None,
-):
+) -> None:
     """Reject (remove) a flagged charge."""
     config = get_config(config_path)
     db = get_db(config)
@@ -557,7 +557,7 @@ def serve(
         typer.Option("--reload", help="Enable auto-reload for development"),
     ] = False,
     config_path: ConfigOption = None,
-):
+) -> None:
     """Start the web server."""
     import os
 

@@ -27,7 +27,7 @@ async def review_list(
     reason: str | None = Query(None),
     user: User = Depends(get_current_user),
     db: Database = Depends(get_db),
-):
+) -> HTMLResponse:
     """List all flagged charges for review."""
     templates = request.app.state.templates
     flash_messages = get_flash_messages(request)
@@ -105,7 +105,7 @@ async def approve_charge(
     note: str = Form(""),
     user: User = Depends(require_reviewer),
     db: Database = Depends(get_db),
-):
+) -> Response:
     """Approve a single flagged charge."""
     # Get charge details for audit log before approval
     charge = db.get_charge_by_id(charge_id)
@@ -164,7 +164,7 @@ async def reject_charge(
     note: str = Form(""),
     user: User = Depends(require_reviewer),
     db: Database = Depends(get_db),
-):
+) -> Response:
     """Reject a flagged charge (soft-delete — charge stays in DB for audit)."""
     # Get charge details for audit log before rejection
     charge = db.get_charge_by_id(charge_id)
@@ -227,7 +227,7 @@ async def approve_all_charges(
     period: int = Form(...),
     user: User = Depends(require_reviewer),
     db: Database = Depends(get_db),
-):
+) -> RedirectResponse:
     """Approve all flagged charges for a period."""
     # Get flagged charges before approval for total amount
     flagged = db.get_flagged_charges(period)
@@ -254,7 +254,7 @@ async def approve_selected_charges(
     request: Request,
     user: User = Depends(require_reviewer),
     db: Database = Depends(get_db),
-):
+) -> RedirectResponse:
     """Approve selected flagged charges."""
     # Parse form data manually to handle list of charge_ids
     form_data = await request.form()
@@ -307,7 +307,7 @@ async def reject_selected_charges(
     request: Request,
     user: User = Depends(require_reviewer),
     db: Database = Depends(get_db),
-):
+) -> RedirectResponse:
     """Reject selected flagged charges."""
     # Parse form data manually to handle list of charge_ids
     form_data = await request.form()

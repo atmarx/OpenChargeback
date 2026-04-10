@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, Query, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 
 from openchargeback.db import Database
 from openchargeback.web.auth import User
@@ -26,7 +26,7 @@ async def list_statements(
     period: str | None = Query(None),
     user: User = Depends(get_current_user),
     db: Database = Depends(get_db),
-):
+) -> HTMLResponse:
     """List all statements."""
     templates = request.app.state.templates
     flash_messages = get_flash_messages(request)
@@ -70,7 +70,7 @@ async def generate_form(
     period: str | None = Query(None),
     user: User = Depends(require_admin),
     db: Database = Depends(get_db),
-):
+) -> HTMLResponse:
     """Show form to generate statements."""
     templates = request.app.state.templates
     flash_messages = get_flash_messages(request)
@@ -119,7 +119,7 @@ async def generate_statements_route(
     send_emails: bool = Form(False),
     user: User = Depends(require_admin),
     db: Database = Depends(get_db),
-):
+) -> RedirectResponse:
     """Generate statements for a billing period."""
     from openchargeback.processing.aggregator import generate_statements
 
@@ -193,7 +193,7 @@ async def download_statement(
     statement_id: int,
     user: User = Depends(get_current_user),
     db: Database = Depends(get_db),
-):
+) -> Response:
     """Download a statement PDF."""
     from sqlalchemy import select
 
@@ -239,7 +239,7 @@ async def send_statement(
     statement_id: int,
     user: User = Depends(require_admin),
     db: Database = Depends(get_db),
-):
+) -> RedirectResponse:
     """Send a statement via email."""
     from openchargeback.delivery.email import EmailSender
 

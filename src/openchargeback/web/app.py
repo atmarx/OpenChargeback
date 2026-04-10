@@ -7,8 +7,9 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.responses import Response
 
 from openchargeback import audit
 from openchargeback.config import load_config
@@ -17,7 +18,7 @@ from openchargeback.config import load_config
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Add security headers including CSP that allows our static assets."""
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         response = await call_next(request)
         # Allow our own static files and inline styles (for htmx)
         response.headers["Content-Security-Policy"] = (
@@ -184,7 +185,7 @@ def create_app(config_path: Path | None = None) -> FastAPI:
     app.include_router(help.router)
 
     @app.on_event("startup")
-    async def startup_sync_users():
+    async def startup_sync_users() -> None:
         """Sync config.yaml users to database on startup."""
         from openchargeback.db import Database
 
@@ -213,17 +214,15 @@ def create_app(config_path: Path | None = None) -> FastAPI:
                 db.close()
 
     @app.get("/health")
-    async def health_check():
+    async def health_check() -> dict[str, str]:
         """Health check endpoint."""
         return {"status": "ok", "templates_dir": str(templates_dir)}
 
     @app.exception_handler(401)
-    async def unauthorized_handler(request: Request, exc: Exception):
+    async def unauthorized_handler(request: Request, exc: Exception) -> Response:
         """Redirect to login on 401 errors."""
         # Check if this is an htmx request
         if request.headers.get("HX-Request"):
-            from fastapi.responses import Response
-
             return Response(
                 status_code=200,
                 headers={"HX-Redirect": "/login"},

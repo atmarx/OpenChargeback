@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, Query, Request
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, Response, StreamingResponse
 
 from openchargeback import audit
 from openchargeback.db import Database
@@ -31,7 +31,7 @@ async def journal_logs(
     page: int = Query(1, ge=1),
     user: User = Depends(get_current_user),
     db: Database = Depends(get_db),
-):
+) -> HTMLResponse:
     """Show journal export history."""
     templates = request.app.state.templates
     flash_messages = get_flash_messages(request)
@@ -83,7 +83,7 @@ async def journal_form(
     period: str | None = Query(None),
     user: User = Depends(get_current_user),
     db: Database = Depends(get_db),
-):
+) -> HTMLResponse:
     """Show journal export form."""
     templates = request.app.state.templates
     flash_messages = get_flash_messages(request)
@@ -133,7 +133,7 @@ async def export_journal(
     include_flagged: bool = Form(False),
     user: User = Depends(get_current_user),
     db: Database = Depends(get_db),
-):
+) -> Response:
     """Export journal entries as CSV."""
     period = db.get_period_by_id(period_id)
     if not period:

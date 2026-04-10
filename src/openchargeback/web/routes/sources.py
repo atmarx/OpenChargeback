@@ -21,7 +21,7 @@ async def list_sources(
     request: Request,
     user: User = Depends(get_current_user),
     db: Database = Depends(get_db),
-):
+) -> HTMLResponse:
     """List all data sources."""
     templates = request.app.state.templates
     flash_messages = get_flash_messages(request)

@@ -1,7 +1,7 @@
 """Charges browser routes."""
 
 from fastapi import APIRouter, Depends, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 
 from openchargeback.db import Database
 from openchargeback.web.auth import User
@@ -27,7 +27,7 @@ async def list_charges(
     page: int = Query(1, ge=1),
     user: User = Depends(get_current_user),
     db: Database = Depends(get_db),
-):
+) -> HTMLResponse:
     """List all charges with filtering and pagination."""
     templates = request.app.state.templates
     flash_messages = get_flash_messages(request)
@@ -105,7 +105,7 @@ async def view_charge(
     charge_id: int,
     user: User = Depends(get_current_user),
     db: Database = Depends(get_db),
-):
+) -> Response:
     """View a single charge detail."""
     templates = request.app.state.templates
     flash_messages = get_flash_messages(request)

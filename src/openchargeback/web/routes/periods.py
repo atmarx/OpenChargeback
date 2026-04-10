@@ -3,7 +3,7 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from openchargeback import audit
 from openchargeback.db import Database
@@ -27,7 +27,7 @@ async def list_periods(
     request: Request,
     user: User = Depends(get_current_user),
     db: Database = Depends(get_db),
-):
+) -> HTMLResponse:
     """List all billing periods."""
     templates = request.app.state.templates
     flash_messages = get_flash_messages(request)
@@ -55,7 +55,7 @@ async def new_period_form(
     request: Request,
     user: User = Depends(require_admin),
     db: Database = Depends(get_db),
-):
+) -> HTMLResponse:
     """Show form to create a new period."""
     templates = request.app.state.templates
     flash_messages = get_flash_messages(request)
@@ -87,7 +87,7 @@ async def create_period(
     notes: str = Form(None),
     user: User = Depends(require_admin),
     db: Database = Depends(get_db),
-):
+) -> RedirectResponse:
     """Create a new billing period."""
     service = PeriodService(db)
 
@@ -117,7 +117,7 @@ async def view_period(
     period_slug: str,
     user: User = Depends(get_current_user),
     db: Database = Depends(get_db),
-):
+) -> Response:
     """View a single billing period."""
     templates = request.app.state.templates
     flash_messages = get_flash_messages(request)
@@ -166,7 +166,7 @@ async def close_period(
     period_slug: str,
     user: User = Depends(require_admin),
     db: Database = Depends(get_db),
-):
+) -> RedirectResponse:
     """Close a billing period."""
     service = PeriodService(db)
     period_obj = service.get_period_by_slug(period_slug)
@@ -202,7 +202,7 @@ async def reopen_period(
     reason: str = Form(""),
     user: User = Depends(require_admin),
     db: Database = Depends(get_db),
-):
+) -> RedirectResponse:
     """Reopen a closed billing period with a required reason."""
     if not reason.strip():
         add_flash_message(request, "error", "A reason is required to reopen a period.")
@@ -241,7 +241,7 @@ async def finalize_period(
     period_slug: str,
     user: User = Depends(require_admin),
     db: Database = Depends(get_db),
-):
+) -> RedirectResponse:
     """Finalize a billing period."""
     service = PeriodService(db)
     period_obj = service.get_period_by_slug(period_slug)

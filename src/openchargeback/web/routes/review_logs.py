@@ -23,7 +23,7 @@ async def list_review_logs(
     action: str | None = Query(None),
     user: User = Depends(get_current_user),
     db: Database = Depends(get_db),
-):
+) -> HTMLResponse:
     """List review action logs."""
     templates = request.app.state.templates
     flash_messages = get_flash_messages(request)

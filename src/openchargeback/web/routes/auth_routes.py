@@ -1,7 +1,7 @@
 """Authentication routes for login/logout."""
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from openchargeback.config import Config
 from openchargeback.db import Database
@@ -15,7 +15,7 @@ router = APIRouter(tags=["auth"])
 async def login_page(
     request: Request,
     config: Config = Depends(get_config),
-):
+) -> Response:
     """Render the login page."""
     # If already logged in, redirect to dashboard
     if request.session.get("user_id"):
@@ -42,7 +42,7 @@ async def login_submit(
     password: str = Form(...),
     config: Config = Depends(get_config),
     db: Database = Depends(get_db),
-):
+) -> Response:
     """Handle login form submission."""
     templates = request.app.state.templates
 
@@ -94,7 +94,7 @@ async def login_submit(
 
 
 @router.post("/logout")
-async def logout(request: Request):
+async def logout(request: Request) -> RedirectResponse:
     """Log out the current user."""
     request.session.clear()
     return RedirectResponse(url="/login", status_code=302)

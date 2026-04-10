@@ -3,6 +3,7 @@
 import csv
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from ..config import Config
 from ..db.repository import Database
@@ -61,7 +62,7 @@ def export_journal_csv(
 def _export_default_format(
     output_path: Path,
     period: str,
-    pi_summaries: dict,
+    pi_summaries: dict[str, Any],
 ) -> None:
     """Export journal in default format.
 

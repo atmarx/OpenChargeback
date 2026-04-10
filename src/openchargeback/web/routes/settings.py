@@ -37,7 +37,7 @@ async def settings_page(
     request: Request,
     user: User = Depends(require_admin),
     db: Database = Depends(get_db),
-):
+) -> HTMLResponse:
     """Display settings page."""
     templates = request.app.state.templates
     flash_messages = get_flash_messages(request)
@@ -74,7 +74,7 @@ async def update_review_patterns(
     fund_org_patterns: str = Form(""),
     user: User = Depends(require_admin),
     db: Database = Depends(get_db),
-):
+) -> RedirectResponse:
     """Update review patterns in config file."""
     config = request.app.state.config
     config_path = get_config_path(request)
@@ -137,7 +137,7 @@ async def test_patterns(
     request: Request,
     user: User = Depends(require_admin),
     db: Database = Depends(get_db),
-):
+) -> str:
     """Test current patterns against existing charges."""
     config = request.app.state.config
 
@@ -268,7 +268,7 @@ async def test_patterns(
     """
 
 
-def _render_flag_matches(matches: list[dict]) -> str:
+def _render_flag_matches(matches: list[dict[str, object]]) -> str:
     """Render flag matches as HTML."""
     if not matches:
         return '<p class="text-muted">No matches found.</p>'
@@ -299,7 +299,7 @@ def _render_flag_matches(matches: list[dict]) -> str:
     """
 
 
-def _render_fund_org_failures(failures: list[dict]) -> str:
+def _render_fund_org_failures(failures: list[dict[str, object]]) -> str:
     """Render fund/org failures as HTML."""
     if not failures:
         return '<p class="text-muted">All fund/org codes match the required patterns.</p>'
@@ -340,7 +340,7 @@ async def reset_data(
     sources: bool = Form(False),
     user: User = Depends(require_admin),
     db: Database = Depends(get_db),
-):
+) -> RedirectResponse:
     """Reset selected data (dev mode only)."""
     config = request.app.state.config
 

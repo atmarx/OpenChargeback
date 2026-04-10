@@ -1,7 +1,7 @@
 """User management routes for admin users."""
 
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from openchargeback import audit
 from openchargeback.db import Database
@@ -26,7 +26,7 @@ async def list_users(
     request: Request,
     user: User = Depends(require_admin),
     db: Database = Depends(get_db),
-):
+) -> HTMLResponse:
     """List all users."""
     templates = request.app.state.templates
     flash_messages = get_flash_messages(request)
@@ -53,7 +53,7 @@ async def new_user_form(
     request: Request,
     user: User = Depends(require_admin),
     db: Database = Depends(get_db),
-):
+) -> HTMLResponse:
     """Show form to create a new user."""
     templates = request.app.state.templates
     flash_messages = get_flash_messages(request)
@@ -87,7 +87,7 @@ async def create_user(
     role: str = Form("viewer"),
     user: User = Depends(require_admin),
     db: Database = Depends(get_db),
-):
+) -> RedirectResponse:
     """Create a new user."""
     config = request.app.state.config
 
@@ -151,7 +151,7 @@ async def edit_user_form(
     user_id: int,
     user: User = Depends(require_admin),
     db: Database = Depends(get_db),
-):
+) -> Response:
     """Show form to edit a user."""
     templates = request.app.state.templates
     flash_messages = get_flash_messages(request)
@@ -189,7 +189,7 @@ async def update_user(
     role: str = Form(...),
     user: User = Depends(require_admin),
     db: Database = Depends(get_db),
-):
+) -> RedirectResponse:
     """Update user details (not password)."""
     edit_user = db.get_user_by_id(user_id)
     if not edit_user:
@@ -235,7 +235,7 @@ async def reset_user_password(
     confirm_password: str = Form(...),
     user: User = Depends(require_admin),
     db: Database = Depends(get_db),
-):
+) -> RedirectResponse:
     """Reset a user's password (admin action)."""
     config = request.app.state.config
 
@@ -269,7 +269,7 @@ async def delete_user(
     user_id: int,
     user: User = Depends(require_admin),
     db: Database = Depends(get_db),
-):
+) -> RedirectResponse:
     """Delete a user."""
     delete_user_obj = db.get_user_by_id(user_id)
     if not delete_user_obj:
@@ -311,7 +311,7 @@ async def change_password_form(
     request: Request,
     user: User = Depends(get_current_user),
     db: Database = Depends(get_db),
-):
+) -> HTMLResponse:
     """Show self-service password change form."""
     templates = request.app.state.templates
     flash_messages = get_flash_messages(request)
@@ -341,7 +341,7 @@ async def change_password(
     confirm_password: str = Form(...),
     user: User = Depends(get_current_user),
     db: Database = Depends(get_db),
-):
+) -> RedirectResponse:
     """Change the current user's password (self-service)."""
     from openchargeback.web.auth import verify_password
 
