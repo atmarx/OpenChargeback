@@ -79,7 +79,7 @@ class Charge:
     fund_org: str | None
     reference_1: str | None = None  # Custom reference field (e.g., grant number)
     reference_2: str | None = None  # Custom reference field (e.g., request ID)
-    raw_tags: dict | None = None
+    raw_tags: dict[str, Any] | None = None
     needs_review: bool = False
     review_reason: str | None = None
     reviewed_at: str | None = None
@@ -213,7 +213,7 @@ class ProjectSummary:
     billing_period_id: int | None = None
 
 
-def _row_to_dict(row: Any) -> dict:
+def _row_to_dict(row: Any) -> dict[str, Any]:
     """Convert SQLAlchemy row to dict."""
     return dict(row._mapping)
 
@@ -261,10 +261,10 @@ class Database:
         """Initialize database schema."""
         initialize_schema(self.engine)
 
-    def _upsert(self, table, values: dict, index_elements: list[str], update_columns: list[str]):
+    def _upsert(self, table: Any, values: dict[str, Any], index_elements: list[str], update_columns: list[str]) -> Any:
         """Create dialect-appropriate upsert statement."""
         if self.dialect == "postgresql":
-            stmt = pg_insert(table).values(**values)
+            stmt: Any = pg_insert(table).values(**values)
             stmt = stmt.on_conflict_do_update(
                 index_elements=index_elements,
                 set_={col: getattr(stmt.excluded, col) for col in update_columns},
@@ -299,7 +299,7 @@ class Database:
                 billing_periods.insert().values(period=period, opened_at=now)
             )
             return BillingPeriod(
-                id=result.inserted_primary_key[0],
+                id=result.inserted_primary_key[0],  # type: ignore[index]
                 period=period,
                 status="open",
                 opened_at=now.isoformat(),
@@ -466,7 +466,7 @@ class Database:
                 )
             )
             return Source(
-                id=result.inserted_primary_key[0],
+                id=result.inserted_primary_key[0],  # type: ignore[index]
                 name=name,
                 display_name=display_name or name,
                 source_type=source_type,
@@ -620,7 +620,7 @@ class Database:
 
             return counts
 
-    def _charge_from_row(self, row) -> Charge:
+    def _charge_from_row(self, row: Any) -> Charge:
         """Convert a database row to a Charge object."""
         row_dict = _row_to_dict(row)
         row_dict["needs_review"] = bool(row_dict["needs_review"])
@@ -796,7 +796,7 @@ class Database:
                     flagged_cost=import_record.flagged_cost,
                 )
             )
-            return result.inserted_primary_key[0]
+            return int(result.inserted_primary_key[0])  # type: ignore[index]
 
     def get_imports_for_period(self, billing_period_id: int) -> list[Import]:
         """Get import logs for a billing period."""
@@ -823,7 +823,7 @@ class Database:
 
     # Dashboard / web helper methods
 
-    def get_period_stats(self, billing_period_id: int) -> dict:
+    def get_period_stats(self, billing_period_id: int) -> dict[str, Any]:
         """Get aggregate statistics for a billing period."""
         from sqlalchemy import func
 
@@ -857,7 +857,7 @@ class Database:
                 "flagged_cost": float(flagged_row.flagged_cost) if flagged_row else 0.0,
             }
 
-    def get_recent_imports(self, limit: int = 10) -> list[dict]:
+    def get_recent_imports(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get most recent imports across all periods."""
         with self.engine.connect() as conn:
             stmt = (
@@ -890,7 +890,7 @@ class Database:
                 for row in rows
             ]
 
-    def get_top_pis(self, billing_period_id: int, limit: int = 10) -> list[dict]:
+    def get_top_pis(self, billing_period_id: int, limit: int = 10) -> list[dict[str, Any]]:
         """Get top PIs by spend for a billing period."""
         from sqlalchemy import func
 
@@ -1365,7 +1365,7 @@ class Database:
 
     # User operations
 
-    def _user_from_row(self, row) -> DBUser:
+    def _user_from_row(self, row: Any) -> DBUser:
         """Convert a database row to a DBUser object."""
         row_dict = _row_to_dict(row)
         row_dict["is_config_user"] = bool(row_dict["is_config_user"])
@@ -1441,7 +1441,7 @@ class Database:
                 )
             )
             return DBUser(
-                id=result.inserted_primary_key[0],
+                id=result.inserted_primary_key[0],  # type: ignore[index]
                 username=username,
                 email=email,
                 display_name=display_name,
@@ -1522,7 +1522,7 @@ class Database:
             result = conn.execute(delete(users).where(users.c.id == user_id))
             return result.rowcount > 0
 
-    def sync_config_users(self, config_users: dict[str, dict]) -> dict[str, int]:
+    def sync_config_users(self, config_users: dict[str, dict[str, Any]]) -> dict[str, int]:
         """Sync users from config.yaml to database.
 
         This ensures config.yaml users exist in the DB and are marked as

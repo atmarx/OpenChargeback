@@ -1,6 +1,7 @@
 """Database engine factory for SQLite and PostgreSQL."""
 
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 
 from sqlalchemy import create_engine, event, text
@@ -43,7 +44,7 @@ def create_db_engine(connection_string: str | Path) -> Engine:
         )
         # Enable foreign keys for SQLite (must be done per-connection)
         @event.listens_for(engine, "connect")
-        def set_sqlite_pragma(dbapi_connection, connection_record):
+        def set_sqlite_pragma(dbapi_connection: Any, connection_record: Any) -> None:
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
             cursor.close()
@@ -88,7 +89,7 @@ def initialize_schema(engine: Engine) -> None:
             conn.execute(schema_version.insert().values(version=SCHEMA_VERSION))
 
 
-def _run_migrations(conn, from_version: int, to_version: int) -> None:
+def _run_migrations(conn: Any, from_version: int, to_version: int) -> None:
     """Run incremental schema migrations."""
     if from_version < 9 <= to_version:
         # v9: Add soft-delete columns for charge rejection

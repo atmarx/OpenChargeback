@@ -1,5 +1,7 @@
 """Statistics service for dashboard data."""
 
+from typing import Any
+
 from openchargeback.db import Database
 from openchargeback.db.repository import BillingPeriod
 from openchargeback.web.schemas import PeriodStats
@@ -23,11 +25,11 @@ class StatsService:
             flagged_cost=stats["flagged_cost"],
         )
 
-    def get_recent_imports(self, limit: int = 5) -> list[dict]:
+    def get_recent_imports(self, limit: int = 5) -> list[dict[str, Any]]:
         """Get recent imports for the dashboard."""
         return self.db.get_recent_imports(limit)
 
-    def get_top_pis(self, period_id: int, limit: int = 5) -> list[dict]:
+    def get_top_pis(self, period_id: int, limit: int = 5) -> list[dict[str, Any]]:
         """Get top PIs by spend for a period."""
         return self.db.get_top_pis(period_id, limit)
 

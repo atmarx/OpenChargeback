@@ -108,14 +108,14 @@ def configure_logging(config: Config) -> structlog.BoundLogger:
         ]
 
     structlog.configure(
-        processors=processors,
+        processors=processors,  # type: ignore[arg-type]
         wrapper_class=structlog.stdlib.BoundLogger,
         context_class=dict,
         logger_factory=structlog.stdlib.LoggerFactory(),
         cache_logger_on_first_use=True,
     )
 
-    return structlog.get_logger()
+    return structlog.get_logger()  # type: ignore[no-any-return]
 
 
 def get_logger(name: str | None = None) -> structlog.BoundLogger:
@@ -127,4 +127,4 @@ def get_logger(name: str | None = None) -> structlog.BoundLogger:
     Returns:
         Structlog bound logger.
     """
-    return structlog.get_logger(name)
+    return structlog.get_logger(name)  # type: ignore[no-any-return]

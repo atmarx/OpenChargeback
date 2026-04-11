@@ -3,13 +3,13 @@
 from typing import Any
 
 from openchargeback.db import Database
-from openchargeback.db.repository import BillingPeriod
+from openchargeback.db.repository import BillingPeriod, Import
 
 
 class PeriodWithStats:
     """Period with computed statistics."""
 
-    def __init__(self, period: BillingPeriod, stats: dict):
+    def __init__(self, period: BillingPeriod, stats: dict[str, Any]):
         self.id = period.id
         self.period = period.period
         self.status = period.status
@@ -71,7 +71,9 @@ class PeriodService:
         period = self.db.get_or_create_period(period_str)
         if notes:
             self.db.update_period_status(period_str, "open", notes)
-            period = self.db.get_period(period_str)
+            updated = self.db.get_period(period_str)
+            if updated is not None:
+                period = updated
         return period
 
     def close_period(
@@ -107,7 +109,7 @@ class PeriodService:
             period.period, "finalized", performed_by=performed_by
         )
 
-    def get_period_imports(self, period_id: int) -> list[dict]:
+    def get_period_imports(self, period_id: int) -> list[Import]:
         """Get imports for a period."""
         return self.db.get_imports_for_period(period_id)
 

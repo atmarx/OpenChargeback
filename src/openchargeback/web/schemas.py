@@ -1,5 +1,7 @@
 """Pydantic schemas for web request/response validation."""
 
+from typing import Any
+
 from pydantic import BaseModel
 
 
@@ -26,8 +28,8 @@ class DashboardData(BaseModel):
 
     current_period: str | None
     stats: PeriodStats | None
-    recent_imports: list[dict]
-    top_pis: list[dict]
+    recent_imports: list[dict[str, Any]]
+    top_pis: list[dict[str, Any]]
 
 
 class ChargeFilters(BaseModel):
@@ -45,7 +47,7 @@ class ChargeFilters(BaseModel):
 class PaginatedResponse(BaseModel):
     """Generic paginated response."""
 
-    items: list
+    items: list[Any]
     total: int
     page: int
     per_page: int

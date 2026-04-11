@@ -3,6 +3,7 @@
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -90,7 +91,7 @@ def get_source_config(source_name: str, config: Config) -> KnownSourceConfig | N
 
 
 def build_journal_entries(
-    charges: list,
+    charges: list[Any],
     period: str,
     config: Config,
     source_id_to_name: dict[int, str] | None = None,
@@ -116,7 +117,7 @@ def build_journal_entries(
 
     # Aggregate charges by (pi_fund_org, source_name)
     # We need to track totals and build one debit per PI fund_org
-    aggregated: dict[tuple[str, str], dict] = {}
+    aggregated: dict[tuple[str, str], dict[str, Any]] = {}
 
     for charge in charges:
         # Get source name from source_id mapping or attribute
@@ -246,7 +247,7 @@ def render_journal_template(
     entries: list[JournalEntry],
     template_name: str,
     template_dir: Path,
-    extra_context: dict | None = None,
+    extra_context: dict[str, Any] | None = None,
 ) -> str:
     """Render journal entries using a Jinja2 template.
 
@@ -281,7 +282,7 @@ def render_journal_template(
 
 
 def export_journal_with_template(
-    charges: list,
+    charges: list[Any],
     period: str,
     config: Config,
     template_dir: Path | None = None,

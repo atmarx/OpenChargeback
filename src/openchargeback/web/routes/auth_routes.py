@@ -6,7 +6,13 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from openchargeback.config import Config
 from openchargeback.db import Database
 from openchargeback.web.auth import authenticate_user
-from openchargeback.web.deps import add_flash_message, get_config, get_db, get_flash_messages, get_templates
+from openchargeback.web.deps import (
+    add_flash_message,
+    get_config,
+    get_db,
+    get_flash_messages,
+    get_templates,
+)
 
 router = APIRouter(tags=["auth"])
 

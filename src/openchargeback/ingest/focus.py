@@ -3,6 +3,7 @@
 import json
 import re
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 
@@ -51,7 +52,7 @@ def extract_period_from_date(date_str: str) -> str:
         return ""
 
 
-def parse_tags(tags_value: str | dict | None, tag_mapping: dict[str, str]) -> dict:
+def parse_tags(tags_value: str | dict[str, Any] | None, tag_mapping: dict[str, str]) -> dict[str, Any]:
     """Parse tags from FOCUS file.
 
     Args:
@@ -199,7 +200,7 @@ class FocusIngester(BaseIngester):
 
         # Process each row
         for idx, row in df.iterrows():
-            line_num = idx + 2  # Account for header and 0-indexing
+            line_num = int(idx) + 2  # Account for header and 0-indexing
 
             # Extract billing period from BillingPeriodStart
             billing_period_start = row.get("billing_period_start", "")
@@ -346,7 +347,7 @@ class FocusIngester(BaseIngester):
                 import_record = Import(
                     id=None,
                     filename=display_filename,
-                    source_id=source.id,
+                    source_id=source.id if source else 0,
                     billing_period_id=billing_period.id,
                     row_count=len(charges),
                     total_cost=period_total,
