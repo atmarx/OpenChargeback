@@ -42,10 +42,13 @@ openchargeback ingest ./aws_2025-01.csv --source aws --period 2025-01
 
 1. CSV is parsed and validated
 2. Period is auto-detected from `BillingPeriodStart`
-3. Tags are extracted for PI attribution
-4. Charges are checked against review patterns
-5. Flagged charges are marked for review
-6. Valid charges are committed to database
+3. **Billing period is created automatically** if it doesn't already exist — no need to open it manually first
+4. Tags are extracted for PI attribution
+5. Charges are checked against review patterns
+6. Flagged charges are marked for review
+7. Valid charges are committed to database
+
+> **Note:** Opening a billing period manually before importing is optional. The import process handles period creation automatically from the data in your CSV.
 
 ### Common Import Issues
 

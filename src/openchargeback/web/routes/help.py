@@ -130,10 +130,11 @@ OpenChargeback uses the FinOps FOCUS format. Required columns:
 - Tag columns for PI, project, and fund/org (configured in config.yaml)
 
 **Import Process:**
-1. Select a billing period (or create a new one)
-2. Choose a data source (AWS, Azure, GCP, etc.)
-3. Upload your CSV file
-4. Review the import summary
+1. Choose a data source (AWS, Azure, GCP, etc.)
+2. Upload your CSV file — the billing period is auto-detected from `BillingPeriodStart` and created automatically if it doesn't exist
+3. Review the import summary
+
+> Opening a billing period manually before importing is optional.
 
 **Duplicate Handling:**
 Imports are tracked by filename and period. Re-importing the same file will skip duplicate rows.
