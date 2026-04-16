@@ -200,7 +200,7 @@ class FocusIngester(BaseIngester):
 
         # Process each row
         for idx, row in df.iterrows():
-            line_num = int(idx) + 2  # Account for header and 0-indexing
+            line_num = int(str(idx)) + 2  # Account for header and 0-indexing
 
             # Extract billing period from BillingPeriodStart
             billing_period_start = row.get("billing_period_start", "")
