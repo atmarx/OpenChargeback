@@ -45,14 +45,18 @@ steps:
   - name: deploy
     image: docker:cli
     commands:
-      - cd /projects/${CI_REPO_NAME} || git clone ${CI_REPO_CLONE_URL} /projects/${CI_REPO_NAME}
-      - cd /projects/${CI_REPO_NAME} && git fetch && git checkout ${CI_COMMIT_BRANCH} && git pull
+      # Mount /opt/projects identically on both sides so compose's relative
+      # bind-mounts (./instance) resolve to a host-valid absolute path.  A
+      # mismatched CI-client path (e.g. /projects/...) would be passed verbatim
+      # to dockerd and bind-mount a stale host directory.
+      - cd /opt/projects/${CI_REPO_NAME} || git clone ${CI_REPO_CLONE_URL} /opt/projects/${CI_REPO_NAME}
+      - cd /opt/projects/${CI_REPO_NAME} && git fetch && git checkout ${CI_COMMIT_BRANCH} && git pull
       - docker network inspect gateway-stack_gateway >/dev/null 2>&1 || docker network create gateway-stack_gateway
-      - cd /projects/${CI_REPO_NAME} && docker compose up -d --build
-      - docker image prune -f
+      - cd /opt/projects/${CI_REPO_NAME} && docker compose up -d --build
+      - docker image prune -f || true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - /opt/projects:/projects
+      - /opt/projects:/opt/projects
     when:
       branch: main
     depends_on:
