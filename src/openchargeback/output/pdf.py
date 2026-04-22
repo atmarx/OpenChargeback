@@ -287,9 +287,11 @@ DEFAULT_STATEMENT_TEMPLATE = """
 
 def get_template_env(config: Config) -> Environment:
     """Get Jinja2 template environment."""
-    # Check for custom templates directory
+    # Check for custom templates directory containing statement.html.
+    # Check the specific file, not just the directory — the Docker image copies
+    # web UI templates to /app/templates/ which doesn't include statement.html.
     templates_dir = Path("templates")
-    if templates_dir.exists():
+    if (templates_dir / "statement.html").exists():
         return Environment(
             loader=FileSystemLoader(templates_dir),
             autoescape=select_autoescape(["html", "xml"]),
