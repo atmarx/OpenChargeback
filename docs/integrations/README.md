@@ -10,13 +10,13 @@ Before implementing any integration, review the [TAG-SPECIFICATION.md](TAG-SPECI
 
 | Integration | Guide | Description |
 |-------------|-------|-------------|
+| Azure (Cloud) | [azure/](azure/) | Azure Cost Management **native FOCUS export** — no preprocessor needed |
+| AWS | [aws/](aws/) | AWS Data Exports **native FOCUS 1.2** — no preprocessor needed |
 | Azure Local | [azure-local/](azure-local/) | Azure Stack HCI/Azure Local VM billing |
 | Isilon | [isilon/](isilon/) | Dell/EMC Isilon storage quota billing |
 | Qumulo | [qumulo/](qumulo/) | Qumulo NAS storage billing with `.openchargeback.json` metadata |
 | Slurm/HPC | [slurm/](slurm/) | HPC cluster job accounting |
 | OpenAI Tokens | [openai-tokens/](openai-tokens/) | OpenAI EDU billing with subsidy support |
-| AWS | Planned | AWS Cost Explorer integration |
-| Azure (Cloud) | Planned | Azure Cost Management integration |
 
 ## Integration Patterns
 

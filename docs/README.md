@@ -60,7 +60,10 @@ docs/
 │   ├── README.md            # Overview and patterns
 │   ├── TAG-SPECIFICATION.md # Required cloud resource tags
 │   ├── TEMPLATE.md          # Template for new integrations
+│   ├── azure/               # Azure Cost Management native FOCUS export
+│   ├── aws/                 # AWS Data Exports native FOCUS export
 │   ├── azure-local/         # Azure Stack HCI guide
+│   ├── isilon/              # Dell/EMC Isilon storage
 │   ├── openai-tokens/       # OpenAI EDU billing + subsidy
 │   ├── slurm/               # HPC/Slurm integration
 │   └── qumulo/              # Storage billing
