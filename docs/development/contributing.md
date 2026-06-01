@@ -187,16 +187,25 @@ async def list_items(request: Request, config=Depends(get_config)):
 ### Adding a New CLI Command
 
 1. Add command in `src/openchargeback/cli.py`
-2. Use click decorators
-3. Access config via context
+2. Use Typer decorators with `Annotated` option/argument types
+3. Load config via `load_config(config_path)`
 
 ```python
-@cli.command()
-@click.option("--example", help="Example option")
-@click.pass_context
-def new_command(ctx, example):
+from pathlib import Path
+from typing import Annotated
+
+import typer
+
+from .config import load_config
+
+
+@app.command()
+def new_command(
+    example: Annotated[str, typer.Option("--example", "-e", help="Example option")],
+    config_path: ConfigOption = None,
+) -> None:
     """Description of command."""
-    config = ctx.obj["config"]
+    config = load_config(config_path)
     # Implementation
 ```
 

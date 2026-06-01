@@ -17,7 +17,7 @@ Both share the same core modules for data processing.
 │                         Interfaces                              │
 ├─────────────────────────────┬───────────────────────────────────┤
 │          CLI                │              Web                  │
-│       (click)               │           (FastAPI)               │
+│       (Typer)               │           (FastAPI)               │
 │    src/openchargeback/cli.py │      src/openchargeback/web/       │
 └──────────────┬──────────────┴──────────────┬────────────────────┘
                │                              │

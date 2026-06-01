@@ -28,6 +28,7 @@ docs/
 ├── getting-started/         # Installation and initial setup
 │   ├── README.md
 │   ├── installation.md
+│   ├── deployment-planning.md  # Institutional decisions before configuring
 │   └── configuration.md
 │
 ├── user-guide/              # Day-to-day usage

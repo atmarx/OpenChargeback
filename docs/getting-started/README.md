@@ -5,7 +5,8 @@ This section covers installing and configuring OpenChargeback for first-time use
 ## Contents
 
 1. [Installation](installation.md) - System requirements, installation methods
-2. [Configuration](configuration.md) - Setting up `config.yaml`
+2. [Deployment Planning](deployment-planning.md) - The institutional decisions to make *before* you configure
+3. [Configuration](configuration.md) - Setting up `config.yaml`
 
 ## Quick Start
 
