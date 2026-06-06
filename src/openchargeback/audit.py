@@ -110,6 +110,23 @@ def log_journal_export(
     )
 
 
+def log_close_package(
+    period: str,
+    filename: str,
+    sha256: str,
+    user: str | None = None,
+) -> None:
+    """Log a forensic close-package download event."""
+    _emit(
+        "export",
+        "close_package",
+        period=period,
+        filename=filename,
+        sha256=sha256,
+        user=user or "system",
+    )
+
+
 # Statement events
 def log_statement_generated(
     period: str,

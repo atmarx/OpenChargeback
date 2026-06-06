@@ -71,6 +71,9 @@ class OutputConfig(BaseModel):
     pdf_dir: Path = Field(default=Path("./instance/output/pdfs"))
     journal_dir: Path = Field(default=Path("./instance/output/journals"))
     email_dir: Path = Field(default=Path("./instance/output/emails"))  # For dev mode
+    # Retained originals of every uploaded source file, by period/source.
+    # This is the forensic input layer the monthly close package draws from.
+    archive_dir: Path = Field(default=Path("./instance/output/archive"))
 
 
 class LoggingConfig(BaseModel):
@@ -278,6 +281,7 @@ def ensure_directories(config: Config) -> None:
     """Create output directories if they don't exist."""
     config.output.pdf_dir.mkdir(parents=True, exist_ok=True)
     config.output.journal_dir.mkdir(parents=True, exist_ok=True)
+    config.output.archive_dir.mkdir(parents=True, exist_ok=True)
 
     # Create email output dir in dev mode
     if config.dev_mode:

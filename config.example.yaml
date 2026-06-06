@@ -38,6 +38,9 @@ output:
   pdf_dir: ./instance/output/pdfs
   journal_dir: ./instance/output/journals
   email_dir: ./instance/output/emails   # For dev_mode email files
+  archive_dir: ./instance/output/archive  # Retained original source files; feeds the monthly close package
+  # Retention is indefinite by default. A future RETENTION_YEARS hook (-1 = indefinite)
+  # is the planned place to wire policy-based rolloff. Until then, the archive grows.
 
 logging:
   level: INFO                     # DEBUG, INFO, WARN, WARNING, ERROR

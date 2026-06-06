@@ -112,6 +112,48 @@ async def create_period(
     return RedirectResponse(url=f"/periods/{new_period.period}", status_code=303)
 
 
+@router.get("/{period_slug}/close-package")
+async def download_close_package(
+    request: Request,
+    period_slug: str,
+    user: User = Depends(require_admin),
+    db: Database = Depends(get_db),
+) -> Response:
+    """Build and download the forensic monthly close package (deterministic zip)."""
+    from openchargeback.output.close_package import build_close_package
+
+    service = PeriodService(db)
+    period_obj = service.get_period_by_slug(period_slug)
+    if not period_obj:
+        add_flash_message(request, "error", "Period not found.")
+        return RedirectResponse(url="/periods", status_code=303)
+
+    config = request.app.state.config
+    try:
+        filename, zip_bytes, sha256_hex = build_close_package(
+            period_obj.period, config, db
+        )
+    except Exception as e:
+        add_flash_message(request, "error", f"Failed to build close package: {e}")
+        return RedirectResponse(url=f"/periods/{period_slug}", status_code=303)
+
+    audit.log_close_package(
+        period=period_obj.period,
+        filename=filename,
+        sha256=sha256_hex,
+        user=user.display_name,
+    )
+
+    return Response(
+        content=zip_bytes,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Package-SHA256": sha256_hex,
+        },
+    )
+
+
 @router.get("/{period_slug}", response_class=HTMLResponse)
 async def view_period(
     request: Request,

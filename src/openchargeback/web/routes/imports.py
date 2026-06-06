@@ -96,6 +96,7 @@ async def upload_files(
     import traceback
 
     from openchargeback.ingest.focus import ingest_focus_file
+    from openchargeback.output.close_package import archive_input_file
 
     try:
         config = request.app.state.config
@@ -181,6 +182,18 @@ async def upload_files(
                         "error": "; ".join(result.errors[:3]),  # First 3 errors
                     })
                 else:
+                    # Retain the original source file for the forensic close
+                    # package. These are the inputs that generated the month's
+                    # results — research accounting keeps custody of them so the
+                    # audit liability stays on their side, not ours.
+                    archive_input_file(
+                        content=content,
+                        period=file_period,
+                        source=file_source,
+                        filename=file.filename or "upload.csv",
+                        config=config,
+                    )
+
                     # Log successful import for audit trail
                     audit.log_import(
                         filename=file.filename or "",
