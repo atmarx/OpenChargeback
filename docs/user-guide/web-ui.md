@@ -33,6 +33,10 @@ Manage billing period lifecycle:
 - **Create**: Open a new billing period
 - **Close**: Lock period for statement generation (can be reopened)
 - **Reopen**: Unlock a closed period to accept more imports
+- **Close Package**: Download the forensic monthly archive — a deterministic, hashed
+  zip of the source files, statements, journal export, email log, and audit trail to
+  hand to research accounting (admin-only). See
+  [Billing Workflow → Step 6](../admin-guide/billing-workflow.md#step-6-download-the-close-package).
 - **Finalize**: Permanently lock period (irreversible)
 
 Period statuses are color-coded:

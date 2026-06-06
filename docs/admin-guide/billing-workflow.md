@@ -5,13 +5,20 @@ This guide walks through the complete monthly billing cycle in OpenChargeback.
 ## Overview
 
 ```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│   Import    │ →  │   Review    │ →  │  Generate   │ →  │   Export    │
-│    Data     │    │   Charges   │    │  Statements │    │   Journal   │
-└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
-       ↓                  ↓                  ↓                  ↓
-   Period Open        Approve/Reject      Send to PIs      To Accounting
+┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌───────────────┐
+│  Import  │ → │  Review  │ → │ Generate │ → │  Close   │ → │ Close Package │
+│   Data   │   │ Charges  │   │Statements│   │  Period  │   │ → Accounting  │
+└──────────┘   └──────────┘   └──────────┘   └──────────┘   └───────────────┘
+     ↓              ↓              ↓              ↓                  ↓
+ Period Open   Approve/Reject   Send to PIs   Lock imports   Hashed forensic
+                                  + Journal                   archive (the deliverable)
 ```
+
+The **close package** is the deliverable that ends the month: a single deterministic,
+hashed zip containing the original source files, the statements as sent, the journal
+export, the proof-of-send email log, and the audit trail. Research accounting keeps
+custody of it — which lets OpenChargeback step down from system-of-record to
+flight-data-recorder, dropping the audit liability. See [Step 6](#step-6-download-the-close-package).
 
 ---
 
@@ -180,29 +187,73 @@ See [Journal Export](journal-export.md) for detailed format documentation.
 
 ---
 
-## Step 5: Close and Finalize
+## Step 5: Close the Period
 
-### Close Period
-
-Closing prevents further imports while allowing reopening if needed.
+Closing prevents further imports while allowing reopening if needed. Close once
+charges are reviewed and statements are sent — it's the "pencils down" that
+freezes the month so the close package captures a stable snapshot.
 
 ```bash
 openchargeback periods close 2025-01
 ```
 
-### Finalize Period
+---
 
-**Finalization is permanent.** Only finalize after accounting confirms receipt of journal entries.
+## Step 6: Download the Close Package
+
+The **close package** is the canonical monthly deliverable for research accounting —
+a single forensic zip that bundles everything justifying the month's charges. Once
+accounting holds it, OpenChargeback is no longer the system of record; it's the
+flight-data-recorder, and the audit liability sits with the custodian of the package.
+
+### Download it
+
+On the **period detail page**, click the **📦 Close Package** button. The archive is
+built fresh on each download (admin-only) and streamed to your browser. There is no
+CLI command for it yet — it's a web-UI action.
+
+### What's inside
+
+| File | Contents |
+|------|----------|
+| `journal.csv` | The bulk journal entries (the ERP handoff) — same export as Step 4, bundled in. |
+| `statements/` | The final PDF statements, **exactly as emailed** to PIs (frozen, never re-rendered). |
+| `inputs/` | The original source files that generated the results, organized by source. |
+| `email-log.csv` | Proof of send: when each statement went out, to whom. |
+| `audit.csv` | The period lifecycle (opened/closed/finalized) plus every charge review action. |
+| `README.txt` | A plain-language guide to the contents. |
+| `MANIFEST.txt` | The sha256 of every file above — the package's per-file signature. |
+
+### Why it's hashed
+
+The package is **byte-deterministic**: the same canonical data produces the same zip,
+and the same sha256, every time. The last 6 characters of that hash are appended to the
+filename — e.g. `openchargeback-close-2025-01-a3f29c.zip` — so the bundle is
+content-addressable. Verify any file by re-hashing it against `MANIFEST.txt`; verify the
+whole bundle by the filename suffix (also returned in the `X-Package-SHA256` response
+header). A different hash means the data changed — that's the point.
+
+> **Input retention:** Only source files imported *after* input retention was enabled
+> appear under `inputs/`. Months imported before then show an empty `inputs/` folder.
+> Retention is indefinite by default; `RETENTION_YEARS` is the planned rolloff hook.
+
+---
+
+## Step 7: Finalize the Period
+
+**Finalization is permanent.** Only finalize after research accounting confirms receipt
+of the close package.
 
 ```bash
-openchargeback periods finalize 2025-01 --notes "Sent to Banner 2025-02-05"
+openchargeback periods finalize 2025-01 --notes "Close package a3f29c sent to Banner 2025-02-05"
 ```
 
 Finalized periods:
 - Cannot be reopened
 - Reject all import attempts
 - Cannot have charges modified
-- Serve as audit record
+- Serve as OpenChargeback's local lock — the canonical record now lives with research
+  accounting, in the close package they hold
 
 ---
 
@@ -216,7 +267,8 @@ Finalized periods:
 | Send statements | 7th-10th of following month |
 | Export journal | After statements sent |
 | Close period | After journal exported |
-| Finalize period | After accounting confirms |
+| Download close package | After close — hand to research accounting |
+| Finalize period | After accounting confirms receipt of the package |
 
 ---
 

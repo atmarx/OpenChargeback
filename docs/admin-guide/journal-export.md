@@ -2,6 +2,11 @@
 
 This guide covers exporting billing data for your accounting system (Banner, Workday, PeopleSoft, etc.).
 
+> **Note:** The journal export is also bundled — as `journal.csv` — inside the monthly
+> [close package](billing-workflow.md#step-6-download-the-close-package), the deterministic
+> hashed archive handed to research accounting. Use the standalone export below for ad-hoc
+> needs; the package is the canonical month-end handoff.
+
 ## Export Formats
 
 OpenChargeback supports multiple export formats to match your institution's needs.
