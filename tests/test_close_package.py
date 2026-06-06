@@ -8,12 +8,16 @@ same data, and the MANIFEST honestly hashes every member.
 import hashlib
 import io
 import zipfile
+from pathlib import Path
 
 import pytest
 
-from openchargeback.config import Config, OutputConfig
+from openchargeback.config import Config, OutputConfig, TagMappingConfig
 from openchargeback.db.repository import Charge, Database, Statement
+from openchargeback.ingest.focus import ingest_focus_file
 from openchargeback.output.close_package import archive_input_file, build_close_package
+
+SAMPLE_INPUTS = Path(__file__).resolve().parent.parent / "sample_data" / "inputs"
 
 
 @pytest.fixture
@@ -211,3 +215,72 @@ def test_audit_csv_includes_period_and_review_events(closed_period_db, config):
 def test_unknown_period_raises(db, config):
     with pytest.raises(ValueError, match="not found"):
         build_close_package("2099-12", config, db)
+
+
+# --- The belief, confirmed on real data ----------------------------------
+# This is the CI gate the accountant cares about: ingest the actual shipped
+# sample CSVs, close the period, build the package twice, and prove the bytes
+# (and therefore the hash) are identical. Same canonical data -> same hash.
+
+@pytest.mark.skipif(not SAMPLE_INPUTS.is_dir(), reason="sample_data not present")
+def test_real_sample_data_is_deterministic(temp_db, tmp_path):
+    cfg = Config(
+        output=OutputConfig(
+            pdf_dir=tmp_path / "pdfs",
+            journal_dir=tmp_path / "journals",
+            archive_dir=tmp_path / "archive",
+        ),
+        # The sample tags carry an explicit "project_id" key
+        tag_mapping=TagMappingConfig(project_id="project_id"),
+    )
+    db = Database(temp_db)
+    db.initialize()
+
+    period = "2025-12"
+    sample_files = sorted(SAMPLE_INPUTS.glob("*_2025-12.csv"))
+    assert sample_files, "expected 2025-12 sample inputs"
+
+    for path in sample_files:
+        source = path.name.split("_")[0]
+        content = path.read_bytes()
+        ingest_focus_file(
+            file_path=path,
+            source_name=source,
+            expected_period=period,
+            config=cfg,
+            db=db,
+            dry_run=False,
+            original_filename=path.name,
+        )
+        archive_input_file(
+            content=content, period=period, source=source,
+            filename=path.name, config=cfg,
+        )
+
+    db.approve_all_charges(db.get_period(period).id, performed_by="ci")
+    db.update_period_status(period, "closed", performed_by="ci")
+
+    name1, bytes1, sha1 = build_close_package(period, cfg, db)
+    name2, bytes2, sha2 = build_close_package(period, cfg, db)
+
+    # The belief: identical data -> identical bytes -> identical hash.
+    assert bytes1 == bytes2
+    assert sha1 == sha2
+    assert name1 == name2 == f"openchargeback-close-{period}-{sha1[:6]}.zip"
+
+    # The signature is honest: every member re-hashes to its MANIFEST line.
+    members = _members(bytes1)
+    manifest = members["MANIFEST.txt"].decode("utf-8")
+    listed = {}
+    for line in manifest.splitlines():
+        if line and not line.startswith("#"):
+            digest, _size, member = line.split("  ", 2)
+            listed[member] = digest
+    assert set(listed) == {n for n in members if n != "MANIFEST.txt"}
+    for member, digest in listed.items():
+        assert hashlib.sha256(members[member]).hexdigest() == digest, member
+
+    # The originals that generated the results are in the bundle, byte-for-byte.
+    for path in sample_files:
+        source = path.name.split("_")[0]
+        assert members[f"inputs/{source}/{path.name}"] == path.read_bytes()
