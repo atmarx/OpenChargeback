@@ -146,6 +146,14 @@ def build_journal_entries(
 
     entries = []
 
+    # Round every group to cents BEFORE building entries, and accumulate
+    # credits from the rounded debit amounts. Rounding debits and credits
+    # independently from unrounded floats produces penny-unbalanced GL
+    # entries (e.g. debits 10.01 + 10.01 against a 20.01 credit), which
+    # ERPs reject.
+    for data in aggregated.values():
+        data["amount"] = round(data["amount"], 2)
+
     # Build debit entries (one per aggregated group)
     for (pi_fund_org, source_name), data in aggregated.items():
         # Parse the PI's fund_org
@@ -194,7 +202,10 @@ def build_journal_entries(
             source_totals[source_name] = 0.0
         source_totals[source_name] += data["amount"]
 
-    for source_name, total in source_totals.items():
+    for source_name, raw_total in source_totals.items():
+        # Kill float dust from summing the rounded debit amounts so the
+        # credit equals the debit lines exactly.
+        total = round(raw_total, 2)
         source_config = get_source_config(source_name, config)
         source_fund_org = source_config.fund_org if source_config else ""
 

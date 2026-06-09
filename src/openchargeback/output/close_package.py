@@ -104,14 +104,26 @@ def _collect_files(period_str: str, config: Config, db: Database) -> dict[str, b
         )
         files["journal.csv"] = journal_path.read_bytes()
 
-    # 2. Statements — frozen PDFs as sent to PIs, copied verbatim
+    # 2. Statements — frozen PDFs as sent to PIs, copied verbatim. A package
+    # that silently omits statements isn't forensic: if a recorded PDF is
+    # missing from disk, refuse to build rather than ship an incomplete
+    # archive that presents itself as complete.
     statements = db.get_statements_for_period(billing_period.id)
+    missing_pdfs = [
+        f"{stmt.pi_email}/{stmt.project_id or '(no project)'}: {stmt.pdf_path or '(no path recorded)'}"
+        for stmt in statements
+        if not stmt.pdf_path or not Path(stmt.pdf_path).exists()
+    ]
+    if missing_pdfs:
+        raise ValueError(
+            f"Cannot build close package for {period_str}: "
+            f"{len(missing_pdfs)} statement PDF(s) missing — "
+            + "; ".join(missing_pdfs)
+            + ". Regenerate statements before closing the package."
+        )
     for stmt in statements:
-        if not stmt.pdf_path:
-            continue
         pdf = Path(stmt.pdf_path)
-        if pdf.exists():
-            files[f"statements/{_safe_name(pdf.name)}"] = pdf.read_bytes()
+        files[f"statements/{_safe_name(pdf.name)}"] = pdf.read_bytes()
 
     # 3. Original input files retained at import time
     input_root = config.output.archive_dir / _safe_name(period_str)
@@ -121,13 +133,11 @@ def _collect_files(period_str: str, config: Config, db: Database) -> dict[str, b
                 rel = path.relative_to(input_root).as_posix()
                 files[f"inputs/{rel}"] = path.read_bytes()
 
-    # 4. Proof of send — email log for this period's statement recipients
-    recipients = {s.pi_email for s in statements if s.pi_email}
-    email_rows: list[EmailLog] = [
-        log
-        for log in db.get_email_logs(limit=10000)
-        if log.recipient in recipients
-    ]
+    # 4. Proof of send — email log scoped to THIS period via statement_id.
+    # An unscoped query would make the package bytes drift as unrelated
+    # email history accrues (same month, different hash) and a row limit
+    # would silently truncate proof-of-send lines.
+    email_rows: list[EmailLog] = db.get_email_logs_for_period(billing_period.id)
     files["email-log.csv"] = _email_log_csv(email_rows)
 
     # 5. Audit trail — review actions (approvals/rejections) for the period
@@ -273,7 +283,10 @@ def _build_deterministic_zip(
             info = zipfile.ZipInfo(filename=name, date_time=date_time)
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0  # no Unix permission noise
-            zf.writestr(info, files[name])
+            # compresslevel must be passed per-call: the ZipFile-level value
+            # does not apply to manually constructed ZipInfo objects, which
+            # would otherwise fall back to the zlib default.
+            zf.writestr(info, files[name], compresslevel=6)
     return buf.getvalue()
 
 

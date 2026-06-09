@@ -173,8 +173,11 @@ DEFAULT_EMAIL_TEMPLATE = """
 
 def get_template_env(config: Config) -> Environment:
     """Get Jinja2 template environment."""
+    # Check the specific file, not just the directory — the Docker image
+    # copies web UI templates to /app/templates/ which doesn't include
+    # email_summary.html (same trap pdf.py guards against for statement.html).
     templates_dir = Path("templates")
-    if templates_dir.exists():
+    if (templates_dir / "email_summary.html").exists():
         return Environment(
             loader=FileSystemLoader(templates_dir),
             autoescape=select_autoescape(["html", "xml"]),
