@@ -1,10 +1,12 @@
 """Aggregation logic for grouping charges by PI and project."""
 
 from dataclasses import dataclass, field
+from decimal import Decimal
 
 from .. import audit
 from ..config import Config
 from ..db.repository import Charge, Database, Statement
+from ..money import NO_PROJECT, MoneyAtom, build_atoms
 
 
 @dataclass
@@ -41,8 +43,8 @@ class ProjectSummary:
 
     @property
     def total_discount(self) -> float:
-        """Total discount amount (list - billed)."""
-        return self.total_list_cost - self.total_cost
+        """Total discount amount (list - billed), exact cents."""
+        return round(self.total_list_cost - self.total_cost, 2)
 
     @property
     def discount_percent(self) -> float:
@@ -63,7 +65,7 @@ class PISummary:
 
     def add_charge(self, charge: Charge) -> None:
         """Add a charge to this PI's summary."""
-        project_id = charge.project_id or "(no project)"
+        project_id = charge.project_id or NO_PROJECT
 
         if project_id not in self.projects:
             self.projects[project_id] = ProjectSummary(
@@ -87,8 +89,8 @@ class PISummary:
 
     @property
     def total_discount(self) -> float:
-        """Total discount amount across all projects."""
-        return self.total_list_cost - self.total_cost
+        """Total discount amount across all projects, exact cents."""
+        return round(self.total_list_cost - self.total_cost, 2)
 
     @property
     def discount_percent(self) -> float:
@@ -114,6 +116,10 @@ class GenerateResult:
 def aggregate_charges(charges: list[Charge]) -> dict[str, PISummary]:
     """Aggregate charges by PI and project.
 
+    Money fields are computed from money atoms (one rounding point, exact
+    cents) so statement totals, journal exports, and GL entries derived
+    from the same charges agree to the penny — see money.py.
+
     Args:
         charges: List of Charge objects.
 
@@ -130,7 +136,54 @@ def aggregate_charges(charges: list[Charge]) -> dict[str, PISummary]:
 
         summaries[pi_email].add_charge(charge)
 
+    _apply_atom_money(summaries, build_atoms(charges))
     return summaries
+
+
+def _apply_atom_money(
+    summaries: dict[str, PISummary], atoms: list[MoneyAtom]
+) -> None:
+    """Replace raw-float accumulations with atom-exact cents.
+
+    add_charge accumulates unrounded floats while it builds the structure;
+    this pass overwrites every money field from the atoms so each project
+    total is exactly the sum of its rendered service lines, and the PI
+    total is exactly the sum of its project totals.
+    """
+    by_pi_project: dict[tuple[str, str], list[MoneyAtom]] = {}
+    for atom in atoms:
+        by_pi_project.setdefault(
+            (atom.key.pi_email, atom.key.project_id), []
+        ).append(atom)
+
+    for pi_email, summary in summaries.items():
+        pi_billed = Decimal("0")
+        pi_listed = Decimal("0")
+        for project_id, project in summary.projects.items():
+            service_billed: dict[str, Decimal] = {}
+            service_listed: dict[str, Decimal] = {}
+            for atom in by_pi_project.get((pi_email, project_id), []):
+                service = atom.key.service_name
+                service_billed[service] = (
+                    service_billed.get(service, Decimal("0")) + atom.billed
+                )
+                service_listed[service] = (
+                    service_listed.get(service, Decimal("0")) + atom.listed
+                )
+            project.service_breakdown = {
+                k: float(v) for k, v in service_billed.items()
+            }
+            project.service_list_breakdown = {
+                k: float(v) for k, v in service_listed.items()
+            }
+            project_billed = sum(service_billed.values(), Decimal("0"))
+            project_listed = sum(service_listed.values(), Decimal("0"))
+            project.total_cost = float(project_billed)
+            project.total_list_cost = float(project_listed)
+            pi_billed += project_billed
+            pi_listed += project_listed
+        summary.total_cost = float(pi_billed)
+        summary.total_list_cost = float(pi_listed)
 
 
 def generate_statements(

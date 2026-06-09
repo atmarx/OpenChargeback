@@ -2,12 +2,14 @@
 
 import re
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from ..config import Config, KnownSourceConfig
+from ..money import NO_PROJECT, build_atoms
 
 
 @dataclass
@@ -115,44 +117,34 @@ def build_journal_entries(
     fund_org_regex = journal_config.fund_org_regex
     source_map = source_id_to_name or {}
 
-    # Aggregate charges by (pi_fund_org, source_name)
-    # We need to track totals and build one debit per PI fund_org
-    aggregated: dict[tuple[str, str], dict[str, Any]] = {}
+    # Aggregate money atoms by (pi_fund_org, source_name). Atoms are exact
+    # cents rounded once at the canonical grain (see money.py), so the GL
+    # debits, the credits accumulated from them, statement totals, and the
+    # journal CSV all partition the same cents — balanced and reconciled
+    # by construction.
+    atoms = build_atoms(charges, account_code_tag=config.tag_mapping.account_code)
 
-    for charge in charges:
-        # Get source name from source_id mapping or attribute
-        source_name = source_map.get(charge.source_id) or getattr(charge, "source_name", None) or "Unknown"
-        pi_fund_org = charge.fund_org or "UNKNOWN"
+    aggregated: dict[tuple[str, str], dict[str, Any]] = {}
+    for atom in atoms:
+        source_name = source_map.get(atom.key.source_id) or "Unknown"
+        pi_fund_org = atom.key.fund_org or "UNKNOWN"
 
         key = (pi_fund_org, source_name)
         if key not in aggregated:
             aggregated[key] = {
-                "amount": 0.0,
-                "pi_email": charge.pi_email,
-                "project_id": charge.project_id or "",
+                "amount": Decimal("0"),
+                "pi_email": atom.key.pi_email,
+                "project_id": "" if atom.key.project_id == NO_PROJECT else atom.key.project_id,
                 "source_name": source_name,
                 "pi_fund_org": pi_fund_org,
-                # Get account_code from raw_tags if present
                 "account_code": None,
             }
 
-        aggregated[key]["amount"] += charge.billed_cost
-
-        # Try to get account_code from raw_tags
-        if charge.raw_tags and isinstance(charge.raw_tags, dict):
-            tag_key = config.tag_mapping.account_code
-            if tag_key in charge.raw_tags and not aggregated[key]["account_code"]:
-                aggregated[key]["account_code"] = charge.raw_tags[tag_key]
+        aggregated[key]["amount"] += atom.billed
+        if atom.account_code and not aggregated[key]["account_code"]:
+            aggregated[key]["account_code"] = atom.account_code
 
     entries = []
-
-    # Round every group to cents BEFORE building entries, and accumulate
-    # credits from the rounded debit amounts. Rounding debits and credits
-    # independently from unrounded floats produces penny-unbalanced GL
-    # entries (e.g. debits 10.01 + 10.01 against a 20.01 credit), which
-    # ERPs reject.
-    for data in aggregated.values():
-        data["amount"] = round(data["amount"], 2)
 
     # Build debit entries (one per aggregated group)
     for (pi_fund_org, source_name), data in aggregated.items():
@@ -184,7 +176,7 @@ def build_journal_entries(
             fund=fund,
             orgn=orgn,
             account=account or "",
-            amount=data["amount"],
+            amount=float(data["amount"]),
             is_debit=True,
             is_credit=False,
             description=description,
@@ -195,17 +187,16 @@ def build_journal_entries(
             project_id=data["project_id"],
         ))
 
-    # Build credit entries (one per source with charges)
-    source_totals: dict[str, float] = {}
+    # Build credit entries (one per source with charges) — accumulated from
+    # the same exact-cents debit amounts, so each source's credit equals its
+    # debit lines to the penny.
+    source_totals: dict[str, Decimal] = {}
     for (_pi_fund_org, source_name), data in aggregated.items():
         if source_name not in source_totals:
-            source_totals[source_name] = 0.0
+            source_totals[source_name] = Decimal("0")
         source_totals[source_name] += data["amount"]
 
-    for source_name, raw_total in source_totals.items():
-        # Kill float dust from summing the rounded debit amounts so the
-        # credit equals the debit lines exactly.
-        total = round(raw_total, 2)
+    for source_name, total in source_totals.items():
         source_config = get_source_config(source_name, config)
         source_fund_org = source_config.fund_org if source_config else ""
 
@@ -237,7 +228,7 @@ def build_journal_entries(
             fund=fund,
             orgn=orgn,
             account=account or "",
-            amount=total,
+            amount=float(total),
             is_debit=False,
             is_credit=True,
             description=description,

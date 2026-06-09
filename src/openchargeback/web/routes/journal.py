@@ -2,8 +2,8 @@
 
 import csv
 import io
-from collections import defaultdict
 from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +12,7 @@ from fastapi.responses import HTMLResponse, Response, StreamingResponse
 
 from openchargeback import audit
 from openchargeback.db import Database
+from openchargeback.money import NO_PROJECT, build_atoms
 from openchargeback.output.journal_template import export_journal_with_template
 from openchargeback.web.auth import User
 from openchargeback.web.deps import (
@@ -25,6 +26,70 @@ from openchargeback.web.deps import (
 )
 
 router = APIRouter(prefix="/journal", tags=["journal"])
+
+
+def render_summary_format(charges: list[Any], period_str: str) -> str:
+    """Summary CSV (PI, project, fund) from money atoms — exact cents that
+    reconcile with statements and every other export. See money.py."""
+    output = io.StringIO()
+    atoms = build_atoms(charges)
+    summary: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for atom in atoms:
+        project_label = "N/A" if atom.key.project_id == NO_PROJECT else atom.key.project_id
+        key = (atom.key.pi_email, project_label, atom.key.fund_org or "N/A")
+        entry = summary.setdefault(key, {"total": Decimal("0"), "charge_count": 0})
+        entry["total"] += atom.billed
+        entry["charge_count"] += atom.charge_count
+
+    fieldnames = ["period", "pi_email", "project_id", "fund_org", "total_cost", "charge_count"]
+    writer = csv.DictWriter(output, fieldnames=fieldnames, lineterminator="\r\n")
+    writer.writeheader()
+    for (pi_email, project_id, fund_org), data in sorted(summary.items()):
+        writer.writerow({
+            "period": period_str,
+            "pi_email": pi_email,
+            "project_id": project_id,
+            "fund_org": fund_org,
+            "total_cost": f"{data['total']:.2f}",
+            "charge_count": data["charge_count"],
+        })
+    return output.getvalue()
+
+
+def render_gl_format(charges: list[Any], period_str: str) -> str:
+    """GL debit/credit CSV from money atoms. The clearing credit is the sum
+    of the exact-cents debits, so the entry balances to the penny and the
+    total equals the statement totals for the same charges."""
+    output = io.StringIO()
+    atoms = build_atoms(charges)
+    by_fund: dict[str, Decimal] = {}
+    for atom in atoms:
+        fund = atom.key.fund_org or "UNKNOWN"
+        by_fund[fund] = by_fund.get(fund, Decimal("0")) + atom.billed
+
+    fieldnames = ["period", "account", "description", "debit", "credit"]
+    writer = csv.DictWriter(output, fieldnames=fieldnames, lineterminator="\r\n")
+    writer.writeheader()
+
+    total = Decimal("0")
+    for fund, amount in sorted(by_fund.items()):
+        writer.writerow({
+            "period": period_str,
+            "account": fund,
+            "description": f"Cloud computing charges - {period_str}",
+            "debit": f"{amount:.2f}",
+            "credit": "",
+        })
+        total += amount
+
+    writer.writerow({
+        "period": period_str,
+        "account": "CLOUD-CLEARING",
+        "description": f"Cloud computing charges - {period_str}",
+        "debit": "",
+        "credit": f"{total:.2f}",
+    })
+    return output.getvalue()
 
 
 @router.get("/logs", response_class=HTMLResponse)
@@ -190,58 +255,12 @@ async def export_journal(
             })
 
     elif format == "summary":
-        # Summary format: aggregated by PI and project
-        summary: defaultdict[tuple[str, str, str], dict[str, Any]] = defaultdict(lambda: {"total": 0.0, "charge_count": 0})
-        for charge in charges:
-            key = (charge.pi_email, charge.project_id or "N/A", charge.fund_org or "N/A")
-            summary[key]["total"] += charge.billed_cost
-            summary[key]["charge_count"] += 1
-
-        fieldnames = ["period", "pi_email", "project_id", "fund_org", "total_cost", "charge_count"]
-        writer = csv.DictWriter(output, fieldnames=fieldnames, lineterminator='\r\n')
-        writer.writeheader()
-
-        for (pi_email, project_id, fund_org), data in sorted(summary.items()):
-            writer.writerow({
-                "period": period.period,
-                "pi_email": pi_email,
-                "project_id": project_id,
-                "fund_org": fund_org,
-                "total_cost": f"{data['total']:.2f}",
-                "charge_count": data["charge_count"],
-            })
+        # Summary format: aggregated by PI and project (exact cents)
+        output.write(render_summary_format(charges, period.period))
 
     elif format == "gl":
-        # General Ledger format: debit/credit entries
-        # Group by fund_org
-        by_fund: defaultdict[str, float] = defaultdict(float)
-        for charge in charges:
-            fund = charge.fund_org or "UNKNOWN"
-            by_fund[fund] += charge.billed_cost
-
-        fieldnames = ["period", "account", "description", "debit", "credit"]
-        writer = csv.DictWriter(output, fieldnames=fieldnames, lineterminator='\r\n')
-        writer.writeheader()
-
-        total = 0.0
-        for fund, amount in sorted(by_fund.items()):
-            writer.writerow({
-                "period": period.period,
-                "account": fund,
-                "description": f"Cloud computing charges - {period.period}",
-                "debit": f"{amount:.2f}",
-                "credit": "",
-            })
-            total += amount
-
-        # Credit entry to clearing account
-        writer.writerow({
-            "period": period.period,
-            "account": "CLOUD-CLEARING",
-            "description": f"Cloud computing charges - {period.period}",
-            "debit": "",
-            "credit": f"{total:.2f}",
-        })
+        # General Ledger format: balanced debit/credit entries (exact cents)
+        output.write(render_gl_format(charges, period.period))
 
     elif format == "template":
         # Template-based format: uses Jinja2 template from config

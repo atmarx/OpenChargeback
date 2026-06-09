@@ -129,7 +129,7 @@ Additional resources:
 
 ```bash
 pip install -e ".[dev]"
-pytest                    # 289 tests
+pytest                    # 292 tests
 mypy src/                 # Type checking
 ruff check src/           # Linting
 ```
