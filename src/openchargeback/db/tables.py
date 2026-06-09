@@ -98,13 +98,18 @@ charges = Table(
         ForeignKey("sources.id", ondelete="CASCADE"),
         nullable=False,
     ),
-    Column("charge_period_start", String(10)),  # YYYY-MM-DD
+    # Natural-key columns are NOT NULL with '' defaults: SQL UNIQUE treats
+    # NULLs as distinct, which silently breaks dedup for rows without a
+    # resource id or charge date (taxes, fees).
+    Column("charge_period_start", String(10), nullable=False, server_default=""),  # YYYY-MM-DD
     Column("charge_period_end", String(10)),
+    Column("charge_category", String(50), nullable=False, server_default=""),  # FOCUS ChargeCategory
+    Column("sku_id", String(200), nullable=False, server_default=""),  # FOCUS SkuId
     Column("list_cost", Float),
     Column("contracted_cost", Float),
     Column("billed_cost", Float, nullable=False),
     Column("effective_cost", Float),
-    Column("resource_id", String(500)),
+    Column("resource_id", String(500), nullable=False, server_default=""),
     Column("resource_name", String(500)),
     Column("service_name", String(200)),
     Column("pi_email", String(254), nullable=False),
@@ -121,11 +126,16 @@ charges = Table(
     Column("rejected_at", DateTime),  # Soft-delete: when rejected
     Column("rejected_by", String(200)),  # User who rejected
     Column("rejection_note", Text),  # Reason for rejection
+    # FOCUS data routinely has multiple rows per resource per charge period
+    # (Usage vs Tax ChargeCategory, multiple SKUs) — they are distinct charges
+    # and must not overwrite each other.
     UniqueConstraint(
         "billing_period_id",
         "source_id",
         "resource_id",
         "charge_period_start",
+        "charge_category",
+        "sku_id",
         name="uq_charges_natural_key",
     ),
 )
@@ -296,4 +306,4 @@ review_logs = Table(
 Index("idx_review_logs_period", review_logs.c.billing_period_id)
 Index("idx_review_logs_performed_at", review_logs.c.performed_at)
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11

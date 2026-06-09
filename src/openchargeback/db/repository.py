@@ -25,6 +25,14 @@ from .tables import (
 )
 
 
+class PeriodLockedError(Exception):
+    """Raised when a write targets a closed or finalized billing period.
+
+    Lives at the repository layer so every interface (web, CLI, future API)
+    inherits the guard instead of re-implementing it.
+    """
+
+
 @dataclass
 class BillingPeriod:
     """Billing period record."""
@@ -88,6 +96,8 @@ class Charge:
     rejected_at: str | None = None
     rejected_by: str | None = None
     rejection_note: str | None = None
+    charge_category: str = ""  # FOCUS ChargeCategory (Usage, Tax, Purchase...)
+    sku_id: str = ""  # FOCUS SkuId
 
     @property
     def discount_amount(self) -> float:
@@ -376,22 +386,40 @@ class Database:
         """
         # Validate transition (same-status is allowed for updating notes)
         current = self.get_period(period)
-        if current and status != current.status:
+        is_transition = current is not None and status != current.status
+        if is_transition:
             allowed = self.VALID_TRANSITIONS.get(current.status, set())
             if status not in allowed:
                 raise ValueError(
                     f"Cannot transition period from '{current.status}' to '{status}'"
                 )
+            # Finalized means "the numbers accounting received" — a period
+            # with unreviewed charges has no final numbers yet. Enforced here
+            # so the CLI can't finalize past the check the web UI applies.
+            if status == "finalized":
+                flagged = self.get_flagged_charges(current.id)
+                if flagged:
+                    raise ValueError(
+                        f"Cannot finalize period {period}: {len(flagged)} "
+                        "charge(s) still need review."
+                    )
 
         now = datetime.now()
         with self.engine.begin() as conn:
-            values: dict[str, Any] = {"status": status, "notes": notes}
-            if status == "closed":
-                values["closed_at"] = now
-                values["closed_by"] = performed_by
-            elif status == "finalized":
-                values["finalized_at"] = now
-                values["finalized_by"] = performed_by
+            values: dict[str, Any] = {"status": status}
+            # notes=None means "leave notes alone", not "erase them".
+            if notes is not None:
+                values["notes"] = notes
+            # Audit fields are written once, at the actual transition. A
+            # repeated same-status call (double POST, stale tab) must never
+            # rewrite who closed/finalized the period or when.
+            if is_transition:
+                if status == "closed":
+                    values["closed_at"] = now
+                    values["closed_by"] = performed_by
+                elif status == "finalized":
+                    values["finalized_at"] = now
+                    values["finalized_by"] = performed_by
 
             conn.execute(
                 update(billing_periods)
@@ -524,38 +552,77 @@ class Database:
 
     # Charge operations
 
+    # Columns that constitute the charge's content for change detection.
+    # Review columns are deliberately excluded: a re-import of unchanged data
+    # must never look like a change just because a human reviewed the row.
+    _CHARGE_CONTENT_COLUMNS = [
+        "charge_period_end",
+        "list_cost",
+        "contracted_cost",
+        "billed_cost",
+        "effective_cost",
+        "resource_name",
+        "service_name",
+        "pi_email",
+        "project_id",
+        "fund_org",
+        "reference_1",
+        "reference_2",
+        "raw_tags",
+    ]
+
     def insert_charges(self, charge_list: list[Charge]) -> dict[str, int]:
         """Insert multiple charges using upsert logic.
+
+        Guarantees:
+          - raises PeriodLockedError if any target period is closed/finalized
+          - unchanged rows are skipped untouched (review decisions survive)
+          - changed rows are updated; if the row had been reviewed/rejected,
+            it is re-flagged as 'changed_after_review' with stale review
+            state cleared
 
         Returns:
             Dict with counts: inserted, updated, skipped
         """
         counts = {"inserted": 0, "updated": 0, "skipped": 0}
 
+        # Lifecycle guard — every interface inherits this.
+        period_ids = {c.billing_period_id for c in charge_list}
+        for period_id in period_ids:
+            period = self.get_period_by_id(period_id)
+            if period and period.status != "open":
+                raise PeriodLockedError(
+                    f"Billing period {period.period} is {period.status}; "
+                    "new or modified charges are not accepted. Reopen the "
+                    "period to import corrections."
+                )
+
         with self.engine.begin() as conn:
             for charge in charge_list:
                 raw_tags_json = json.dumps(charge.raw_tags) if charge.raw_tags else None
 
-                # Check if charge already exists
+                # Natural-key columns are stored as '' (never NULL) so the
+                # unique constraint and this lookup agree on identity.
+                key = {
+                    "billing_period_id": charge.billing_period_id,
+                    "source_id": charge.source_id,
+                    "resource_id": charge.resource_id or "",
+                    "charge_period_start": charge.charge_period_start or "",
+                    "charge_category": charge.charge_category or "",
+                    "sku_id": charge.sku_id or "",
+                }
                 existing = conn.execute(
                     select(charges).where(
-                        charges.c.billing_period_id == charge.billing_period_id,
-                        charges.c.source_id == charge.source_id,
-                        charges.c.resource_id == charge.resource_id,
-                        charges.c.charge_period_start == charge.charge_period_start,
+                        *(charges.c[col] == val for col, val in key.items())
                     )
                 ).first()
 
-                values = {
-                    "billing_period_id": charge.billing_period_id,
-                    "source_id": charge.source_id,
-                    "charge_period_start": charge.charge_period_start,
+                content = {
                     "charge_period_end": charge.charge_period_end,
                     "list_cost": charge.list_cost,
                     "contracted_cost": charge.contracted_cost,
                     "billed_cost": charge.billed_cost,
                     "effective_cost": charge.effective_cost,
-                    "resource_id": charge.resource_id,
                     "resource_name": charge.resource_name,
                     "service_name": charge.service_name,
                     "pi_email": charge.pi_email,
@@ -564,59 +631,58 @@ class Database:
                     "reference_1": charge.reference_1,
                     "reference_2": charge.reference_2,
                     "raw_tags": raw_tags_json,
-                    "needs_review": charge.needs_review,
-                    "review_reason": charge.review_reason,
                 }
 
-                if existing:
-                    # Check if any updateable values differ
-                    existing_dict = _row_to_dict(existing)
-                    has_changes = False
-                    for col in ["list_cost", "contracted_cost", "billed_cost", "effective_cost",
-                                "resource_name", "service_name", "pi_email", "project_id",
-                                "fund_org", "reference_1", "reference_2", "raw_tags",
-                                "needs_review", "review_reason"]:
-                        new_val = values.get(col)
-                        old_val = existing_dict.get(col)
-                        if new_val != old_val:
-                            has_changes = True
-                            break
-
-                    if has_changes:
-                        counts["updated"] += 1
-                    else:
-                        counts["skipped"] += 1
-                else:
+                if existing is None:
                     counts["inserted"] += 1
+                    conn.execute(charges.insert().values(
+                        **key,
+                        **content,
+                        needs_review=charge.needs_review,
+                        review_reason=charge.review_reason,
+                    ))
+                    continue
 
-                # Execute the upsert regardless (it's idempotent)
-                stmt = self._upsert(
-                    charges,
-                    values,
-                    index_elements=[
-                        "billing_period_id",
-                        "source_id",
-                        "resource_id",
-                        "charge_period_start",
-                    ],
-                    update_columns=[
-                        "list_cost",
-                        "contracted_cost",
-                        "billed_cost",
-                        "effective_cost",
-                        "resource_name",
-                        "service_name",
-                        "pi_email",
-                        "project_id",
-                        "fund_org",
-                        "reference_1",
-                        "reference_2",
-                        "raw_tags",
-                        "needs_review",
-                        "review_reason",
-                    ],
+                existing_dict = _row_to_dict(existing)
+                has_changes = any(
+                    content[col] != existing_dict.get(col)
+                    for col in self._CHARGE_CONTENT_COLUMNS
                 )
-                conn.execute(stmt)
+                if not has_changes:
+                    # Identical re-import: leave the row — and any human
+                    # review decision on it — completely untouched.
+                    counts["skipped"] += 1
+                    continue
+
+                counts["updated"] += 1
+                update_vals: dict[str, Any] = dict(content)
+                was_reviewed = (
+                    existing_dict.get("reviewed_at") is not None
+                    or existing_dict.get("rejected_at") is not None
+                )
+                if was_reviewed:
+                    # The data changed under a human decision: the decision
+                    # is stale. Re-flag honestly and clear the old verdict —
+                    # never leave a reviewed_by on data the reviewer never saw.
+                    update_vals.update(
+                        needs_review=True,
+                        review_reason="changed_after_review",
+                        reviewed_at=None,
+                        reviewed_by=None,
+                        rejected_at=None,
+                        rejected_by=None,
+                        rejection_note=None,
+                    )
+                else:
+                    update_vals.update(
+                        needs_review=charge.needs_review,
+                        review_reason=charge.review_reason,
+                    )
+                conn.execute(
+                    update(charges)
+                    .where(charges.c.id == existing_dict["id"])
+                    .values(**update_vals)
+                )
 
             return counts
 
@@ -655,8 +721,29 @@ class Database:
             rows = conn.execute(stmt).fetchall()
             return [self._charge_from_row(row) for row in rows]
 
+    def _assert_charge_period_not_finalized(self, charge_id: int) -> None:
+        """Refuse review mutations on charges in finalized periods."""
+        charge = self.get_charge_by_id(charge_id)
+        if charge is None:
+            return
+        period = self.get_period_by_id(charge.billing_period_id)
+        if period and period.status == "finalized":
+            raise PeriodLockedError(
+                f"Billing period {period.period} is finalized; "
+                "charges can no longer be approved or rejected."
+            )
+
+    def _assert_period_not_finalized(self, billing_period_id: int) -> None:
+        period = self.get_period_by_id(billing_period_id)
+        if period and period.status == "finalized":
+            raise PeriodLockedError(
+                f"Billing period {period.period} is finalized; "
+                "charges can no longer be approved or rejected."
+            )
+
     def approve_charge(self, charge_id: int, performed_by: str | None = None) -> bool:
         """Approve a flagged charge. Returns True if a charge was actually approved."""
+        self._assert_charge_period_not_finalized(charge_id)
         with self.engine.begin() as conn:
             result = conn.execute(
                 update(charges)
@@ -672,6 +759,7 @@ class Database:
 
     def approve_all_charges(self, billing_period_id: int, performed_by: str | None = None) -> int:
         """Approve all flagged charges for a period."""
+        self._assert_period_not_finalized(billing_period_id)
         with self.engine.begin() as conn:
             result = conn.execute(
                 update(charges)
@@ -694,6 +782,7 @@ class Database:
         Rejected charges stay in the database for audit but are excluded
         from aggregation, statements, and journal exports.
         """
+        self._assert_charge_period_not_finalized(charge_id)
         with self.engine.begin() as conn:
             result = conn.execute(
                 update(charges)
@@ -723,26 +812,65 @@ class Database:
     # Statement operations
 
     def upsert_statement(self, statement: Statement) -> int:
-        """Insert or update a statement."""
+        """Insert or update a statement, returning the id of the row touched.
+
+        Explicit check-then-act instead of ON CONFLICT: SQLite's
+        inserted_primary_key after an upsert-update is the connection's stale
+        lastrowid (the wrong row), and NULL project_ids never match a unique
+        index, so legacy rows would duplicate forever.
+        """
         with self.engine.begin() as conn:
+            project_match = (
+                statements.c.project_id == statement.project_id
+                if statement.project_id is not None
+                else statements.c.project_id.is_(None)
+            )
+            existing = conn.execute(
+                select(statements.c.id).where(
+                    statements.c.billing_period_id == statement.billing_period_id,
+                    statements.c.pi_email == statement.pi_email,
+                    project_match,
+                )
+            ).fetchone()
+
             values = {
-                "billing_period_id": statement.billing_period_id,
-                "pi_email": statement.pi_email,
-                "project_id": statement.project_id,
                 "fund_org": statement.fund_org,
                 "total_cost": statement.total_cost,
                 "project_count": statement.project_count,
                 "pdf_path": statement.pdf_path,
                 "generated_at": datetime.now(),
             }
-            stmt = self._upsert(
-                statements,
-                values,
-                index_elements=["billing_period_id", "pi_email", "project_id"],
-                update_columns=["total_cost", "fund_org", "project_count", "pdf_path", "generated_at"],
+            if existing:
+                conn.execute(
+                    update(statements)
+                    .where(statements.c.id == existing.id)
+                    .values(**values)
+                )
+                return int(existing.id)
+
+            result = conn.execute(statements.insert().values(
+                billing_period_id=statement.billing_period_id,
+                pi_email=statement.pi_email,
+                project_id=statement.project_id,
+                **values,
+            ))
+            return int(result.inserted_primary_key[0])  # type: ignore[index]
+
+    def prune_statements(self, billing_period_id: int, keep_ids: list[int]) -> int:
+        """Delete statements for a period that are not in keep_ids.
+
+        Called after regeneration so statements for PI/project combinations
+        that no longer exist (e.g. all their charges were rejected) don't
+        linger in the UI and the close package.
+        """
+        with self.engine.begin() as conn:
+            stmt = delete(statements).where(
+                statements.c.billing_period_id == billing_period_id
             )
+            if keep_ids:
+                stmt = stmt.where(statements.c.id.notin_(keep_ids))
             result = conn.execute(stmt)
-            return result.inserted_primary_key[0] if result.inserted_primary_key else 0
+            return int(result.rowcount or 0)
 
     def get_statements_for_period(self, billing_period_id: int) -> list[Statement]:
         """Get all statements for a billing period."""
@@ -829,12 +957,16 @@ class Database:
 
         with self.engine.connect() as conn:
             # Total charges and cost
+            # Rejected charges are excluded everywhere money is summed —
+            # the dashboard must agree with statements and exports.
             stmt = select(
                 func.count(charges.c.id).label("charge_count"),
                 func.coalesce(func.sum(charges.c.billed_cost), 0).label("total_cost"),
                 func.count(func.distinct(charges.c.pi_email)).label("pi_count"),
                 func.count(func.distinct(charges.c.project_id)).label("project_count"),
-            ).where(charges.c.billing_period_id == billing_period_id)
+            ).where(
+                charges.c.billing_period_id == billing_period_id
+            ).where(charges.c.rejected_at.is_(None))
             row = conn.execute(stmt).fetchone()
 
             # Flagged charges
@@ -845,7 +977,7 @@ class Database:
                 charges.c.billing_period_id == billing_period_id
             ).where(
                 charges.c.needs_review == True  # noqa: E712
-            )
+            ).where(charges.c.rejected_at.is_(None))
             flagged_row = conn.execute(flagged_stmt).fetchone()
 
             return {
@@ -902,6 +1034,7 @@ class Database:
                     func.count(func.distinct(charges.c.project_id)).label("project_count"),
                 )
                 .where(charges.c.billing_period_id == billing_period_id)
+                .where(charges.c.rejected_at.is_(None))
                 .group_by(charges.c.pi_email)
                 .order_by(func.sum(charges.c.billed_cost).desc())
                 .limit(limit)
@@ -1046,6 +1179,29 @@ class Database:
                 result.append(EmailLog(**row_dict))
             return result
 
+    def get_email_logs_for_period(self, billing_period_id: int) -> list[EmailLog]:
+        """Get email logs for one period, linked via statement_id.
+
+        Used by the close package: the proof-of-send log must be scoped to
+        the period and deterministically ordered, or the package hash drifts
+        as unrelated email history accrues. No limit — truncation here would
+        silently drop proof-of-send lines.
+        """
+        with self.engine.connect() as conn:
+            stmt = (
+                select(email_logs)
+                .join(statements, email_logs.c.statement_id == statements.c.id)
+                .where(statements.c.billing_period_id == billing_period_id)
+                .order_by(email_logs.c.sent_at.asc(), email_logs.c.id.asc())
+            )
+            rows = conn.execute(stmt).fetchall()
+            result = []
+            for row in rows:
+                row_dict = _row_to_dict(row)
+                row_dict["sent_at"] = _format_datetime(row_dict["sent_at"])
+                result.append(EmailLog(**row_dict))
+            return result
+
     # Project operations
 
     def get_projects_summary(
@@ -1072,47 +1228,31 @@ class Database:
                     func.max(charges.c.fund_org).label("fund_org"),
                 )
                 .where(charges.c.project_id.isnot(None))
+                .where(charges.c.rejected_at.is_(None))
                 .group_by(charges.c.project_id, charges.c.pi_email)
             )
 
-            count_stmt = (
-                select(func.count())
-                .select_from(
+            def build_count_stmt() -> Any:
+                base_q = (
                     select(charges.c.project_id, charges.c.pi_email)
                     .where(charges.c.project_id.isnot(None))
-                    .group_by(charges.c.project_id, charges.c.pi_email)
-                    .subquery()
+                    .where(charges.c.rejected_at.is_(None))
                 )
-            )
+                if billing_period_id:
+                    base_q = base_q.where(charges.c.billing_period_id == billing_period_id)
+                if pi_email:
+                    base_q = base_q.where(charges.c.pi_email == pi_email)
+                return select(func.count()).select_from(
+                    base_q.group_by(charges.c.project_id, charges.c.pi_email).subquery()
+                )
+
+            count_stmt = build_count_stmt()
 
             # Apply filters
             if billing_period_id:
                 stmt = stmt.where(charges.c.billing_period_id == billing_period_id)
-                # Rebuild count statement with filter
-                count_stmt = (
-                    select(func.count())
-                    .select_from(
-                        select(charges.c.project_id, charges.c.pi_email)
-                        .where(charges.c.project_id.isnot(None))
-                        .where(charges.c.billing_period_id == billing_period_id)
-                        .group_by(charges.c.project_id, charges.c.pi_email)
-                        .subquery()
-                    )
-                )
-
             if pi_email:
                 stmt = stmt.where(charges.c.pi_email == pi_email)
-                # Rebuild count statement with filter
-                base_q = (
-                    select(charges.c.project_id, charges.c.pi_email)
-                    .where(charges.c.project_id.isnot(None))
-                    .where(charges.c.pi_email == pi_email)
-                )
-                if billing_period_id:
-                    base_q = base_q.where(charges.c.billing_period_id == billing_period_id)
-                count_stmt = select(func.count()).select_from(
-                    base_q.group_by(charges.c.project_id, charges.c.pi_email).subquery()
-                )
 
             # Get total count
             total = conn.execute(count_stmt).scalar() or 0
@@ -1140,9 +1280,10 @@ class Database:
         project_id: str,
         billing_period_id: int | None = None,
     ) -> list[Charge]:
-        """Get all charges for a specific project."""
+        """Get all charges for a specific project (excludes rejected)."""
         with self.engine.connect() as conn:
             stmt = select(charges).where(charges.c.project_id == project_id)
+            stmt = stmt.where(charges.c.rejected_at.is_(None))
 
             if billing_period_id:
                 stmt = stmt.where(charges.c.billing_period_id == billing_period_id)

@@ -8,7 +8,7 @@ from typing import Any
 import pandas as pd
 
 from ..config import Config
-from ..db.repository import Charge, Database, Import
+from ..db.repository import Charge, Database, Import, PeriodLockedError
 from .base import BaseIngester, IngestResult
 
 # FOCUS specification column names
@@ -17,6 +17,8 @@ FOCUS_COLUMNS = {
     "BillingPeriodEnd": "billing_period_end",
     "ChargePeriodStart": "charge_period_start",
     "ChargePeriodEnd": "charge_period_end",
+    "ChargeCategory": "charge_category",
+    "SkuId": "sku_id",
     "ListCost": "list_cost",
     "ContractedCost": "contracted_cost",
     "BilledCost": "billed_cost",
@@ -84,6 +86,47 @@ def parse_tags(tags_value: str | dict[str, Any] | None, tag_mapping: dict[str, s
             result[internal_name] = tags[tag_key]
 
     return result
+
+
+def _cell(row: Any, name: str) -> str:
+    """Read a CSV cell as a string, with NaN/missing collapsing to ''."""
+    value = row.get(name, "")
+    return "" if pd.isna(value) else str(value)
+
+
+def _disambiguate_key_collisions(charges: list[Charge]) -> None:
+    """Make natural keys unique within one file's rows for a period.
+
+    FOCUS files legitimately contain rows that collide on (resource_id,
+    charge_period_start, charge_category, sku_id) — e.g. resource-less
+    service fees, or exports without SkuId. The old behavior let the last
+    row silently overwrite the rest. Instead, suffix colliding rows'
+    sku_id with '#2', '#3', ... in CONTENT-SORTED order: every row (and
+    every dollar) survives, and because the order is derived from content
+    rather than file position, re-importing the same data — in any row
+    order — maps each row back to the same database identity.
+    """
+    groups: dict[tuple[str, str, str, str], list[Charge]] = {}
+    for charge in charges:
+        key = (
+            charge.resource_id or "",
+            charge.charge_period_start or "",
+            charge.charge_category or "",
+            charge.sku_id or "",
+        )
+        groups.setdefault(key, []).append(charge)
+
+    for group in groups.values():
+        if len(group) < 2:
+            continue
+        group.sort(key=lambda c: repr((
+            c.billed_cost, c.list_cost, c.contracted_cost, c.effective_cost,
+            c.charge_period_end, c.resource_name, c.service_name,
+            c.pi_email, c.project_id, c.fund_org,
+            c.reference_1, c.reference_2, c.raw_tags,
+        )))
+        for i, charge in enumerate(group[1:], start=2):
+            charge.sku_id = f"{charge.sku_id}#{i}"
 
 
 class FocusIngester(BaseIngester):
@@ -285,20 +328,29 @@ class FocusIngester(BaseIngester):
                 needs_review = True
                 review_reason = review_reason or f"pattern_match:{matched_pattern}"
 
+            # Natural-key components are '' (never None) so SQL UNIQUE
+            # semantics and dedup agree on row identity.
+            resource_id = _cell(row, "resource_id")
+            charge_period_start = _cell(row, "charge_period_start")
+            charge_category = _cell(row, "charge_category")
+            sku_id = _cell(row, "sku_id")
+
             # Create charge object
             charge = Charge(
                 id=None,
                 billing_period_id=0,  # Will be set when inserting
                 source_id=source.id if source else 0,
-                charge_period_start=str(row.get("charge_period_start", "")) if not pd.isna(row.get("charge_period_start")) else None,
-                charge_period_end=str(row.get("charge_period_end", "")) if not pd.isna(row.get("charge_period_end")) else None,
+                charge_period_start=charge_period_start,
+                charge_period_end=_cell(row, "charge_period_end") or None,
+                charge_category=charge_category,
+                sku_id=sku_id,
                 list_cost=list_cost,
                 contracted_cost=contracted_cost,
                 billed_cost=billed_cost,
                 effective_cost=effective_cost,
-                resource_id=str(row.get("resource_id", "")) if not pd.isna(row.get("resource_id")) else None,
-                resource_name=str(row.get("resource_name", "")) if not pd.isna(row.get("resource_name")) else None,
-                service_name=str(row.get("service_name", "")) if not pd.isna(row.get("service_name")) else None,
+                resource_id=resource_id,
+                resource_name=_cell(row, "resource_name") or None,
+                service_name=_cell(row, "service_name") or None,
                 pi_email=pi_email,
                 project_id=tags.get("project_id"),
                 fund_org=tags.get("fund_org"),
@@ -323,18 +375,45 @@ class FocusIngester(BaseIngester):
 
         result.periods = sorted(periods_seen)
 
+        # Rows that collide on the natural key within one file (common for
+        # resource-less service fees) are deterministically disambiguated so
+        # every row survives and re-imports stay idempotent.
+        for charges in period_charges.values():
+            _disambiguate_key_collisions(charges)
+
         # Insert charges to database (grouped by period)
         if self.db and not self.dry_run:
             for period, charges in period_charges.items():
                 # Get or create billing period
                 billing_period = self.db.get_or_create_period(period)
 
+                # Lifecycle guard: rows are grouped by the period parsed from
+                # the row itself, so this check cannot be sidestepped by
+                # uploading "against" a different period. insert_charges
+                # raises the same error as a backstop.
+                if billing_period.status != "open":
+                    result.errors.append(
+                        f"Period {period} is {billing_period.status}: "
+                        f"{len(charges)} row(s) not imported. Reopen the "
+                        "period to import corrections."
+                    )
+                    result.total_rows -= len(charges)
+                    result.total_cost -= sum(c.billed_cost for c in charges)
+                    blocked_flagged = [c for c in charges if c.needs_review]
+                    result.flagged_rows -= len(blocked_flagged)
+                    result.flagged_cost -= sum(c.billed_cost for c in blocked_flagged)
+                    continue
+
                 # Set billing_period_id on all charges
                 for charge in charges:
                     charge.billing_period_id = billing_period.id
 
                 # Insert charges and track counts
-                counts = self.db.insert_charges(charges)
+                try:
+                    counts = self.db.insert_charges(charges)
+                except PeriodLockedError as e:
+                    result.errors.append(str(e))
+                    continue
                 result.inserted_rows += counts["inserted"]
                 result.updated_rows += counts["updated"]
                 result.skipped_rows += counts["skipped"]

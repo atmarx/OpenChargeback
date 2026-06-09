@@ -182,6 +182,7 @@ def generate_statements(
     config.output.pdf_dir.mkdir(parents=True, exist_ok=True)
 
     # Generate statements for each PI — one statement per project
+    all_statement_ids: list[int] = []
     for pi_email, summary in pi_summaries.items():
         pdf_paths: list[str] = []
         statement_ids: list[int] = []
@@ -217,6 +218,7 @@ def generate_statements(
                 )
                 statement_id = db.upsert_statement(statement)
                 statement_ids.append(statement_id)
+                all_statement_ids.append(statement_id)
                 result.statements_generated += 1
             else:
                 result.statements_generated += 1
@@ -247,5 +249,11 @@ def generate_statements(
                     pi_email=pi_email,
                     total_cost=summary.total_cost,
                 )
+
+    # Remove statements for PI/project combinations that no longer exist
+    # (e.g. all their charges were rejected since the last run) so stale
+    # rows don't linger in the UI or the close package.
+    if not dry_run:
+        db.prune_statements(billing_period.id, keep_ids=all_statement_ids)
 
     return result
