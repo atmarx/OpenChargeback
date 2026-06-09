@@ -75,12 +75,15 @@ Charges are flagged for manual review when they don't meet validation rules.
 
 | Reason | Description |
 |--------|-------------|
-| `missing_pi_email` | No PI email in tags |
-| `missing_project_id` | No project identifier |
+| `missing_project` | No project identifier |
 | `missing_fund_org` | No fund/org code |
 | `invalid_fund_org` | Fund/org doesn't match required pattern |
-| `pattern_match` | Matches a flag pattern (e.g., GPU instance) |
+| `pattern_match:<pattern>` | Matches a flag pattern (e.g., GPU instance) |
 | `period_mismatch` | Charge date doesn't match import period |
+
+> **Note**: Rows with no PI email are **not** flagged — they are skipped
+> entirely and reported as an import error ("Missing pi_email tag").  Fix the
+> source data and re-import to capture them.
 
 ### Review Actions
 
@@ -152,7 +155,7 @@ Each statement includes:
 
 ### Dev Mode
 
-When `dev_mode: true`, emails are saved to `output/emails/` instead of sent. Use this for testing the full workflow.
+When `dev_mode: true`, emails are saved to `instance/output/emails/` instead of sent. Use this for testing the full workflow.
 
 ---
 

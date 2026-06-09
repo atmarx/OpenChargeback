@@ -25,9 +25,12 @@ Charges without required attribution tags are flagged:
 
 | Tag | Flag Reason |
 |-----|-------------|
-| `pi_email` | `missing_pi_email` - Cannot attribute charge |
-| `project_id` | `missing_project_id` - No project context |
+| `project_id` | `missing_project` - No project context |
 | `fund_org` | `missing_fund_org` - No billing code |
+
+A missing `pi_email` tag is different: the row cannot be attributed at all, so
+it is **skipped** during import and reported as an error ("Missing pi_email
+tag") rather than flagged.
 
 ### Fund/Org Validation
 

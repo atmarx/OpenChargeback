@@ -75,7 +75,7 @@ Every charge is tagged at the source with:
 | Project ID | Groups charges by research project |
 | Fund/Org | Accounting code for the correct grant or department |
 
-Charges missing these tags are held for review rather than silently excluded.
+Charges missing a project or fund/org tag are held for review rather than silently excluded.  Charges missing a PI email cannot be attributed at all, so they are excluded from the import and reported as errors for correction at the source.
 
 ## Discount Visibility
 

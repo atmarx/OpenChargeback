@@ -55,7 +55,8 @@ docs/
 │   ├── README.md
 │   ├── authentication.md    # User auth and sessions
 │   ├── data-protection.md   # Data handling and privacy
-│   └── audit-trail.md       # Audit logging
+│   ├── audit-trail.md       # Audit logging
+│   └── supply-chain.md      # Dependency and supply-chain security
 │
 ├── integrations/            # Cloud provider integrations
 │   ├── README.md            # Overview and patterns
@@ -92,4 +93,4 @@ docs/
 
 ## Version
 
-This documentation is for OpenChargeback v0.3.x.
+This documentation is for OpenChargeback v0.4.x.

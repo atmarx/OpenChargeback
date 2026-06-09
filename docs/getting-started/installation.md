@@ -46,7 +46,7 @@ See [Operations: Docker](../operations/docker.md) for production deployment deta
 openchargeback --help
 
 # Check version
-openchargeback --version
+openchargeback version
 ```
 
 ## Directory Structure
@@ -61,7 +61,8 @@ openchargeback/
 │   └── output/            # Generated files
 │       ├── pdfs/          # PDF statements
 │       ├── journals/      # Journal exports
-│       └── emails/        # Dev mode email files
+│       ├── emails/        # Dev mode email files
+│       └── archive/       # Retained source file originals (feeds the close package)
 ├── templates/             # Custom template overrides
 │   ├── statement.html     # PDF template
 │   ├── email_summary.html # Email template

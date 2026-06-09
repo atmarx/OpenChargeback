@@ -97,8 +97,10 @@ CONFIG=/etc/openchargeback/config.yaml
 openchargeback ingest /data/aws_${PERIOD}.csv -s aws -p $PERIOD -c $CONFIG
 openchargeback ingest /data/azure_${PERIOD}.csv -s azure -p $PERIOD -c $CONFIG
 openchargeback generate -p $PERIOD -c $CONFIG --send
-openchargeback export-journal -p $PERIOD -f gl -c $CONFIG
+openchargeback export-journal -p $PERIOD -c $CONFIG
 ```
+
+The CLI exports the standard detail journal format; GL (debit/credit) and custom-template exports live in the web UI's Journal Export page.
 
 Statements go out, journals land in a shared folder for accounting—no web clicks required. Use the web UI for exceptions: reviewing flagged charges, adjusting patterns, one-off resends.
 
@@ -127,7 +129,7 @@ Additional resources:
 
 ```bash
 pip install -e ".[dev]"
-pytest                    # 239 tests
+pytest                    # 289 tests
 mypy src/                 # Type checking
 ruff check src/           # Linting
 ```

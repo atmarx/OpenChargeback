@@ -6,7 +6,7 @@ The web interface provides a dashboard for managing billing periods, reviewing c
 
 ```bash
 # From CLI
-openchargeback web
+openchargeback serve
 
 # Or with Docker
 docker compose -f docker/docker-compose.yml up -d
@@ -69,7 +69,7 @@ Generate PDF statements and send emails:
 
 1. Select a period
 2. Preview statement list
-3. Generate PDFs (saved to `output/pdfs/`)
+3. Generate PDFs (saved to `instance/output/pdfs/`)
 4. Send emails to PIs
 
 In `dev_mode`, emails are saved to files instead of sent via SMTP.
@@ -135,8 +135,8 @@ The sidebar provides quick access to all sections. The top bar shows:
 
 | Role | Permissions |
 |------|-------------|
-| **admin** | Full access, manage users, finalize periods |
-| **reviewer** | Import, review, generate statements |
+| **admin** | Full access: import data, manage periods, generate and send statements, manage users |
+| **reviewer** | Review charges, export journals |
 | **viewer** | Read-only access |
 
 ---
@@ -145,7 +145,7 @@ The sidebar provides quick access to all sections. The top bar shows:
 
 When `dev_mode: true` in config:
 
-- Emails are saved to `output/emails/` instead of sent
+- Emails are saved to `instance/output/emails/` instead of sent
 - Additional debugging options available in Settings
 - Database reset options enabled
 

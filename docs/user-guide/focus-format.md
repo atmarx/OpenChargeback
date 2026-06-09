@@ -107,7 +107,10 @@ During import, OpenChargeback validates:
 4. **Fund/org format**: If `fund_org_patterns` configured, validates format
 5. **Period consistency**: If `--period` specified, flags mismatches
 
-Charges failing validation are flagged for review rather than rejected outright.
+Most validation failures flag the charge for review rather than rejecting it.
+The exception is a missing `pi_email` tag: those rows are **excluded** from the
+import and reported as errors in the import summary — fix the source data and
+re-import to capture them.
 
 ---
 

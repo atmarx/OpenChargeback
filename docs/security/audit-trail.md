@@ -1,85 +1,109 @@
 # Audit Trail
 
-OpenChargeback maintains comprehensive audit trails for compliance and troubleshooting.
+OpenChargeback maintains audit trails for compliance and troubleshooting.
 
 ## Audit Sources
 
 ### 1. Application Logs
 
-Structured logs capture all significant events. See [Logging](../operations/logging.md) for configuration.
+Structured logs capture significant events. See [Logging](../operations/logging.md) for configuration.
+
+Audit events are emitted by `openchargeback.audit` as structured log lines.  Event
+names are dotted, in the form `{event_type}.{action}` (e.g. `import.completed`,
+`period.closed`).  Every event carries its event-specific fields plus a `user`
+field where applicable (defaulting to `system` for CLI/unattended operations).
 
 ### 2. Database Tables
 
 | Table | Audit Purpose |
 |-------|---------------|
-| `imports` | Who imported what, when |
-| `statements` | When statements were generated |
-| `email_logs` | Email delivery tracking |
+| `imports` | What was imported, when, into which period |
+| `statements` | When statements were generated and sent |
+| `email_logs` | Email delivery tracking (who sent, to whom, status) |
+| `journal_exports` | Journal export history (format, row count, who exported) |
 | `review_logs` | Charge approval/rejection history |
-| `billing_periods` | Period status changes with notes |
+| `billing_periods` | Period status changes (closed/reopened/finalized, by whom) |
 
 ### 3. File System
 
+Default paths (configurable under `output:` in config.yaml):
+
 | Location | Audit Purpose |
 |----------|---------------|
-| `output/pdfs/` | Generated statements (timestamped) |
-| `output/journals/` | Exported journals (timestamped) |
-| `output/emails/` | Email content (dev mode) |
+| `instance/output/pdfs/` | Generated statements (timestamped) |
+| `instance/output/journals/` | Exported journals (timestamped) |
+| `instance/output/emails/` | Email content (dev mode) |
+| `instance/output/archive/` | Retained originals of uploaded source files (feeds the close package) |
 
 ## Auditable Events
 
-### Authentication Events
-
-| Event | Logged Data |
-|-------|-------------|
-| `login_success` | User email, timestamp, IP (if configured) |
-| `login_failed` | Attempted email, timestamp, failure reason |
-| `logout` | User email, timestamp |
-| `session_expired` | User email, timestamp |
+These are the events actually emitted by `openchargeback.audit`:
 
 ### Data Import Events
 
 | Event | Logged Data |
 |-------|-------------|
-| `import_started` | User, source, filename, timestamp |
-| `import_completed` | Charge count, total amount, period |
-| `import_failed` | Error message, partial data if any |
-| `charges_flagged` | Count, reasons |
+| `import.completed` | filename, source, period, row_count, total_cost, flagged_count, user |
+
+### Export Events
+
+| Event | Logged Data |
+|-------|-------------|
+| `export.journal` | period, format, row_count, total_cost, include_flagged, user |
+| `export.close_package` | period, filename, sha256, user |
 
 ### Review Events
 
 | Event | Logged Data |
 |-------|-------------|
-| `charge_approved` | Charge ID, user, timestamp |
-| `charge_rejected` | Charge ID, user, timestamp, reason |
-| `bulk_approve` | Period, count, user |
+| `charge.approved` | charge_id, period, pi_email, amount, note, user |
+| `charge.rejected` | charge_id, period, pi_email, amount, reason, user |
+| `charge.bulk_approved` | period, count, total_amount, user |
 
-### Statement Events
+### Statement and Email Events
 
 | Event | Logged Data |
 |-------|-------------|
-| `statement_generated` | PI, period, filename, user |
-| `email_sent` | Recipient, period, timestamp |
-| `email_failed` | Recipient, error message |
+| `statement.generated` | period, pi_email, total_cost, charge_count, pdf_path |
+| `statement.sent` | period, pi_email, total_cost, user |
+| `email.success` | recipient, subject, status |
+| `email.error` | recipient, subject, status, error |
+| `email.dev_mode` | recipient, subject, status |
 
 ### Period Management Events
 
 | Event | Logged Data |
 |-------|-------------|
-| `period_created` | Period, user |
-| `period_closed` | Period, user |
-| `period_reopened` | Period, user |
-| `period_finalized` | Period, user, notes |
+| `period.created` | period, user |
+| `period.closed` | period, total_cost, charge_count, user |
+| `period.reopened` | period, reason, user |
+| `period.finalized` | period, total_cost, statement_count, user |
 
-### Administrative Events
+### User Management Events
 
 | Event | Logged Data |
 |-------|-------------|
-| `user_created` | Email, role, created_by |
-| `user_modified` | Email, changes, modified_by |
-| `settings_changed` | Setting name, old/new values, user |
+| `user.created` | username, email, role, created_by |
+| `user.updated` | username, changes, user |
+| `user.deleted` | username, user |
+| `user.password_reset` | username, user |
+| `user.password_changed` | username |
+
+### Not Yet Implemented
+
+The following are **not** currently emitted as audit events.  Do not build
+compliance reporting on them:
+
+- Authentication events (`login`, `logout`, failed logins, session expiry).
+  Login attempts are not audit-logged today; if you need authentication
+  auditing, capture it at the reverse proxy / SSO layer.
+- Settings changes (review patterns, fund/org patterns).
+- A separate "import started" / "charges flagged" event — flag counts are
+  carried on `import.completed` instead.
 
 ## Database Audit Tables
+
+Column names below match the real schema (`src/openchargeback/db/tables.py`).
 
 ### imports Table
 
@@ -88,14 +112,30 @@ SELECT
     id,
     source_id,
     filename,
-    billing_period,
-    charge_count,
+    billing_period_id,
+    row_count,
+    flagged_rows,
     total_cost,
-    imported_at,
-    imported_by
+    imported_at
 FROM imports
 WHERE imported_at > '2025-01-01'
 ORDER BY imported_at DESC;
+```
+
+### journal_exports Table
+
+```sql
+SELECT
+    billing_period_id,
+    format,
+    include_flagged,
+    row_count,
+    total_cost,
+    exported_at,
+    exported_by,
+    filename
+FROM journal_exports
+ORDER BY exported_at DESC;
 ```
 
 ### review_logs Table
@@ -104,25 +144,27 @@ ORDER BY imported_at DESC;
 SELECT
     charge_id,
     action,  -- 'approved' or 'rejected'
-    user_email,
-    timestamp,
-    notes
+    performed_by,
+    performed_at,
+    note
 FROM review_logs
-WHERE timestamp > '2025-01-01'
-ORDER BY timestamp DESC;
+WHERE performed_at > '2025-01-01'
+ORDER BY performed_at DESC;
 ```
 
 ### billing_periods Table
 
-Includes finalization notes:
+Includes who closed/finalized each period and any notes:
 
 ```sql
 SELECT
     period,
     status,
+    closed_at,
+    closed_by,
     finalized_at,
     finalized_by,
-    finalization_notes
+    notes
 FROM billing_periods
 WHERE status = 'finalized';
 ```
@@ -135,22 +177,16 @@ WHERE status = 'finalized';
 grep "level=ERROR" openchargeback.log | tail -20
 ```
 
-### Failed Logins (Past 24 Hours)
-
-```bash
-grep "login_failed" openchargeback.log | grep "$(date -d 'yesterday' +%Y-%m-%d)"
-```
-
 ### Import History
 
 ```bash
-grep "import_completed" openchargeback.log | grep "period=2025-01"
+grep "import.completed" openchargeback.log | grep "period=2025-01"
 ```
 
 ### Email Delivery Issues
 
 ```bash
-grep "email_failed" openchargeback.log
+grep "email.error" openchargeback.log
 ```
 
 ## Splunk Queries
@@ -160,20 +196,15 @@ For Splunk-indexed logs:
 ```spl
 # All activity by user
 index=openchargeback user="admin@example.edu"
-| table _time event action details
+| table _time event_type action
 
 # Import summary by period
-index=openchargeback event="import_completed"
-| stats sum(charge_count) as charges, sum(total_cost) as cost by period
-
-# Failed authentications
-index=openchargeback event="login_failed"
-| stats count by email
-| sort -count
+index=openchargeback event_type="import" action="completed"
+| stats sum(row_count) as rows, sum(total_cost) as cost by period
 
 # Review activity
-index=openchargeback event IN ("charge_approved", "charge_rejected")
-| timechart count by event
+index=openchargeback event_type="charge" action IN ("approved", "rejected")
+| timechart count by action
 ```
 
 ## Compliance Considerations
@@ -185,6 +216,7 @@ For financial audits, provide:
 2. Review logs showing approval workflow
 3. Statement generation records
 4. Journal export files
+5. The period close package (hashed archive of all of the above)
 
 ```sql
 -- Comprehensive audit report for period
@@ -193,30 +225,26 @@ SELECT
     c.billed_cost,
     c.pi_email,
     c.fund_org,
-    i.filename as source_file,
-    i.imported_at,
-    CASE WHEN c.flagged THEN 'flagged' ELSE 'auto-approved' END as review_status,
+    CASE WHEN c.needs_review THEN 'flagged' ELSE 'auto-approved' END as review_status,
     rl.action as review_action,
-    rl.user_email as reviewed_by,
-    rl.timestamp as reviewed_at
+    rl.performed_by as reviewed_by,
+    rl.performed_at as reviewed_at
 FROM charges c
-LEFT JOIN imports i ON c.import_id = i.id
+JOIN billing_periods bp ON c.billing_period_id = bp.id
 LEFT JOIN review_logs rl ON c.id = rl.charge_id
-WHERE c.billing_period = '2025-01'
+WHERE bp.period = '2025-01'
 ORDER BY c.id;
 ```
+
+Note: charges are not linked row-by-row to a specific import record; use the
+`imports` table (filtered by `billing_period_id` and `source_id`) to show which
+files fed a period.
 
 ### Data Retention
 
 - Logs should be retained per institutional policy
 - Database tables maintain full history
 - Finalized periods are permanent records
-
-### Access Audits
-
-- All authenticated access goes through session system
-- Login attempts are logged regardless of success
-- No anonymous access to any data
 
 ## Best Practices
 
@@ -235,7 +263,6 @@ ORDER BY c.id;
 
 ### Regular Reviews
 
-- Weekly: Review failed login attempts
 - Monthly: Review import activity
 - Quarterly: Full audit trail review
 - Annually: Compliance audit
@@ -245,4 +272,4 @@ ORDER BY c.id;
 Audit data should be included in regular backups:
 - Database (includes all audit tables)
 - Log files (separate backup recommended)
-- Generated files (statements, journals)
+- Generated files (statements, journals, close packages)

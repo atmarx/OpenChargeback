@@ -22,6 +22,7 @@ database:
 | `statements` | Generated statement records |
 | `imports` | Import log tracking what was loaded |
 | `email_logs` | Email delivery audit trail |
+| `journal_exports` | Journal export audit trail |
 | `users` | Database-managed users (not config users) |
 | `review_logs` | Charge review action audit trail |
 
@@ -78,7 +79,7 @@ If the schema is corrupted or needs reset:
 ```bash
 # Delete and let app recreate
 rm instance/billing.db
-openchargeback web  # Will create new database
+openchargeback serve  # Will create new database
 ```
 
 > **Warning**: This deletes all data. Use only in development or after backup.

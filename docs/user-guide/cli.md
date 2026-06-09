@@ -166,17 +166,18 @@ See [Admin Guide: Journal Export](../admin-guide/journal-export.md) for details 
 
 ---
 
-### web
+### serve
 
 Start the web interface.
 
 ```bash
-openchargeback web --host 0.0.0.0 --port 8000
+openchargeback serve --host 0.0.0.0 --port 8000
 ```
 
 **Options:**
 - `--host`: Bind address (default: from config, or 127.0.0.1)
 - `--port`: Port number (default: from config, or 8000)
+- `--reload`: Enable auto-reload for development
 - `--config`: Path to config file
 
 ---

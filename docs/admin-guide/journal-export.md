@@ -11,47 +11,77 @@ This guide covers exporting billing data for your accounting system (Banner, Wor
 
 OpenChargeback supports multiple export formats to match your institution's needs.
 
-### Standard Detail
+### Standard Detail (web UI)
 
 One row per charge. Best for audit trails and detailed analysis.
 
 | Column | Description |
 |--------|-------------|
-| BillingPeriod | Period (YYYY-MM) |
-| PIEmail | PI's email address |
-| ProjectID | Project identifier |
-| FundOrg | Fund/org code |
-| ServiceName | Service category |
-| Amount | Billed cost |
-| ResourceCount | Number of resources |
+| period | Period (YYYY-MM) |
+| pi_email | PI's email address |
+| project_id | Project identifier |
+| fund_org | Fund/org code |
+| service_name | Service category |
+| resource_id | Resource identifier |
+| resource_name | Resource display name |
+| billed_cost | Billed cost |
+| list_cost | List (undiscounted) cost, if available |
+| discount_amount | Discount, if available |
 
-### Summary by PI/Project
+The CLI `export-journal` command produces a similar detail format, aggregated by
+PI / project / service (columns: BillingPeriod, PIEmail, ProjectID, FundOrg,
+ServiceName, Amount, ResourceCount).  The CLI only implements this one format.
+
+### Summary by PI/Project (web UI)
 
 Aggregated totals. Best for simple charge summaries.
 
 | Column | Description |
 |--------|-------------|
-| BillingPeriod | Period |
-| PIEmail | PI's email |
-| ProjectID | Project |
-| FundOrg | Fund/org code |
-| TotalAmount | Sum of all charges |
+| period | Period |
+| pi_email | PI's email |
+| project_id | Project |
+| fund_org | Fund/org code |
+| total_cost | Sum of all charges |
+| charge_count | Number of charges |
 
-### General Ledger (Debit/Credit)
+### General Ledger (web UI)
 
-Double-entry format. Best for institutions requiring balanced entries.
+A simple double-entry format.  Creates one **debit** row per fund/org (the sum
+of that fund/org's charges) and a single balancing **credit** row to a
+hardcoded `CLOUD-CLEARING` account.
 
-Creates:
-- **Debit entries**: Charges to PI's fund_org (expense)
-- **Credit entries**: Offsetting entries to service provider's fund_org (revenue)
+| Column | Description |
+|--------|-------------|
+| period | Period |
+| account | Fund/org code (debits) or `CLOUD-CLEARING` (credit) |
+| description | "Cloud computing charges - {period}" |
+| debit | Debit amount |
+| credit | Credit amount |
+
+This format does **not** use account codes, `fund_org_regex` parsing, or
+per-source credit fund/orgs — those belong to the Custom Template export below.
+If your institution needs real GL account coding, use the template export.
 
 ### Custom Template (GL)
 
-Uses a Jinja2 template for your institution's specific format. See [Templates](templates.md) for customization.
+Uses a Jinja2 template for your institution's specific format.  This is the
+exporter that builds true balanced GL entries:
+
+- **Debit entries**: Charges to each PI's fund_org (expense), with account
+  codes resolved from charge tags, per-source config, or `journal.default_account`
+- **Credit entries**: Offsetting entries to each service provider's configured
+  fund_org (revenue)
+
+All of the `journal:` configuration below (fund/org parsing, account codes,
+credit fund/orgs) applies to this format.  See [Templates](templates.md) for
+template customization.
 
 ---
 
 ## Configuration
+
+These settings apply to the **Custom Template** export.
 
 ### Fund/Org Parsing
 
@@ -105,9 +135,9 @@ imports:
 
 ---
 
-## How Debit/Credit Works
+## How Debit/Credit Works (Custom Template export)
 
-For each billing period, the GL export creates balanced entries:
+For each billing period, the template export creates balanced entries:
 
 ### Example
 
@@ -156,10 +186,11 @@ openchargeback export-journal --period 2025-01 --output ./accounting/jan.csv
 
 ### Output Location
 
-Journals are saved to `output/journals/` by default:
+Web UI exports download directly in the browser.  CLI exports are saved to
+`instance/output/journals/` by default (configurable via `output.journal_dir`):
 
 ```
-output/journals/
+instance/output/journals/
 ├── journal_2025-01_20250205_120000.csv
 ├── journal_2025-01_20250205_143022.csv  # Re-export
 └── journal_2025-02_20250305_090000.csv

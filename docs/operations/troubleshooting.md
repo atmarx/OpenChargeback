@@ -36,9 +36,9 @@ openchargeback review list --period 2025-01
 2. If finalization was premature, there's no built-in undo (by design)
 3. For emergencies, direct database modification is possible but not recommended
 
-### "Missing required tag: pi_email"
+### "Missing pi_email tag"
 
-**Symptoms**: Many charges flagged with `missing_pi_email`.
+**Symptoms**: Import summary reports many "Missing pi_email tag" errors; those rows are skipped (not imported, not flagged).
 
 **Cause**: Source data doesn't include PI email in tags, or tag name doesn't match config.
 
@@ -229,7 +229,7 @@ location /static/ {
 **Solution**: For development, reset the database:
 ```bash
 rm instance/billing.db
-openchargeback web  # Recreates schema
+openchargeback serve  # Recreates schema
 ```
 
 For production, migrations would be needed (not currently implemented).

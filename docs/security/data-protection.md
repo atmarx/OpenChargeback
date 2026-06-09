@@ -62,9 +62,10 @@ smtp:
 
 | Directory | Contents | Sensitivity |
 |-----------|----------|-------------|
-| `output/pdfs/` | PDF statements | Contains PI charges - restrict access |
-| `output/journals/` | Accounting exports | Contains billing data |
-| `output/emails/` | Email files (dev mode) | Contains PI contact info |
+| `instance/output/pdfs/` | PDF statements | Contains PI charges - restrict access |
+| `instance/output/journals/` | Accounting exports | Contains billing data |
+| `instance/output/emails/` | Email files (dev mode) | Contains PI contact info |
+| `instance/output/archive/` | Retained source file originals | Contains raw billing data |
 | `logs/` | Application logs | May contain emails, amounts |
 
 Recommend restricting access:
@@ -111,10 +112,14 @@ No automatic data deletion. All data is retained until manually removed.
 
 ```sql
 -- Remove old charges (example: keep last 2 years)
-DELETE FROM charges WHERE billing_period < '2023-01';
+DELETE FROM charges WHERE billing_period_id IN (
+    SELECT id FROM billing_periods WHERE period < '2023-01'
+);
 
 -- Remove old statements
-DELETE FROM statements WHERE period < '2023-01';
+DELETE FROM statements WHERE billing_period_id IN (
+    SELECT id FROM billing_periods WHERE period < '2023-01'
+);
 
 -- Remove old import logs
 DELETE FROM imports WHERE imported_at < '2023-01-01';

@@ -391,7 +391,7 @@ Journal CSV columns: `BillingPeriod, PIEmail, ProjectID, FundOrg, ServiceName, A
 Start the web interface.
 
 ```bash
-openchargeback web --host 0.0.0.0 --port 8000
+openchargeback serve --host 0.0.0.0 --port 8000
 ```
 
 ---

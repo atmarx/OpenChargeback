@@ -62,6 +62,7 @@ output:
   pdf_dir: ./instance/output/pdfs
   journal_dir: ./instance/output/journals
   email_dir: ./instance/output/emails  # Used in dev_mode
+  archive_dir: ./instance/output/archive  # Retained originals of uploaded source files; feeds the monthly close package
 
 logging:
   level: INFO                     # DEBUG, INFO, WARN, ERROR

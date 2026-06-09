@@ -25,7 +25,7 @@ pip install -e ".[dev]"
 python -m pytest tests/ -v
 
 # Start development server
-openchargeback web
+openchargeback serve
 ```
 
 ## Project Structure

@@ -96,8 +96,8 @@ web:
 
 | Role | Permissions |
 |------|-------------|
-| `admin` | Full access: manage users, finalize periods, all operations |
-| `reviewer` | Import data, review charges, generate statements, export journals |
+| `admin` | Full access: import data, manage periods, generate/send statements, all operations |
+| `reviewer` | Review charges, export journals |
 | `viewer` | Read-only access to all data |
 
 ### Permission Matrix
@@ -106,11 +106,12 @@ web:
 |--------|-------|----------|--------|
 | View dashboard | ✓ | ✓ | ✓ |
 | View charges | ✓ | ✓ | ✓ |
-| Import data | ✓ | ✓ | ✗ |
+| Import data | ✓ | ✗ | ✗ |
 | Review charges | ✓ | ✓ | ✗ |
-| Generate statements | ✓ | ✓ | ✗ |
+| Generate statements | ✓ | ✗ | ✗ |
+| Send statements | ✓ | ✗ | ✗ |
 | Export journals | ✓ | ✓ | ✗ |
-| Close periods | ✓ | ✓ | ✗ |
+| Close periods | ✓ | ✗ | ✗ |
 | Finalize periods | ✓ | ✗ | ✗ |
 | Manage users | ✓ | ✗ | ✗ |
 | Change settings | ✓ | ✗ | ✗ |
