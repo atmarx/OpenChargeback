@@ -9,7 +9,17 @@ from rich.table import Table
 
 from . import __version__
 from .config import Config, load_config
-from .db.repository import Charge, Database
+from .db.repository import Charge, Database, PeriodLockedError
+
+
+def _cli_user() -> str:
+    """Attribute CLI actions to the OS user — audit fields must never be empty."""
+    import getpass
+
+    try:
+        return f"cli:{getpass.getuser()}"
+    except Exception:
+        return "cli:unknown"
 
 # Create Typer app with subcommands
 app = typer.Typer(
@@ -75,7 +85,9 @@ def ingest(
     config_path: ConfigOption = None,
 ) -> None:
     """Import billing data from a FOCUS CSV file."""
+    from . import audit
     from .ingest.focus import ingest_focus_file
+    from .output.close_package import archive_input_file
 
     config = get_config(config_path)
 
@@ -109,12 +121,38 @@ def ingest(
 
         console.print(table)
 
+        if not dry_run and db and not result.errors:
+            # Same forensic guarantees as the web upload path: retain the
+            # original source file for the close package and write the
+            # audit-trail entry. A CLI-driven month must not produce a close
+            # package with an empty inputs/ directory.
+            content = file.read_bytes()
+            for imported_period in result.periods:
+                archive_input_file(
+                    content=content,
+                    period=imported_period,
+                    source=source,
+                    filename=file.name,
+                    config=config,
+                )
+                audit.log_import(
+                    filename=file.name,
+                    source=source,
+                    period=imported_period,
+                    row_count=result.total_rows,
+                    total_cost=result.total_cost,
+                    flagged_count=result.flagged_rows,
+                    user=_cli_user(),
+                )
+
         if result.errors:
             console.print(f"\n[red]Errors ({len(result.errors)}):[/red]")
             for error in result.errors[:10]:  # Show first 10
                 console.print(f"  - {error}")
             if len(result.errors) > 10:
                 console.print(f"  ... and {len(result.errors) - 10} more")
+            # Scripted pipelines need a nonzero exit to detect a bad import.
+            raise typer.Exit(1)
 
     finally:
         if db:
@@ -327,12 +365,17 @@ def periods_close(
     db = get_db(config)
 
     try:
-        result = db.update_period_status(period, "closed", notes)
+        result = db.update_period_status(
+            period, "closed", notes, performed_by=_cli_user()
+        )
         if result:
             console.print(f"[green]Period {period} is now closed[/green]")
         else:
             console.print(f"[red]Period {period} not found[/red]")
             raise typer.Exit(1)
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1) from e
     finally:
         db.close()
 
@@ -348,12 +391,17 @@ def periods_finalize(
     db = get_db(config)
 
     try:
-        result = db.update_period_status(period, "finalized", notes)
+        result = db.update_period_status(
+            period, "finalized", notes, performed_by=_cli_user()
+        )
         if result:
             console.print(f"[green]Period {period} is now finalized[/green]")
         else:
             console.print(f"[red]Period {period} not found[/red]")
             raise typer.Exit(1)
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1) from e
     finally:
         db.close()
 
@@ -510,15 +558,45 @@ def review_approve(
 
     try:
         if charge_id:
-            db.approve_charge(charge_id)
-            console.print(f"[green]Charge {charge_id} approved[/green]")
+            charge = db.get_charge_by_id(charge_id)
+            if db.approve_charge(charge_id, performed_by=_cli_user()):
+                if charge:
+                    db.log_review_action(
+                        billing_period_id=charge.billing_period_id,
+                        charge_id=charge_id,
+                        action="approved",
+                        pi_email=charge.pi_email,
+                        amount=charge.billed_cost,
+                        resource_id=charge.resource_id,
+                        service_name=charge.service_name,
+                        performed_by=_cli_user(),
+                    )
+                console.print(f"[green]Charge {charge_id} approved[/green]")
+            else:
+                console.print(f"[red]Charge {charge_id} not found or not flagged[/red]")
+                raise typer.Exit(1)
         elif period:
             bp = db.get_period(period)
             if not bp:
                 console.print(f"[red]Period {period} not found[/red]")
                 raise typer.Exit(1)
-            count = db.approve_all_charges(bp.id)
+            flagged = db.get_flagged_charges(bp.id)
+            count = db.approve_all_charges(bp.id, performed_by=_cli_user())
+            for charge in flagged:
+                db.log_review_action(
+                    billing_period_id=bp.id,
+                    charge_id=charge.id,
+                    action="approved",
+                    pi_email=charge.pi_email,
+                    amount=charge.billed_cost,
+                    resource_id=charge.resource_id,
+                    service_name=charge.service_name,
+                    performed_by=_cli_user(),
+                )
             console.print(f"[green]{count} charges approved for {period}[/green]")
+    except PeriodLockedError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1) from e
     finally:
         db.close()
 
@@ -533,8 +611,26 @@ def review_reject(
     db = get_db(config)
 
     try:
-        db.reject_charge(charge_id)
-        console.print(f"[green]Charge {charge_id} removed[/green]")
+        charge = db.get_charge_by_id(charge_id)
+        if db.reject_charge(charge_id, performed_by=_cli_user()):
+            if charge:
+                db.log_review_action(
+                    billing_period_id=charge.billing_period_id,
+                    charge_id=charge_id,
+                    action="rejected",
+                    pi_email=charge.pi_email,
+                    amount=charge.billed_cost,
+                    resource_id=charge.resource_id,
+                    service_name=charge.service_name,
+                    performed_by=_cli_user(),
+                )
+            console.print(f"[green]Charge {charge_id} removed[/green]")
+        else:
+            console.print(f"[red]Charge {charge_id} not found or not flagged[/red]")
+            raise typer.Exit(1)
+    except PeriodLockedError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1) from e
     finally:
         db.close()
 

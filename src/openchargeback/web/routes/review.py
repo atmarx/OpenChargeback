@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from openchargeback import audit
 from openchargeback.db import Database
+from openchargeback.db.repository import PeriodLockedError
 from openchargeback.web.auth import User
 from openchargeback.web.deps import (
     add_flash_message,
@@ -112,7 +113,16 @@ async def approve_charge(
     charge = db.get_charge_by_id(charge_id)
     period = db.get_period_by_id(charge.billing_period_id) if charge else None
 
-    approved = db.approve_charge(charge_id, performed_by=user.display_name)
+    try:
+        approved = db.approve_charge(charge_id, performed_by=user.display_name)
+    except PeriodLockedError as e:
+        if request.headers.get("HX-Request"):
+            return Response(
+                content=f'<div class="alert alert-warning">{e}</div>',
+                media_type="text/html",
+            )
+        add_flash_message(request, "error", str(e))
+        return RedirectResponse(url="/review", status_code=303)
 
     if not approved:
         if request.headers.get("HX-Request"):
@@ -171,9 +181,18 @@ async def reject_charge(
     charge = db.get_charge_by_id(charge_id)
     period = db.get_period_by_id(charge.billing_period_id) if charge else None
 
-    rejected = db.reject_charge(
-        charge_id, performed_by=user.display_name, note=note.strip() if note else None
-    )
+    try:
+        rejected = db.reject_charge(
+            charge_id, performed_by=user.display_name, note=note.strip() if note else None
+        )
+    except PeriodLockedError as e:
+        if request.headers.get("HX-Request"):
+            return Response(
+                content=f'<div class="alert alert-warning">{e}</div>',
+                media_type="text/html",
+            )
+        add_flash_message(request, "error", str(e))
+        return RedirectResponse(url="/review", status_code=303)
 
     if not rejected:
         if request.headers.get("HX-Request"):
@@ -273,8 +292,12 @@ async def approve_selected_charges(
         charge = db.get_charge_by_id(charge_id)
         period = db.get_period_by_id(charge.billing_period_id) if charge else None
 
-        if not db.approve_charge(charge_id, performed_by=user.display_name):
-            continue  # Skip charges not in review queue
+        try:
+            if not db.approve_charge(charge_id, performed_by=user.display_name):
+                continue  # Skip charges not in review queue
+        except PeriodLockedError as e:
+            add_flash_message(request, "error", str(e))
+            break
 
         approved_count += 1
 
@@ -327,10 +350,14 @@ async def reject_selected_charges(
         charge = db.get_charge_by_id(charge_id)
         period = db.get_period_by_id(charge.billing_period_id) if charge else None
 
-        if not db.reject_charge(
-            charge_id, performed_by=user.display_name, note=note if note else None
-        ):
-            continue  # Skip charges not in review queue
+        try:
+            if not db.reject_charge(
+                charge_id, performed_by=user.display_name, note=note if note else None
+            ):
+                continue  # Skip charges not in review queue
+        except PeriodLockedError as e:
+            add_flash_message(request, "error", str(e))
+            break
 
         rejected_count += 1
 

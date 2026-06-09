@@ -94,9 +94,9 @@
         <div class="card-header">
             <h3 class="card-title">Imports</h3>
             {% if period.status == 'open' %}
-            <a href="/imports/upload?period={{ period.id }}" class="btn btn-sm btn-outline">
+            <button type="button" class="btn btn-sm btn-outline" onclick="openImportModal()">
                 <span>&#8593;</span> Import CSV
-            </a>
+            </button>
             {% endif %}
         </div>
         <div class="card-body">

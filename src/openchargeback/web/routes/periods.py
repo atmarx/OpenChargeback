@@ -217,7 +217,13 @@ async def close_period(
         add_flash_message(request, "error", "Period not found.")
         return RedirectResponse(url="/periods", status_code=303)
 
-    period = service.close_period(period_obj.id, performed_by=user.display_name)
+    try:
+        period = service.close_period(period_obj.id, performed_by=user.display_name)
+    except ValueError as e:
+        # Invalid transition (e.g. closing a finalized period from a stale
+        # tab) — a flash message, not a 500.
+        add_flash_message(request, "error", str(e))
+        return RedirectResponse(url=f"/periods/{period_slug}", status_code=303)
 
     if period:
         # Get stats for audit log
@@ -312,7 +318,11 @@ async def finalize_period(
         )
         return RedirectResponse(url=f"/periods/{period_slug}", status_code=303)
 
-    period = service.finalize_period(period_obj.id, performed_by=user.display_name)
+    try:
+        period = service.finalize_period(period_obj.id, performed_by=user.display_name)
+    except ValueError as e:
+        add_flash_message(request, "error", str(e))
+        return RedirectResponse(url=f"/periods/{period_slug}", status_code=303)
 
     if period:
         # Get stats for audit log

@@ -111,9 +111,8 @@ Statements are PDF documents summarizing charges for each PI.
 
 **Sending Statements:**
 - **Send** - Email individual statement to PI
-- **Send All** - Bulk send all unsent statements
 
-In dev mode, emails are saved to the output/emails folder instead of being sent.
+In dev mode, emails are saved to the instance/output/emails folder instead of being sent.
 """
     },
     "imports": {

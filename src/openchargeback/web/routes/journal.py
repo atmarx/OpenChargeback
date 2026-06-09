@@ -21,6 +21,7 @@ from openchargeback.web.deps import (
     get_flash_messages,
     get_global_flagged_count,
     get_templates,
+    require_reviewer,
 )
 
 router = APIRouter(prefix="/journal", tags=["journal"])
@@ -134,16 +135,21 @@ async def export_journal(
     period_id: int = Form(...),
     format: str = Form("standard"),
     include_flagged: bool = Form(False),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_reviewer),
     db: Database = Depends(get_db),
 ) -> Response:
     """Export journal entries as CSV."""
+    from fastapi.responses import RedirectResponse
+
+    from openchargeback.web.deps import add_flash_message
+
     period = db.get_period_by_id(period_id)
     if not period:
-        from fastapi.responses import RedirectResponse
-
-        from openchargeback.web.deps import add_flash_message
         add_flash_message(request, "error", "Period not found.")
+        return RedirectResponse(url="/journal", status_code=303)
+
+    if format not in ("standard", "summary", "gl", "template"):
+        add_flash_message(request, "error", f"Unknown journal export format: {format}")
         return RedirectResponse(url="/journal", status_code=303)
 
     # Get charges for the period
