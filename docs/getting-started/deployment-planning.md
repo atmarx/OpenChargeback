@@ -66,6 +66,7 @@ OpenChargeback passes costs through as-is; it does not compute rates. Rates and 
 - **Which services are subsidized, and by how much?** Even a 100%-subsidized service should carry its `ListCost` so the statement shows the true value (List Price $2,400 / Discount -$2,400 / Amount Due $0). Always populate `ListCost`.
 - **Subsidy model.** Annual / monthly / weekly cap, tiered, applied per-project / per-user / per-PI / global pool. The OpenAI integration's [SUBSIDY-OPTIONS.md](../integrations/openai-tokens/SUBSIDY-OPTIONS.md) walks the tradeoffs.
 - **The subsidy fund/org** — who's covering it (Provost, department, a grant).
+- **Cost precision in your exports: carry it, don't pre-round.** Emit `rate × usage` at full decimal precision (`BilledCost: 0.0004`), exactly as the cloud providers' native FOCUS exports do — their penny-flooring happens in pricing, not in the export format. OpenChargeback rounds once, at the statement/journal grain, so sub-cent rows aggregate honestly (1,000 × $0.0004 recovers $0.40). Pre-rounding each row to a cent silently turns that into $10.00 (floor) or $0.00 (round-half) — both break reconciliation against your own rate sheet. If you want a minimum charge per allocation, make it an explicit rate-policy rule in your preprocessor, never a formatting side effect.
 
 ---
 
