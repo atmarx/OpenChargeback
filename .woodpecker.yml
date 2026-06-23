@@ -21,10 +21,12 @@ steps:
       - /opt/cache/pip:/cache/pip
 
   # Provenance gate. The forensic close package research accounting relies on
-  # must be byte-deterministic: same canonical month of data -> same archive ->
-  # same sha256. This step proves it on the real shipped sample data and checks
-  # that MANIFEST.txt honestly hashes every member. If it ever goes red, the
-  # "signed package" promise is broken — do not ship.
+  # must be byte-deterministic: same canonical month of data -> same bytes ->
+  # same sha256, in BOTH wrappers (zip and pdf portfolio). This step proves it on
+  # the real shipped sample data — two months, two wrappers — and checks that the
+  # zip's entries and the pdf's embedded attachments are byte-identical (the
+  # wrapper never changes a number) and that MANIFEST.txt honestly hashes every
+  # member. If it ever goes red, the "signed package" promise is broken — do not ship.
   - name: close-package-determinism
     image: python:3.12-slim
     commands:

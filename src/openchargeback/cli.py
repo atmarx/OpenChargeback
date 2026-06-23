@@ -240,6 +240,62 @@ def export_journal(
         db.close()
 
 
+@app.command("export-package")
+def export_package(
+    period: Annotated[str, typer.Option("--period", "-p", help="Billing period (YYYY-MM)")],
+    format: Annotated[
+        str, typer.Option("--format", "-f", help="Wrapper: zip or pdf (portfolio)")
+    ] = "zip",
+    output_dir: Annotated[
+        Path | None,
+        typer.Option("--output-dir", "-o", help="Directory to write the package into"),
+    ] = None,
+    config_path: ConfigOption = None,
+) -> None:
+    """Export the forensic monthly close package (zip or pdf portfolio).
+
+    Same canonical data produces the same bytes and the same sha256 — the last
+    6 chars of which are embedded in the filename for content-addressing.
+    """
+    from . import audit
+    from .output.close_package import build_close_package
+
+    if format not in ("zip", "pdf"):
+        console.print(f"[red]Unknown format {format!r} (expected 'zip' or 'pdf')[/red]")
+        raise typer.Exit(1)
+
+    config = get_config(config_path)
+    db = get_db(config)
+
+    try:
+        filename, package_bytes, sha256_hex = build_close_package(
+            period, config, db, fmt=format  # type: ignore[arg-type]
+        )
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1) from e
+    finally:
+        db.close()
+
+    dest_dir = output_dir or Path.cwd()
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / filename
+    dest.write_bytes(package_bytes)
+
+    audit.log_close_package(
+        period=period, filename=filename, sha256=sha256_hex, user=_cli_user()
+    )
+
+    table = Table(title=f"Close Package - {period}")
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value", style="green")
+    table.add_row("Format", format)
+    table.add_row("File", str(dest))
+    table.add_row("Size", f"{len(package_bytes):,} bytes")
+    table.add_row("sha256", sha256_hex)
+    console.print(table)
+
+
 @app.command()
 def show(
     pi_email: Annotated[str, typer.Argument(help="PI email address")],

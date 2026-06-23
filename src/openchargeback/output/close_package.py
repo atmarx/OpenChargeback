@@ -6,19 +6,28 @@ handed to the ERP. With all of that in their hands each month, OpenChargeback
 steps down from system-of-record to flight-data-recorder — the audit liability
 drops an order of magnitude.
 
-The package is a deterministic zip. Same canonical inputs -> same bytes ->
-same sha256, every time. A ``MANIFEST.txt`` inside lists the sha256 of every
-file *as delivered* — that per-file hash list is the package's signature. The
-last 6 chars of the whole-zip hash are appended to the filename so the bundle
-is content-addressable: ``openchargeback-close-2026-05-a3f29c.zip``.
+The package comes in two wrappers — a deterministic **zip** and a **PDF
+portfolio** — chosen per export. The bytes *inside* are identical either way:
+the same member files and the same ``MANIFEST.txt``. Only the container differs,
+so the wrapper an org picks never changes a number. Same canonical inputs ->
+same bytes -> same sha256, every time, in both formats.
+
+A ``MANIFEST.txt`` inside lists the sha256 of every file *as delivered* — that
+per-file hash list is the package's signature. The last 6 chars of the whole-
+package hash are appended to the filename so the bundle is content-addressable:
+``openchargeback-close-2026-05-a3f29c.zip`` / ``...-a3f29c.pdf``.
 
 Determinism rules (see Reg's spec in #openchargeback):
   1. entries sorted by archive name (never filesystem walk order)
-  2. ``ZipInfo.date_time`` pinned to the period's ``closed_at`` (stable, meaningful)
-  3. ``ZIP_DEFLATED`` + ``compresslevel=6``, ``external_attr`` cleared (no perm noise)
+  2. timestamps pinned to the period's ``closed_at`` (stable, meaningful)
+  3. zip: ``ZIP_DEFLATED`` + ``compresslevel=6``, ``external_attr`` cleared
+  4. pdf: pikepdf/qpdf, base-14 fonts only, ``deterministic_id`` (content hash),
+     no XMP, no wall-clock — and no native render stack (CI has none)
 
 PDFs are frozen at first generation and copied verbatim into the package — never
 re-rendered (weasyprint embeds wall-clock timestamps that would break the hash).
+The PDF *portfolio* cover is drawn directly with base-14 fonts for the same
+reason: WeasyPrint can't run in the slim test image.
 """
 
 import csv
@@ -28,7 +37,9 @@ import tempfile
 import zipfile
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
+
+import pikepdf
 
 from ..config import Config
 from ..db.repository import BillingPeriod, Database, EmailLog, ReviewLog
@@ -236,7 +247,7 @@ def _readme(period_str: str) -> bytes:
         "PROVENANCE / 'SIGNED PACKAGE'",
         "  MANIFEST.txt lists the sha256 of each file in this archive. That",
         "  per-file hash list is the package's signature — verify any file by",
-        "  re-hashing it and comparing. The 6-character suffix on this zip's",
+        "  re-hashing it and comparing. The 6-character suffix on this package's",
         "  filename is the last 6 chars of the sha256 of the entire archive,",
         "  making the bundle content-addressable. Re-running the close on the",
         "  same canonical data produces the same hash. A different hash means",
@@ -290,15 +301,169 @@ def _build_deterministic_zip(
     return buf.getvalue()
 
 
+# --- PDF portfolio wrapper -------------------------------------------------
+# Accounting systems that attach a single supporting PDF to a purchase order
+# can't ingest a zip. The PDF portfolio carries the exact same member set as the
+# zip — every file embedded as a verbatim attachment — behind a readable
+# monospace cover that doubles as a printed manifest. Built with pikepdf/qpdf
+# and base-14 fonts only: no font subsetting, no XMP, no wall-clock, so the
+# bytes are deterministic and no native render stack is required.
+
+_PDF_PAGE = (612, 792)  # US Letter, points
+_PDF_X = 54.0           # left margin
+_PDF_Y_TOP = 748.0      # first baseline
+_PDF_Y_BOTTOM = 54.0    # bottom margin
+
+
+def _pdf_date(date_time: tuple[int, int, int, int, int, int]) -> str:
+    """Format a date_time tuple as a pinned PDF date string (no wall-clock)."""
+    y, mo, d, h, mi, s = date_time
+    return f"D:{y:04d}{mo:02d}{d:02d}{h:02d}{mi:02d}{s:02d}Z"
+
+
+def _pdf_mime(name: str) -> str:
+    n = name.lower()
+    if n.endswith(".pdf"):
+        return "application/pdf"
+    if n.endswith(".csv"):
+        return "text/csv"
+    return "text/plain"
+
+
+def _pdf_escape(text: str) -> bytes:
+    """Escape a string for a PDF content-stream literal (WinAnsi/latin-1)."""
+    raw = text.encode("latin-1", "replace")
+    return raw.replace(b"\\", b"\\\\").replace(b"(", b"\\(").replace(b")", b"\\)")
+
+
+def _pdf_cover_lines(
+    files: dict[str, bytes], period_str: str
+) -> list[tuple[str, float, str]]:
+    """The cover as (font_key, size, text) rows — a rendered manifest."""
+    lines: list[tuple[str, float, str]] = [
+        ("F2", 15, "OpenChargeback - Monthly Close Package"),
+        ("F1", 10, f"Period: {period_str}     Wrapper: PDF portfolio"),
+        ("F1", 8, ""),
+        ("F1", 8, "A forensic, audit-defensible snapshot of one billing month.  Every"),
+        ("F1", 8, "artifact below is embedded as a file attachment: the original source"),
+        ("F1", 8, "files (verbatim, exactly as ingested), the statements sent to PIs, the"),
+        ("F1", 8, "journal export, the proof-of-send log and the audit trail."),
+        ("F1", 8, ""),
+        ("F1", 8, "Re-hash any attachment and compare to its sha256 below to verify it."),
+        ("F1", 8, "The 6-character suffix on this file's name is the sha256 of the whole"),
+        ("F1", 8, "PDF -- the same canonical data always reproduces the same hash."),
+        ("F1", 8, ""),
+        ("F1", 8, f"{'sha256':<64}  {'bytes':>9}  file"),
+    ]
+    for name in sorted(files):
+        digest = hashlib.sha256(files[name]).hexdigest()
+        lines.append(("F1", 7, f"{digest}  {len(files[name]):>9}  {name}"))
+    return lines
+
+
+def _pdf_paginate(
+    lines: list[tuple[str, float, str]],
+) -> list[list[tuple[str, float, str, float]]]:
+    """Lay lines out top-to-bottom, breaking at the bottom margin.
+
+    Returns pages of (font_key, size, text, baseline_y).
+    """
+    pages: list[list[tuple[str, float, str, float]]] = []
+    cur: list[tuple[str, float, str, float]] = []
+    y = _PDF_Y_TOP
+    for font, size, text in lines:
+        leading = max(size * 1.4, 9.5)
+        if y - leading < _PDF_Y_BOTTOM and cur:
+            pages.append(cur)
+            cur, y = [], _PDF_Y_TOP
+        cur.append((font, size, text, y))
+        y -= leading
+    if cur:
+        pages.append(cur)
+    return pages
+
+
+def _pdf_content(page_lines: list[tuple[str, float, str, float]]) -> bytes:
+    """Render one page's text as a PDF content stream (absolute-positioned)."""
+    out = [b"BT"]
+    for font, size, text, y in page_lines:
+        out.append(f"/{font} {size:g} Tf".encode())
+        out.append(f"1 0 0 1 {_PDF_X:.2f} {y:.2f} Tm".encode())
+        out.append(b"(" + _pdf_escape(text) + b") Tj")
+    out.append(b"ET")
+    return b"\n".join(out)
+
+
+def _build_deterministic_pdf(
+    files: dict[str, bytes],
+    date_time: tuple[int, int, int, int, int, int],
+    period_str: str,
+) -> bytes:
+    """Pack files into a byte-deterministic PDF portfolio.
+
+    Same member bytes embedded as in the zip, plus a rendered-manifest cover.
+    ``deterministic_id`` derives the PDF /ID from a hash of the content and all
+    dates are pinned to the period's close — so same inputs -> identical bytes.
+    """
+    pdf = pikepdf.new()
+    date = _pdf_date(date_time)
+
+    font_mono = pdf.make_indirect(pikepdf.Dictionary(
+        Type=pikepdf.Name.Font, Subtype=pikepdf.Name.Type1,
+        BaseFont=pikepdf.Name.Courier, Encoding=pikepdf.Name.WinAnsiEncoding,
+    ))
+    font_bold = pdf.make_indirect(pikepdf.Dictionary(
+        Type=pikepdf.Name.Font, Subtype=pikepdf.Name.Type1,
+        BaseFont=pikepdf.Name("/Helvetica-Bold"), Encoding=pikepdf.Name.WinAnsiEncoding,
+    ))
+    resources = pdf.make_indirect(pikepdf.Dictionary(
+        Font=pikepdf.Dictionary(F1=font_mono, F2=font_bold)
+    ))
+
+    for page_lines in _pdf_paginate(_pdf_cover_lines(files, period_str)):
+        page = pdf.make_indirect(pikepdf.Dictionary(
+            Type=pikepdf.Name.Page,
+            MediaBox=[0, 0, _PDF_PAGE[0], _PDF_PAGE[1]],
+            Resources=resources,
+            Contents=pdf.make_stream(_pdf_content(page_lines)),
+        ))
+        pdf.pages.append(pikepdf.Page(page))
+
+    pdf.docinfo[pikepdf.Name.Title] = f"OpenChargeback Close Package {period_str}"
+    pdf.docinfo[pikepdf.Name.Producer] = "OpenChargeback"
+    pdf.docinfo[pikepdf.Name.Creator] = "OpenChargeback Close Package"
+    pdf.docinfo[pikepdf.Name.CreationDate] = date
+    pdf.docinfo[pikepdf.Name.ModDate] = date
+
+    # Embed every member verbatim, sorted so the name tree is deterministic.
+    for name in sorted(files):
+        spec = pikepdf.AttachedFileSpec(
+            pdf, files[name],
+            description=name, filename=name, mime_type=_pdf_mime(name),
+            creation_date=date, mod_date=date,
+        )
+        pdf.attachments[name] = spec
+
+    buf = io.BytesIO()
+    pdf.save(buf, deterministic_id=True, compress_streams=True, fix_metadata_version=False)
+    return buf.getvalue()
+
+
 def build_close_package(
     period_str: str,
     config: Config,
     db: Database,
+    fmt: Literal["zip", "pdf"] = "zip",
 ) -> tuple[str, bytes, str]:
     """Build the forensic monthly close package for a period.
 
-    Returns ``(filename, zip_bytes, sha256_hex)``. The filename embeds the last
-    6 chars of the full-archive sha256: ``openchargeback-close-<period>-<hash6>.zip``.
+    ``fmt`` selects the wrapper — a ``"zip"`` or a ``"pdf"`` portfolio. The
+    member files and ``MANIFEST.txt`` are byte-identical in both; only the
+    container differs, so the choice never changes a number.
+
+    Returns ``(filename, package_bytes, sha256_hex)``. The filename embeds the
+    last 6 chars of the full-package sha256:
+    ``openchargeback-close-<period>-<hash6>.<ext>``.
     """
     billing_period = db.get_period(period_str)
     if not billing_period:
@@ -306,16 +471,24 @@ def build_close_package(
 
     files = _collect_files(period_str, config, db)
 
-    # README and MANIFEST are part of the archive. MANIFEST hashes every other
-    # file (added before it is computed); the whole-zip suffix then covers the
-    # manifest and readme too.
+    # README and MANIFEST are part of the package. MANIFEST hashes every other
+    # file (added before it is computed); the whole-package suffix then covers
+    # the manifest and readme too. Identical regardless of wrapper.
     files["README.txt"] = _readme(period_str)
     files["MANIFEST.txt"] = _manifest(
         {k: v for k, v in files.items() if k != "MANIFEST.txt"}
     )
 
     date_time = _parse_dt(billing_period.closed_at or billing_period.finalized_at)
-    zip_bytes = _build_deterministic_zip(files, date_time)
-    sha256_hex = hashlib.sha256(zip_bytes).hexdigest()
-    filename = f"openchargeback-close-{period_str}-{sha256_hex[:6]}.zip"
-    return filename, zip_bytes, sha256_hex
+    if fmt == "zip":
+        package_bytes = _build_deterministic_zip(files, date_time)
+    elif fmt == "pdf":
+        package_bytes = _build_deterministic_pdf(files, date_time, period_str)
+    else:
+        raise ValueError(
+            f"Unknown close package format: {fmt!r} (expected 'zip' or 'pdf')"
+        )
+
+    sha256_hex = hashlib.sha256(package_bytes).hexdigest()
+    filename = f"openchargeback-close-{period_str}-{sha256_hex[:6]}.{fmt}"
+    return filename, package_bytes, sha256_hex

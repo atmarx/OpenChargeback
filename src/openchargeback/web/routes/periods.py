@@ -116,11 +116,20 @@ async def create_period(
 async def download_close_package(
     request: Request,
     period_slug: str,
+    format: str = "zip",
     user: User = Depends(require_admin),
     db: Database = Depends(get_db),
 ) -> Response:
-    """Build and download the forensic monthly close package (deterministic zip)."""
+    """Build and download the forensic monthly close package.
+
+    ``?format=zip`` (default) or ``?format=pdf`` for the portfolio. Same data,
+    same bytes either way — only the container differs.
+    """
     from openchargeback.output.close_package import build_close_package
+
+    if format not in ("zip", "pdf"):
+        add_flash_message(request, "error", f"Unknown package format: {format}")
+        return RedirectResponse(url=f"/periods/{period_slug}", status_code=303)
 
     service = PeriodService(db)
     period_obj = service.get_period_by_slug(period_slug)
@@ -130,8 +139,8 @@ async def download_close_package(
 
     config = request.app.state.config
     try:
-        filename, zip_bytes, sha256_hex = build_close_package(
-            period_obj.period, config, db
+        filename, package_bytes, sha256_hex = build_close_package(
+            period_obj.period, config, db, fmt=format  # type: ignore[arg-type]
         )
     except Exception as e:
         add_flash_message(request, "error", f"Failed to build close package: {e}")
@@ -144,9 +153,10 @@ async def download_close_package(
         user=user.display_name,
     )
 
+    media_type = "application/pdf" if format == "pdf" else "application/zip"
     return Response(
-        content=zip_bytes,
-        media_type="application/zip",
+        content=package_bytes,
+        media_type=media_type,
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
             "X-Package-SHA256": sha256_hex,

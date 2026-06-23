@@ -205,15 +205,23 @@ openchargeback periods close 2025-01
 ## Step 6: Download the Close Package
 
 The **close package** is the canonical monthly deliverable for research accounting —
-a single forensic zip that bundles everything justifying the month's charges. Once
-accounting holds it, OpenChargeback is no longer the system of record; it's the
-flight-data-recorder, and the audit liability sits with the custodian of the package.
+a single forensic bundle of everything justifying the month's charges, offered in two
+interchangeable wrappers: a **ZIP** or a **PDF portfolio**. The bytes *inside* are
+identical either way — pick whichever your accounting system accepts (some can only
+attach a PDF to a purchase order). Once accounting holds it, OpenChargeback is no longer
+the system of record; it's the flight-data-recorder, and the audit liability sits with
+the custodian of the package.
 
 ### Download it
 
-On the **period detail page**, click the **📦 Close Package** button. The archive is
-built fresh on each download (admin-only) and streamed to your browser. There is no
-CLI command for it yet — it's a web-UI action.
+On the **period detail page**, click **📦 Close Package (ZIP)** or **📄 Close Package (PDF)**.
+The package is built fresh on each download (admin-only) and streamed to your browser.
+
+From the CLI — handy for scripted month-end — use `export-package`:
+
+```bash
+openchargeback export-package -p 2025-01 -f pdf -o ./out   # -f zip for the ZIP wrapper
+```
 
 ### What's inside
 
@@ -227,14 +235,19 @@ CLI command for it yet — it's a web-UI action.
 | `README.txt` | A plain-language guide to the contents. |
 | `MANIFEST.txt` | The sha256 of every file above — the package's per-file signature. |
 
+In the **PDF portfolio**, these same files are embedded as attachments behind a cover
+page that prints the manifest. Open the attachments panel in any PDF reader to pull them
+out — each one is byte-for-byte identical to the matching entry in the ZIP.
+
 ### Why it's hashed
 
-The package is **byte-deterministic**: the same canonical data produces the same zip,
-and the same sha256, every time. The last 6 characters of that hash are appended to the
-filename — e.g. `openchargeback-close-2025-01-a3f29c.zip` — so the bundle is
-content-addressable. Verify any file by re-hashing it against `MANIFEST.txt`; verify the
-whole bundle by the filename suffix (also returned in the `X-Package-SHA256` response
-header). A different hash means the data changed — that's the point.
+The package is **byte-deterministic** in both wrappers: the same canonical data produces
+the same bytes, and the same sha256, every time. The last 6 characters of that hash are
+appended to the filename — e.g. `openchargeback-close-2025-01-a3f29c.zip` or
+`…-a3f29c.pdf` — so the bundle is content-addressable. Verify any file by re-hashing it
+against `MANIFEST.txt`; verify the whole bundle by the filename suffix (also returned in
+the `X-Package-SHA256` response header). A different hash means the data changed — that's
+the point.
 
 > **Input retention:** Only source files imported *after* input retention was enabled
 > appear under `inputs/`. Months imported before then show an empty `inputs/` folder.

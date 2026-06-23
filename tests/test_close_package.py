@@ -10,6 +10,7 @@ import io
 import zipfile
 from pathlib import Path
 
+import pikepdf
 import pytest
 
 from openchargeback.config import Config, OutputConfig, TagMappingConfig
@@ -122,6 +123,16 @@ def _members(zip_bytes: bytes) -> dict[str, bytes]:
         return {name: zf.read(name) for name in zf.namelist()}
 
 
+def _pdf_members(pdf_bytes: bytes) -> dict[str, bytes]:
+    """The PDF portfolio's embedded attachments, keyed by name — the zip's
+    entries by another door."""
+    with pikepdf.open(io.BytesIO(pdf_bytes)) as pdf:
+        return {
+            name: pdf.attachments[name].get_file().read_bytes()
+            for name in pdf.attachments
+        }
+
+
 def test_archive_input_file_writes_under_period_source(config):
     dest = archive_input_file(
         content=b"hello",
@@ -160,6 +171,36 @@ def test_build_is_byte_deterministic(closed_period_db, config):
     assert bytes1 == bytes2
     assert sha1 == sha2
     assert name1 == name2
+
+
+def test_pdf_build_is_byte_deterministic(closed_period_db, config):
+    """The PDF wrapper holds the same bar as the zip: same data -> same bytes."""
+    name1, bytes1, sha1 = build_close_package("2026-05", config, closed_period_db, fmt="pdf")
+    name2, bytes2, sha2 = build_close_package("2026-05", config, closed_period_db, fmt="pdf")
+    assert bytes1 == bytes2
+    assert sha1 == sha2
+    assert name1 == name2 == f"openchargeback-close-2026-05-{sha1[:6]}.pdf"
+    assert bytes1[:5] == b"%PDF-"  # it is in fact a PDF
+
+
+def test_zip_and_pdf_carry_identical_members(closed_period_db, config):
+    """The invariant that makes the wrapper choice safe: pick zip or pdf, the
+    members inside are byte-for-byte identical. The container never touches a
+    number."""
+    _, zip_bytes, _ = build_close_package("2026-05", config, closed_period_db, fmt="zip")
+    _, pdf_bytes, _ = build_close_package("2026-05", config, closed_period_db, fmt="pdf")
+
+    zip_members = _members(zip_bytes)
+    pdf_members = _pdf_members(pdf_bytes)
+
+    assert set(zip_members) == set(pdf_members)
+    for name in zip_members:
+        assert zip_members[name] == pdf_members[name], name
+
+
+def test_unknown_format_raises(closed_period_db, config):
+    with pytest.raises(ValueError, match="Unknown close package format"):
+        build_close_package("2026-05", config, closed_period_db, fmt="tar")  # type: ignore[arg-type]
 
 
 def test_manifest_hashes_match_members(closed_period_db, config):
@@ -284,3 +325,79 @@ def test_real_sample_data_is_deterministic(temp_db, tmp_path):
     for path in sample_files:
         source = path.name.split("_")[0]
         assert members[f"inputs/{source}/{path.name}"] == path.read_bytes()
+
+
+# --- The 2x2: two months, two wrappers, one set of facts ------------------
+# Accounting can choose zip or PDF per org. This proves the choice is cosmetic:
+# both wrappers are byte-deterministic, both carry identical members, and the
+# package hash tracks the data (a different month is a different hash).
+
+
+def _ingest_and_close(db, cfg, period: str) -> list[Path]:
+    """Ingest every sample CSV for a period (verbatim-archived), then close it.
+
+    Source name is the full filename minus the ``_<period>.csv`` suffix — the
+    same rule generate-sample-outputs.sh uses, so ``it_storage`` stays whole.
+    """
+    suffix = f"_{period}.csv"
+    sample_files = sorted(SAMPLE_INPUTS.glob(f"*{suffix}"))
+    assert sample_files, f"expected {period} sample inputs"
+    for path in sample_files:
+        source = path.name[: -len(suffix)]
+        content = path.read_bytes()
+        ingest_focus_file(
+            file_path=path, source_name=source, expected_period=period,
+            config=cfg, db=db, dry_run=False, original_filename=path.name,
+        )
+        archive_input_file(
+            content=content, period=period, source=source,
+            filename=path.name, config=cfg,
+        )
+    db.approve_all_charges(db.get_period(period).id, performed_by="ci")
+    db.update_period_status(period, "closed", performed_by="ci")
+    return sample_files
+
+
+@pytest.mark.skipif(not SAMPLE_INPUTS.is_dir(), reason="sample_data not present")
+def test_both_months_both_wrappers_agree(temp_db, tmp_path):
+    cfg = Config(
+        output=OutputConfig(
+            pdf_dir=tmp_path / "pdfs",
+            journal_dir=tmp_path / "journals",
+            archive_dir=tmp_path / "archive",
+        ),
+        tag_mapping=TagMappingConfig(project_id="project_id"),
+    )
+    db = Database(temp_db)
+    db.initialize()
+
+    periods = ["2025-01", "2025-12"]
+    for period in periods:
+        _ingest_and_close(db, cfg, period)
+
+    pkg_hashes: dict[str, dict[str, str]] = {}
+    for period in periods:
+        # Each wrapper builds twice -> identical bytes (determinism).
+        zname, zbytes, zsha = build_close_package(period, cfg, db, fmt="zip")
+        _, zbytes2, zsha2 = build_close_package(period, cfg, db, fmt="zip")
+        pname, pbytes, psha = build_close_package(period, cfg, db, fmt="pdf")
+        _, pbytes2, psha2 = build_close_package(period, cfg, db, fmt="pdf")
+        assert zbytes == zbytes2 and zsha == zsha2
+        assert pbytes == pbytes2 and psha == psha2
+
+        # Filenames carry the right extension and the content-address suffix.
+        assert zname == f"openchargeback-close-{period}-{zsha[:6]}.zip"
+        assert pname == f"openchargeback-close-{period}-{psha[:6]}.pdf"
+
+        # The invariant: the wrapper never changes a member.
+        zip_members = _members(zbytes)
+        pdf_members = _pdf_members(pbytes)
+        assert set(zip_members) == set(pdf_members)
+        for name in zip_members:
+            assert zip_members[name] == pdf_members[name], f"{period}:{name}"
+
+        pkg_hashes[period] = {"zip": zsha, "pdf": psha}
+
+    # The hash tracks the data: a different month is a different package.
+    assert pkg_hashes["2025-01"]["zip"] != pkg_hashes["2025-12"]["zip"]
+    assert pkg_hashes["2025-01"]["pdf"] != pkg_hashes["2025-12"]["pdf"]
