@@ -313,6 +313,7 @@ _PDF_PAGE = (612, 792)  # US Letter, points
 _PDF_X = 54.0           # left margin
 _PDF_Y_TOP = 748.0      # first baseline
 _PDF_Y_BOTTOM = 54.0    # bottom margin
+_PDF_COURIER_ADVANCE = 0.6  # Courier glyph advance (em) — monospace, so width is exact
 
 
 def _pdf_date(date_time: tuple[int, int, int, int, int, int]) -> str:
@@ -353,11 +354,22 @@ def _pdf_cover_lines(
         ("F1", 8, "The 6-character suffix on this file's name is the sha256 of the whole"),
         ("F1", 8, "PDF -- the same canonical data always reproduces the same hash."),
         ("F1", 8, ""),
-        ("F1", 8, f"{'sha256':<64}  {'bytes':>9}  file"),
     ]
-    for name in sorted(files):
-        digest = hashlib.sha256(files[name]).hexdigest()
-        lines.append(("F1", 7, f"{digest}  {len(files[name]):>9}  {name}"))
+    # The manifest table: a header plus one row per member. Each row carries a
+    # full 64-char sha256, so the widest line can run off the right edge. Size
+    # the whole block to fit the widest line within a symmetric margin —
+    # monospace makes the width exact — clamped so it never gets unreadable.
+    # Same members -> same widest line -> same size, so determinism holds.
+    header = f"{'sha256':<64}  {'bytes':>9}  file"
+    rows = [
+        f"{hashlib.sha256(files[name]).hexdigest()}  {len(files[name]):>9}  {name}"
+        for name in sorted(files)
+    ]
+    usable = _PDF_PAGE[0] - 2 * _PDF_X
+    widest = max(len(line) for line in (header, *rows))
+    size = max(5.0, min(7.0, usable / (widest * _PDF_COURIER_ADVANCE)))
+    lines.append(("F1", size, header))
+    lines.extend(("F1", size, row) for row in rows)
     return lines
 
 
