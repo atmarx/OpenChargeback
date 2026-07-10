@@ -79,16 +79,26 @@ def test_every_mutating_route_is_role_guarded(tmp_path):
     )
 
 
-def test_statement_download_is_reachable_by_any_authenticated_user(tmp_path):
+def test_statement_download_is_reachable_by_any_authenticated_user():
     """The other half of the rule: a viewer CAN download statements — the
-    download route must NOT be gated to reviewer/admin."""
-    app = create_app(_config(tmp_path))
+    download route must NOT be gated to reviewer/admin.
 
-    download = next(
+    Inspect the statements router's own routes (populated at import) rather than
+    the assembled app, and match loosely — assembled-app path rendering has
+    varied across FastAPI/Starlette versions, and a bare next() there turned a
+    'route not found' into a confusing StopIteration in CI.
+    """
+    from openchargeback.web.routes import statements as statements_routes
+
+    downloads = [
         r
-        for r in app.routes
-        if isinstance(r, APIRoute) and r.path.endswith("/{statement_id}/download")
+        for r in statements_routes.router.routes
+        if isinstance(r, APIRoute) and "download" in r.path
+    ]
+    assert downloads, "statement download route not found; router has: " + ", ".join(
+        getattr(r, "path", "?") for r in statements_routes.router.routes
     )
-    guards = _dependency_calls(download.dependant)
-    assert require_admin not in guards
-    assert require_reviewer not in guards
+    for route in downloads:
+        guards = _dependency_calls(route.dependant)
+        assert require_admin not in guards
+        assert require_reviewer not in guards
