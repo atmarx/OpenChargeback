@@ -43,7 +43,7 @@ Passwords are hashed using bcrypt with automatic salt generation:
 ```python
 import bcrypt
 hash = bcrypt.hashpw(b"password", bcrypt.gensalt()).decode()
-# Result: $2b$12$Fxu99zxFh4plt3a2FDyEnuFyg2Co/osXmQGGYw.HFl0/Id6V.Uvey
+# Result: $2b$12$<your-own-unique-hash>  (never reuse a hash from the docs)
 ```
 
 The `$2b$12$` prefix indicates:

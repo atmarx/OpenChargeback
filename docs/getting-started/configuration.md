@@ -158,7 +158,7 @@ User passwords must be bcrypt hashed:
 import bcrypt
 hash = bcrypt.hashpw(b"your-password", bcrypt.gensalt()).decode()
 print(hash)
-# Output: $2b$12$Fxu99zxFh4plt3a2FDyEnuFyg2Co/osXmQGGYw.HFl0/Id6V.Uvey
+# Output: $2b$12$<your-own-unique-hash>  (never reuse a hash from the docs)
 ```
 
 Or use the command line:

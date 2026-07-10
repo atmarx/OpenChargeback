@@ -16,6 +16,12 @@ from openchargeback import audit
 from openchargeback.config import load_config
 from openchargeback.logging import configure_logging
 
+# The bcrypt hash the example config shipped for password "admin123".  Its user
+# has recovery: true, so it authenticates by bypassing the DB and cannot be
+# revoked from the UI — a verbatim copy is an un-revocable backdoor.  We refuse
+# to boot in production if it's still present.
+_EXAMPLE_ADMIN_HASH = "$2b$12$Fxu99zxFh4plt3a2FDyEnuFyg2Co/osXmQGGYw.HFl0/Id6V.Uvey"
+
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Add security headers: CSP (allowing our static assets), anti-clickjacking,
@@ -143,6 +149,19 @@ def create_app(config_path: Path | None = None) -> FastAPI:
                 "web.secret_key must be set to a strong random value in production. "
                 "Generate one with: python -c 'import secrets; print(secrets.token_hex(32))'"
             )
+    # Refuse to boot in production with the shipped example admin still in place
+    # (same posture as the secret_key guard above).
+    if not config.dev_mode:
+        for username, user in (config.web.users or {}).items():
+            if user.password_hash == _EXAMPLE_ADMIN_HASH:
+                raise RuntimeError(
+                    f"Config user {username!r} still uses the example 'admin123' "
+                    "password hash — an un-revocable backdoor in production. "
+                    "Replace it with your own (python -c \"import bcrypt; "
+                    "print(bcrypt.hashpw(b'yourpassword', bcrypt.gensalt()).decode())\") "
+                    "before running in production, or set dev_mode: true."
+                )
+
     app.add_middleware(
         SessionMiddleware,
         secret_key=secret_key,

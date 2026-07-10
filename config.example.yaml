@@ -57,18 +57,23 @@ web:
 
   # Bootstrap/recovery users defined in config
   # These users are available during initial setup or for emergency recovery.
+  #
+  # SECURITY: no working password ships here on purpose.  Generate your own hash
+  # before first run — the app refuses to boot in production (dev_mode: false)
+  # while the old shipped example hash is present.  For a quick local look,
+  # set dev_mode: true above instead.
   users:
     admin:
       email: admin@example.edu
       display_name: "Admin User"
       # Generate hash with: python -c "import bcrypt; print(bcrypt.hashpw(b'yourpassword', bcrypt.gensalt()).decode())"
-      # Default password below is "admin123" - CHANGE THIS!
-      password_hash: "$2b$12$Fxu99zxFh4plt3a2FDyEnuFyg2Co/osXmQGGYw.HFl0/Id6V.Uvey"
+      password_hash: "REPLACE-ME-with-a-bcrypt-hash-from-the-command-above"
       role: admin  # admin, reviewer, or viewer
       # Recovery mode - when true, this user ALWAYS authenticates against config.yaml,
-      # bypassing the database. Use for emergency recovery if locked out of DB users.
-      # Set to false for normal bootstrap users that can be overridden by DB.
-      recovery: true
+      # bypassing the database (cannot be revoked from the UI). Leave false for a
+      # normal bootstrap admin that DB users can override; set true only for a
+      # deliberate break-glass account.
+      recovery: false
 
   # Password policy for database users
   # Enforced when creating users or changing passwords. If requirements are
