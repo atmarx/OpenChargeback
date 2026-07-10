@@ -1,6 +1,7 @@
 """FOCUS CSV file parser and ingester."""
 
 import json
+import math
 import re
 from pathlib import Path
 from typing import Any
@@ -43,15 +44,22 @@ def extract_period_from_date(date_str: str) -> str:
     if not date_str:
         return ""
 
+    period = ""
     # Try to parse as pandas datetime
     try:
         dt = pd.to_datetime(date_str)
-        return f"{dt.year:04d}-{dt.month:02d}"
+        period = f"{dt.year:04d}-{dt.month:02d}"
     except Exception:
         # Fallback: try to extract YYYY-MM from string
         if len(date_str) >= 7:
-            return date_str[:7]
-        return ""
+            period = date_str[:7]
+
+    # Only accept a well-formed YYYY-MM in a sane range.  Without this, a
+    # value like "notadate" slid through the fallback as period "notadat" and
+    # got minted as a real billing month with real dollars under it.
+    if re.fullmatch(r"(19|20)\d{2}-(0[1-9]|1[0-2])", period):
+        return period
+    return ""
 
 
 def parse_tags(tags_value: str | dict[str, Any] | None, tag_mapping: dict[str, str]) -> dict[str, Any]:
@@ -92,6 +100,17 @@ def _cell(row: Any, name: str) -> str:
     """Read a CSV cell as a string, with NaN/missing collapsing to ''."""
     value = row.get(name, "")
     return "" if pd.isna(value) else str(value)
+
+
+def _opt_cost(row: Any, field: str) -> float | None:
+    """Read an optional cost cell as a float; missing/NaN -> None.
+
+    Raises ValueError/TypeError on an unparseable value (e.g. an Excel-exported
+    "1,234.56" with a thousands separator), which the caller turns into a row
+    error instead of a crash.
+    """
+    raw = row.get(field)
+    return None if raw is None or pd.isna(raw) else float(raw)
 
 
 def _disambiguate_key_collisions(charges: list[Charge]) -> None:
@@ -219,6 +238,26 @@ class FocusIngester(BaseIngester):
 
         df = df.rename(columns=column_map)
 
+        # A file missing the cost or period column would otherwise import every
+        # row at $0 (or fail row-by-row) with no headline error — the "mail
+        # every PI a $0 statement" trap.  Require the load-bearing columns up
+        # front and reject the whole file loudly if either is absent.
+        required_columns = {
+            "billed_cost": "BilledCost",
+            "billing_period_start": "BillingPeriodStart",
+        }
+        missing_columns = [
+            focus_col
+            for internal_col, focus_col in required_columns.items()
+            if internal_col not in df.columns
+        ]
+        if missing_columns:
+            result.errors.append(
+                f"Missing required column(s): {', '.join(missing_columns)}. "
+                "No rows imported."
+            )
+            return result
+
         # Tag mapping from config
         tag_mapping = {
             "pi_email": self.config.tag_mapping.pi_email,
@@ -270,38 +309,57 @@ class FocusIngester(BaseIngester):
                 result.errors.append(f"Line {line_num}: Missing pi_email tag")
                 continue
 
-            # Get cost values
-            list_cost = row.get("list_cost")
-            if pd.isna(list_cost):
-                list_cost = None
-            else:
-                list_cost = float(list_cost)
+            # Parse cost fields.  An unparseable cost (e.g. an Excel-exported
+            # "1,234.56" with a thousands separator) or a non-finite value
+            # rejects the row loudly instead of crashing the import or poisoning
+            # the money atoms; a *missing* BilledCost value flags the row for
+            # review rather than being silently treated as $0.
+            cost_missing = False
+            try:
+                raw_billed = row.get("billed_cost")
+                if raw_billed is None or pd.isna(raw_billed):
+                    billed_cost = 0.0
+                    cost_missing = True
+                else:
+                    billed_cost = float(raw_billed)
 
-            contracted_cost = row.get("contracted_cost")
-            if pd.isna(contracted_cost):
-                contracted_cost = None
-            else:
-                contracted_cost = float(contracted_cost)
+                list_cost = _opt_cost(row, "list_cost")
+                contracted_cost = _opt_cost(row, "contracted_cost")
+                effective_cost = _opt_cost(row, "effective_cost")
+            except (ValueError, TypeError):
+                result.errors.append(
+                    f"Line {line_num}: a cost column is not a number — remove "
+                    "thousands separators like '1,234.56' if this is an Excel re-export"
+                )
+                continue
 
-            billed_cost = row.get("billed_cost", 0)
-            if pd.isna(billed_cost):
-                billed_cost = 0
-            billed_cost = float(billed_cost)
-
-            effective_cost = row.get("effective_cost")
-            if pd.isna(effective_cost):
-                effective_cost = None
-            else:
-                effective_cost = float(effective_cost)
+            if not all(
+                math.isfinite(c)
+                for c in (
+                    billed_cost,
+                    list_cost or 0.0,
+                    contracted_cost or 0.0,
+                    effective_cost or 0.0,
+                )
+            ):
+                result.errors.append(
+                    f"Line {line_num}: cost is not a finite number"
+                )
+                continue
 
             # Determine if this row needs review
             needs_review = False
             review_reason = None
 
+            # A blank cost is retained but flagged, never billed as $0 silently.
+            if cost_missing:
+                needs_review = True
+                review_reason = "missing_cost"
+
             # Check period mismatch
             if expected_period and period != expected_period:
                 needs_review = True
-                review_reason = "period_mismatch"
+                review_reason = review_reason or "period_mismatch"
 
             # Check for missing required tags
             if not tags.get("project_id"):

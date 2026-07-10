@@ -635,3 +635,108 @@ class TestFocusIngester:
         # Should still work - invalid regex skipped, valid one matches
         assert result.total_rows == 1
         assert result.flagged_rows == 1  # Matches ".*valid.*"
+
+
+class TestExtractPeriodRejectsJunk:
+    """A malformed date must not mint a junk billing period."""
+
+    def test_notadate_returns_empty(self):
+        # Regression: len>=7 used to slide through as period "notadat".
+        assert extract_period_from_date("notadate") == ""
+
+    def test_impossible_month_returns_empty(self):
+        assert extract_period_from_date("2025-13") == ""
+        assert extract_period_from_date("2025-00") == ""
+
+    def test_out_of_range_year_returns_empty(self):
+        assert extract_period_from_date("0001-05") == ""
+
+    def test_wellformed_still_accepted(self):
+        assert extract_period_from_date("2025-07-15") == "2025-07"
+        assert extract_period_from_date("2025-07") == "2025-07"
+
+
+class TestIngestCostRobustness:
+    """The write path must never silently bill $0 or crash on bad cost data."""
+
+    @pytest.fixture
+    def config(self):
+        return Config(
+            tag_mapping=TagMappingConfig(
+                pi_email="pi_email",
+                project_id="project",
+                fund_org="fund_org",
+                cost_center="cost_center",
+            )
+        )
+
+    @pytest.fixture
+    def db(self, temp_db):
+        database = Database(temp_db)
+        database.initialize()
+        return database
+
+    def test_missing_billed_cost_column_rejects_whole_file(self, tmp_path, config, db):
+        # No BilledCost column at all — must NOT import every row at $0.
+        csv_content = (
+            "BillingPeriodStart,Tags\n"
+            '2025-01-01,"{""pi_email"":""a@x.edu"",""project"":""p"",""fund_org"":""9""}"\n'
+        )
+        csv_file = tmp_path / "no_cost_col.csv"
+        csv_file.write_text(csv_content)
+
+        result = ingest_focus_file(
+            file_path=csv_file, source_name="s", expected_period=None,
+            config=config, db=db, dry_run=False,
+        )
+        assert result.total_rows == 0
+        assert any("BilledCost" in e for e in result.errors)
+
+    def test_infinite_cost_is_rejected(self, tmp_path, config, db):
+        csv_content = (
+            "BillingPeriodStart,BilledCost,Tags\n"
+            '2025-01-01,inf,"{""pi_email"":""a@x.edu"",""project"":""p"",""fund_org"":""9""}"\n'
+        )
+        csv_file = tmp_path / "inf.csv"
+        csv_file.write_text(csv_content)
+
+        result = ingest_focus_file(
+            file_path=csv_file, source_name="s", expected_period=None,
+            config=config, db=db, dry_run=False,
+        )
+        assert result.total_rows == 0
+        assert any("finite" in e for e in result.errors)
+
+    def test_excel_thousands_separator_gives_helpful_error(self, tmp_path, config, db):
+        csv_content = (
+            "BillingPeriodStart,BilledCost,Tags\n"
+            '2025-01-01,"1,234.56","{""pi_email"":""a@x.edu"",""project"":""p"",""fund_org"":""9""}"\n'
+        )
+        csv_file = tmp_path / "excel.csv"
+        csv_file.write_text(csv_content)
+
+        result = ingest_focus_file(
+            file_path=csv_file, source_name="s", expected_period=None,
+            config=config, db=db, dry_run=False,
+        )
+        assert result.total_rows == 0
+        assert any("thousands separator" in e.lower() or "Excel" in e for e in result.errors)
+
+    def test_blank_cost_is_flagged_not_silently_zero(self, tmp_path, config, db):
+        # A blank BilledCost value (column present) is retained but flagged
+        # 'missing_cost', not billed as $0 without anyone noticing.
+        csv_content = (
+            "BillingPeriodStart,BilledCost,Tags\n"
+            '2025-01-01,,"{""pi_email"":""a@x.edu"",""project"":""p"",""fund_org"":""9""}"\n'
+        )
+        csv_file = tmp_path / "blank_cost.csv"
+        csv_file.write_text(csv_content)
+
+        result = ingest_focus_file(
+            file_path=csv_file, source_name="s", expected_period=None,
+            config=config, db=db, dry_run=False,
+        )
+        assert result.total_rows == 1
+        assert result.flagged_rows == 1
+        charges = db.get_charges_for_period(db.get_period("2025-01").id, include_flagged=True)
+        assert charges[0].review_reason == "missing_cost"
