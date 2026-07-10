@@ -6,7 +6,12 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+from jinja2 import (
+    ChainableUndefined,
+    Environment,
+    FileSystemLoader,
+    select_autoescape,
+)
 
 from ..config import Config, KnownSourceConfig
 from ..money import NO_PROJECT, build_atoms
@@ -268,6 +273,10 @@ def render_journal_template(
         # For CSV, we don't want autoescape but we'll be careful with data
         trim_blocks=True,
         lstrip_blocks=True,
+        # A reference to a removed/unknown context var (e.g. a template that
+        # still reaches for the old `config`, which is deliberately no longer
+        # exposed) renders as empty rather than crashing the month-end export.
+        undefined=ChainableUndefined,
     )
 
     # Add custom filters
@@ -309,12 +318,21 @@ def export_journal_with_template(
 
     template_name = config.journal.template
 
+    # Institution-editable templates must never see the raw Config — that
+    # object carries config.smtp.password, config.web.secret_key, and per-source
+    # api_keys, any of which a template line like `{{ config.smtp.password }}`
+    # would render straight into the GL CSV that gets emailed to accounting.
+    # Expose only a secret-free view: the period and the (non-secret) journal
+    # display settings.
     return render_journal_template(
         entries=entries,
         template_name=template_name,
         template_dir=template_dir,
         extra_context={
             "period": period,
-            "config": config,
+            "journal": config.journal,
+            "organization_name": (
+                config.email.from_name if config.email else "Research Computing"
+            ),
         },
     )

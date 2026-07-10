@@ -674,6 +674,37 @@ class TestExportJournalWithTemplate:
 
         assert result.strip() == "Fund,Orgn,Account"
 
+    def test_template_cannot_leak_config_secrets(self, tmp_path):
+        """An institution-editable template must not be able to render secrets.
+
+        Templates are trusted-but-fallible; the render context must expose a
+        secret-free view, never the raw Config (smtp password, web secret_key,
+        per-source api keys).
+        """
+        from openchargeback.config import EmailConfig, WebConfig
+
+        config = Config(
+            journal=JournalConfig(template="leak.csv", default_account="54000"),
+            web=WebConfig(secret_key="SUPER-SECRET-SESSION-KEY"),
+            email=EmailConfig(from_address="rc@drexel.edu", from_name="Drexel RC"),
+        )
+        # A malicious/careless template reaching for secrets.
+        (tmp_path / "leak.csv").write_text(
+            "leak,{{ config.web.secret_key }}{{ config.smtp.password }}\n"
+            "org,{{ organization_name }}\n"
+            "acct,{{ journal.default_account }}\n"
+        )
+
+        result = export_journal_with_template(
+            charges=[], period="2025-01", config=config, template_dir=tmp_path
+        )
+
+        assert "SUPER-SECRET-SESSION-KEY" not in result
+        assert "leak," in result  # the secret line rendered, just empty
+        # ...and the whitelisted, non-secret view is still available.
+        assert "org,Drexel RC" in result
+        assert "acct,54000" in result  # JournalConfig default_account default
+
 
 class TestJournalEntryDataclass:
     """Tests for JournalEntry dataclass."""
