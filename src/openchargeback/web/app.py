@@ -14,6 +14,7 @@ from starlette.types import ASGIApp
 
 from openchargeback import audit
 from openchargeback.config import load_config
+from openchargeback.logging import configure_logging
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -105,6 +106,11 @@ def create_app(config_path: Path | None = None) -> FastAPI:
 
     # Load configuration
     config = load_config(config_path)
+
+    # Apply the config's logging settings (file/format/level) — otherwise audit
+    # events, including close-package exports that have no DB record, fall
+    # through to the dev console renderer and vanish on the next deploy.
+    configure_logging(config)
 
     # Configure audit logging
     audit.configure(enabled=config.logging.enabled)

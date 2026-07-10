@@ -264,11 +264,25 @@ def load_config(config_path: Path | None = None) -> Config:
         FileNotFoundError: If config file doesn't exist.
         ValidationError: If config is invalid.
     """
+    explicit = config_path is not None
     if config_path is None:
-        config_path = Path("instance/config.yaml")
+        # An operator can point at the config via env (the container sets
+        # CONFIG_PATH); FOCUS_BILLING_CONFIG is the historical name.  A path
+        # named this way is meant to exist, so it's treated as explicit below.
+        env_path = os.environ.get("CONFIG_PATH") or os.environ.get("FOCUS_BILLING_CONFIG")
+        if env_path:
+            config_path = Path(env_path)
+            explicit = True
+        else:
+            config_path = Path("instance/config.yaml")
 
     if not config_path.exists():
-        # Return default config if no file exists
+        # A path the caller explicitly named (via --config or an env var) that
+        # doesn't exist is an error: silently falling back to a fresh default
+        # config writes to the wrong ledger with a success exit code.  Only the
+        # implicit default location gets the first-run convenience fallback.
+        if explicit:
+            raise FileNotFoundError(f"Config file not found: {config_path}")
         return Config()
 
     with open(config_path) as f:

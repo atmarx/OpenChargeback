@@ -305,6 +305,12 @@ logging:
         config = load_config(config_file)
         assert isinstance(config, Config)
 
+    def test_explicit_missing_path_raises(self, tmp_path):
+        """A --config path that doesn't exist must error, not silently default
+        to a fresh config that writes to the wrong ledger."""
+        with pytest.raises(FileNotFoundError):
+            load_config(tmp_path / "nope.yaml")
+
     def test_load_partial_config(self, tmp_path):
         """Partial config merges with defaults."""
         config_content = """

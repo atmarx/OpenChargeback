@@ -10,6 +10,7 @@ from rich.table import Table
 from . import __version__
 from .config import Config, load_config
 from .db.repository import Charge, Database, PeriodLockedError
+from .logging import configure_logging
 
 
 def _cli_user() -> str:
@@ -48,8 +49,12 @@ ConfigOption = Annotated[
 
 
 def get_config(config_path: Path | None) -> Config:
-    """Load configuration."""
-    return load_config(config_path)
+    """Load configuration and apply its logging settings."""
+    config = load_config(config_path)
+    # Without this, config.logging.file/format/level are inert and CLI audit
+    # events fall through to structlog's default dev console renderer.
+    configure_logging(config)
+    return config
 
 
 def fmt_currency(value: float, config: Config) -> str:
@@ -59,6 +64,10 @@ def fmt_currency(value: float, config: Config) -> str:
 
 def get_db(config: Config) -> Database:
     """Get database connection and ensure it's initialized."""
+    # Create the DB's parent dir so a first run in a fresh directory gets a
+    # clean "created instance/billing.db" instead of an OperationalError
+    # traceback ("unable to open database file").
+    config.database.path.parent.mkdir(parents=True, exist_ok=True)
     db = Database(config.database.path)
     db.initialize()
     return db
@@ -405,7 +414,18 @@ def periods_open(
 
     try:
         billing_period = db.get_or_create_period(period)
-        console.print(f"[green]Period {period} is now open (id={billing_period.id})[/green]")
+        if billing_period.status == "open":
+            console.print(f"[green]Period {period} is open (id={billing_period.id})[/green]")
+        else:
+            # get_or_create_period never changes an existing period's status, so
+            # claiming "now open" on a closed/finalized month was a false success
+            # a cron script would trust.  The CLI has no reopen — say so.
+            console.print(
+                f"[yellow]Period {period} already exists and is "
+                f"{billing_period.status} (id={billing_period.id}). Reopen it in "
+                f"the web UI (Periods → {period} → Reopen) — the CLI "
+                f"has no reopen command.[/yellow]"
+            )
     finally:
         db.close()
 
