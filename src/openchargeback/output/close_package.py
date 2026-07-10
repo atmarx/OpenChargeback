@@ -45,6 +45,7 @@ from ..config import Config
 from ..db.repository import BillingPeriod, Database, EmailLog, ReviewLog
 from .csv_safe import csv_safe
 from .journal import export_journal_csv
+from .journal_template import export_journal_with_template
 
 # Pinned fallback timestamp for periods that have no closed_at yet (e.g. a
 # package built from an open period). Constant so the zip stays deterministic.
@@ -106,15 +107,32 @@ def _collect_files(period_str: str, config: Config, db: Database) -> dict[str, b
 
     files: dict[str, bytes] = {}
 
-    # 1. Journal export (fresh, deterministic — sorted rows, no timestamp in body)
+    # 1. The GL export — the star of the package: the balanced, account-coded
+    # debit/credit journal accounting actually imports into the ERP. Built per
+    # fund straight from the money atoms, so a charge moved to another fund lands
+    # in the right fund here, and every debit has an offsetting credit (balanced
+    # by construction — build_journal_entries asserts it). Deterministic row
+    # order; reconciles to the cent with the statements in this same package.
+    charges = db.get_charges_for_period(billing_period.id, include_flagged=False)
+    source_id_to_name = {s.id: s.name for s in db.list_sources()}
+    gl_csv = export_journal_with_template(
+        period=period_str,
+        charges=charges,
+        config=config,
+        source_id_to_name=source_id_to_name,
+    )
+    files["journal.csv"] = gl_csv.encode("utf-8")
+
+    # 1b. A human-readable summary by PI / project / service. A convenience view
+    # for eyeballing, explicitly NOT the ERP handoff — that is journal.csv above.
     with tempfile.TemporaryDirectory() as tmp:
-        journal_path = export_journal_csv(
+        summary_path = export_journal_csv(
             period=period_str,
             config=config,
             db=db,
-            output_path=Path(tmp) / "journal.csv",
+            output_path=Path(tmp) / "journal_summary.csv",
         )
-        files["journal.csv"] = journal_path.read_bytes()
+        files["journal_summary.csv"] = summary_path.read_bytes()
 
     # 2. Statements — frozen PDFs as sent to PIs, copied verbatim. A package
     # that silently omits statements isn't forensic: if a recorded PDF is
@@ -251,7 +269,11 @@ def _readme(period_str: str) -> bytes:
         "  the audit liability stays with them.",
         "",
         "CONTENTS",
-        "  journal.csv        Bulk journal entries (the ERP handoff).",
+        "  journal.csv          The general-ledger export — the ERP handoff:",
+        "                       balanced, account-coded debit/credit entries,",
+        "                       one per fund. This is the file accounting imports.",
+        "  journal_summary.csv  Human-readable summary by PI / project / service.",
+        "                       A convenience view, NOT the ERP import.",
         "  statements/        Final PDF statements, exactly as emailed to PIs.",
         "  inputs/            Original source files that generated the results,",
         "                     organized by source. (Empty for months imported",

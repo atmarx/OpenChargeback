@@ -231,11 +231,20 @@ def test_package_contains_expected_artifacts(closed_period_db, config):
     members = _members(zip_bytes)
 
     assert "journal.csv" in members
+    assert "journal_summary.csv" in members
     assert "email-log.csv" in members
     assert "audit.csv" in members
     assert "README.txt" in members
     assert "inputs/AWS/aws-may.csv" in members
     assert any(n.startswith("statements/") and n.endswith(".pdf") for n in members)
+
+    # journal.csv is the GL handoff (FOAPAL header), not the old rollup.
+    gl = members["journal.csv"].decode("utf-8")
+    assert gl.splitlines()[0].startswith("Fund,Orgn,Account")
+    # journal_summary.csv is the human-readable rollup.
+    assert members["journal_summary.csv"].decode("utf-8").splitlines()[0].startswith(
+        "BillingPeriod,PIEmail"
+    )
 
     # The frozen PDF is preserved byte-for-byte
     pdf_member = next(n for n in members if n.startswith("statements/"))
@@ -243,6 +252,28 @@ def test_package_contains_expected_artifacts(closed_period_db, config):
 
     # The retained input is the original bytes
     assert members["inputs/AWS/aws-may.csv"] == b"BilledCost,ServiceName\n100.00,Amazon EC2\n"
+
+
+def test_packaged_gl_balances(closed_period_db, config):
+    """The packaged journal.csv is a real GL: its debits equal its credits.
+
+    Parses the FOAPAL columns and sums each side in cents — a forensic package
+    must never carry an unbalanced ledger."""
+    import csv as _csv
+    import io as _io
+
+    _, zip_bytes, _ = build_close_package("2026-05", config, closed_period_db)
+    gl = _members(zip_bytes)["journal.csv"].decode("utf-8")
+
+    debit = credit = 0
+    reader = _csv.DictReader(_io.StringIO(gl))
+    for row in reader:
+        if row.get("Debit"):
+            debit += round(float(row["Debit"]) * 100)
+        if row.get("Credit"):
+            credit += round(float(row["Credit"]) * 100)
+    assert debit == credit
+    assert debit == 100_00  # the fixture's single $100.00 charge
 
 
 def test_audit_csv_includes_period_and_review_events(closed_period_db, config):
