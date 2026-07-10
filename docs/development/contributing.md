@@ -25,7 +25,7 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 
 # Verify installation
-openchargeback --version
+openchargeback version
 python -m pytest tests/ -v
 ```
 
@@ -42,7 +42,7 @@ python -m pytest tests/ -v
 
 ```bash
 # Format code
-black src/ tests/
+ruff format src/ tests/
 
 # Check types
 mypy src/

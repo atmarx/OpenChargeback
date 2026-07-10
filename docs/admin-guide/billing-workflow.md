@@ -61,7 +61,7 @@ openchargeback ingest ./aws_2025-01.csv --source aws --period 2025-01
 
 | Issue | Cause | Solution |
 |-------|-------|----------|
-| "Period is finalized" | Importing to locked period | Import to correct period or unfinalize (if possible) |
+| "Period is finalized" | Importing to locked period | Import to the correct (open) period. Finalization cannot be undone — post corrections to the next period as adjustments. |
 | "Missing pi_email tag" | Tag not in CSV | Fix source data or add tag mapping |
 | Many flagged charges | Strict review patterns | Review patterns in Settings |
 
@@ -242,7 +242,7 @@ out — each one is byte-for-byte identical to the matching entry in the ZIP.
 ### Why it's hashed
 
 The package is **byte-deterministic** in both wrappers: the same canonical data produces
-the same bytes, and the same sha256, every time. The last 6 characters of that hash are
+the same bytes, and the same sha256, every time. The first 6 characters of that hash are
 appended to the filename — e.g. `openchargeback-close-2025-01-a3f29c.zip` or
 `…-a3f29c.pdf` — so the bundle is content-addressable. Verify any file by re-hashing it
 against `MANIFEST.txt`; verify the whole bundle by the filename suffix (also returned in

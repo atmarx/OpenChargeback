@@ -13,7 +13,7 @@ so the wrapper an org picks never changes a number. Same canonical inputs ->
 same bytes -> same sha256, every time, in both formats.
 
 A ``MANIFEST.txt`` inside lists the sha256 of every file *as delivered* — that
-per-file hash list is the package's signature. The last 6 chars of the whole-
+per-file hash list is the package's signature. The first 6 chars of the whole-
 package hash are appended to the filename so the bundle is content-addressable:
 ``openchargeback-close-2026-05-a3f29c.zip`` / ``...-a3f29c.pdf``.
 
@@ -264,7 +264,7 @@ def _readme(period_str: str) -> bytes:
         "  MANIFEST.txt lists the sha256 of each file in this archive. That",
         "  per-file hash list is the package's signature — verify any file by",
         "  re-hashing it and comparing. The 6-character suffix on this package's",
-        "  filename is the last 6 chars of the sha256 of the entire archive,",
+        "  filename is the first 6 chars of the sha256 of the entire archive,",
         "  making the bundle content-addressable. Re-running the close on the",
         "  same canonical data produces the same hash. A different hash means",
         "  something changed — that is a feature, not a bug.",
@@ -490,7 +490,7 @@ def build_close_package(
     container differs, so the choice never changes a number.
 
     Returns ``(filename, package_bytes, sha256_hex)``. The filename embeds the
-    last 6 chars of the full-package sha256:
+    first 6 chars of the full-package sha256:
     ``openchargeback-close-<period>-<hash6>.<ext>``.
     """
     billing_period = db.get_period(period_str)

@@ -79,11 +79,17 @@ openchargeback ingest sample_data/inputs/hpc_2025-01.csv -s hpc -p 2025-01 -c in
 # Generate statements (dry run)
 openchargeback generate -p 2025-01 -c instance/config.yaml --dry-run
 
-# Or start the web UI
+# Or start the web UI (see the login note below first)
 openchargeback serve -c instance/config.yaml
 ```
 
-Open http://localhost:8000 and log in with credentials from `instance/config.yaml`.
+The example config ships no session key and no working password. For a quick
+local look, edit `instance/config.yaml`: set `dev_mode: true` (auto-generates a
+session key) and set the admin `password_hash` to your own —
+`python -c "import bcrypt; print(bcrypt.hashpw(b'changeme', bcrypt.gensalt()).decode())"`.
+Then open http://localhost:8000 and log in as username **`admin`** (the YAML
+key, not the email). For production (`dev_mode: false`) the app refuses to start
+until a strong `web.secret_key` and a real admin hash are set.
 
 ## CLI Automation
 
@@ -129,7 +135,7 @@ Additional resources:
 
 ```bash
 pip install -e ".[dev]"
-pytest                    # 292 tests
+pytest                    # full test suite
 mypy src/                 # Type checking
 ruff check src/           # Linting
 ```

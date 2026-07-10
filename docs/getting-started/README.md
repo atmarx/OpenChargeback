@@ -19,14 +19,25 @@ source .venv/bin/activate
 pip install -e .
 
 # 2. Create configuration
+mkdir -p instance
 cp config.example.yaml instance/config.yaml
-# Edit instance/config.yaml with your settings
+
+# The example ships no session key and no working password (on purpose). For a
+# quick local look, edit instance/config.yaml: set `dev_mode: true` (this
+# auto-generates a session key), then set the admin password_hash to your own:
+python -c "import bcrypt; print(bcrypt.hashpw(b'changeme', bcrypt.gensalt()).decode())"
+# (paste the output as the admin user's password_hash)
 
 # 3. Start the web interface
 openchargeback serve
 
-# 4. Open http://localhost:8000 and log in
+# 4. Open http://localhost:8000 and log in as username `admin` (the YAML key),
+#    not the email address, with the password you hashed above.
 ```
+
+For a production deployment (`dev_mode: false`) the app refuses to start until
+you set a strong `web.secret_key` and replace the example admin hash — see
+[Configuration](configuration.md).
 
 ## Next Steps
 

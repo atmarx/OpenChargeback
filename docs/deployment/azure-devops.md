@@ -21,7 +21,7 @@ This guide covers deploying openchargeback to Azure App Service with:
 ┌─────────────────────────────────────────────────────────────┐
 │                    Azure App Service (B1)                    │
 │  ┌─────────────────────────────────────────────────────┐    │
-│  │           openchargeback Container (Port 8000)        │    │
+│  │           openchargeback Container (Port 3000)        │    │
 │  └─────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
          │                    │                    │
@@ -150,8 +150,11 @@ resource appService 'Microsoft.Web/sites@2023-01-01' = {
         { name: 'DOCKER_REGISTRY_SERVER_URL', value: 'https://${acr.properties.loginServer}' }
         { name: 'DOCKER_REGISTRY_SERVER_USERNAME', value: acr.listCredentials().username }
         { name: 'DOCKER_REGISTRY_SERVER_PASSWORD', value: acr.listCredentials().passwords[0].value }
-        { name: 'WEBSITES_PORT', value: '8000' }
-        { name: 'DATABASE_PATH', value: '/data/billing.db' }
+        { name: 'WEBSITES_PORT', value: '3000' }
+        // NOTE: the app has no DATABASE_PATH env var. The DB path comes from
+        // config.yaml (database.path). Mount your Azure Files share at
+        // /app/instance and point database.path there, or the SQLite file lands
+        // in the ephemeral container and is lost on every redeploy.
         { name: 'WEB_SECRET_KEY', value: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=web-secret-key)' }
         { name: 'ACS_CONNECTION_STRING', value: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=acs-connection-string)' }
       ]
@@ -182,8 +185,7 @@ output acrLoginServer string = acr.properties.loginServer
 **Environment Variables**:
 | Variable | Purpose |
 |----------|---------|
-| `WEBSITES_PORT` | Tell App Service the container listens on 8000 |
-| `DATABASE_PATH` | SQLite file location on mounted share |
+| `WEBSITES_PORT` | Tell App Service the container listens on 3000 |
 | `WEB_SECRET_KEY` | Session encryption (from Key Vault) |
 | `ACS_CONNECTION_STRING` | Email service (from Key Vault) |
 

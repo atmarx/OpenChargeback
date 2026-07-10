@@ -88,8 +88,7 @@ openchargeback review list
 # Filter by period
 openchargeback review list --period 2025-01
 
-# Filter by flag reason
-openchargeback review list --reason missing_fund_org
+# (Filtering by flag reason is available in the web Review Queue, not the CLI.)
 
 # Approve specific charge
 openchargeback review approve --id 12345
