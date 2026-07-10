@@ -194,6 +194,12 @@ class JournalConfig(BaseModel):
     # Default account code if not specified on charge or source
     default_account: str = ""
 
+    # Where a source with no configured fund_org is credited, so the journal
+    # still balances instead of silently dropping the credit. Empty falls back
+    # to a visible "CLEARING-<source>" placeholder that both balances the entry
+    # and flags that the source needs a real fund_org.
+    clearing_fund_org: str = ""
+
     # Description template for journal entries
     # Available variables: {source}, {period}, {fund_org}, {pi_email}, {project_id}
     debit_description: str = "{source} {period} Research Computing Charges"

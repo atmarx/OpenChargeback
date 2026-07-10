@@ -16,6 +16,27 @@ from jinja2 import (
 from ..config import Config, KnownSourceConfig
 from ..money import NO_PROJECT, build_atoms
 
+# The GL template ships inside the package so it is always present in the wheel
+# and the Docker image. The repo-root ``templates/`` dir is NOT packaged (the
+# Dockerfile only copies web UI templates to /app/templates), so resolving the
+# GL template CWD-relative alone raised TemplateNotFound in the container — the
+# "ERP handoff" export was silently 500ing in production. See resolve_template_dir.
+_PACKAGE_TEMPLATE_DIR = Path(__file__).parent / "templates"
+
+
+def resolve_template_dir(template_name: str, override_dir: Path | None = None) -> Path:
+    """Locate the directory that actually holds ``template_name``.
+
+    An institution override wins — an explicitly passed dir, or a ``templates/``
+    dir in the working directory that contains the file — so a site can drop in
+    its own GL layout without touching the package. Otherwise the copy shipped
+    inside the package, which is always present in the wheel and the image.
+    """
+    for candidate in (override_dir, Path("templates")):
+        if candidate is not None and (candidate / template_name).exists():
+            return candidate
+    return _PACKAGE_TEMPLATE_DIR
+
 
 @dataclass
 class JournalEntry:
@@ -205,9 +226,13 @@ def build_journal_entries(
         source_config = get_source_config(source_name, config)
         source_fund_org = source_config.fund_org if source_config else ""
 
+        # A source with no configured fund_org must still be credited: dropping
+        # the credit unbalances the journal (debits with no offset), which an ERP
+        # rejects and a forensic package must never ship. Route it to the
+        # clearing fund_org; if that too is unset, a visible placeholder so the
+        # entry balances AND flags that the source needs a real fund_org.
         if not source_fund_org:
-            # Skip credit entry if source has no fund_org configured
-            continue
+            source_fund_org = journal_config.clearing_fund_org or f"CLEARING-{source_name}"
 
         # Parse the source's fund_org
         parsed = parse_fund_org(source_fund_org, fund_org_regex)
@@ -244,10 +269,36 @@ def build_journal_entries(
             project_id="",
         ))
 
-    # Sort: debits first (by fund_org), then credits (by fund_org)
-    entries.sort(key=lambda e: (not e.is_debit, e.fund_org))
+    # Sort debits first, then credits, each fully ordered by content so the GL
+    # row order (and therefore the close-package bytes) is deterministic even
+    # when two entries share a fund_org.
+    entries.sort(
+        key=lambda e: (
+            not e.is_debit, e.fund_org, e.source_name,
+            e.account, e.pi_email, e.project_id,
+        )
+    )
 
+    assert_journal_balanced(entries)
     return entries
+
+
+def assert_journal_balanced(entries: list[JournalEntry]) -> None:
+    """A GL that doesn't balance is a broken handoff — fail loudly, never ship it.
+
+    Compares in integer cents (entry amounts are exact-cents floats) so float
+    drift can neither mask a real imbalance nor invent a phantom one. With every
+    source now credited (see the clearing-fund fallback above) this is a safety
+    net that should never fire — if it does, that is a real bug worth stopping for.
+    """
+    debit_cents = sum(round(e.amount * 100) for e in entries if e.is_debit)
+    credit_cents = sum(round(e.amount * 100) for e in entries if e.is_credit)
+    if debit_cents != credit_cents:
+        raise ValueError(
+            f"Journal does not balance: debits ${debit_cents / 100:.2f} != "
+            f"credits ${credit_cents / 100:.2f}. Every source needs a fund_org "
+            "(or set journal.clearing_fund_org)."
+        )
 
 
 def render_journal_template(
@@ -311,12 +362,13 @@ def export_journal_with_template(
     Returns:
         Rendered journal content as string.
     """
-    if template_dir is None:
-        template_dir = Path("templates")
-
     entries = build_journal_entries(charges, period, config, source_id_to_name)
 
     template_name = config.journal.template
+
+    # Resolve robustly: an institution override wins, else the packaged copy.
+    # Never a bare CWD lookup — that is what broke this export in the container.
+    template_dir = resolve_template_dir(template_name, template_dir)
 
     # Institution-editable templates must never see the raw Config — that
     # object carries config.smtp.password, config.web.secret_key, and per-source

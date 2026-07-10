@@ -13,13 +13,63 @@ from openchargeback.config import (
     TagMappingConfig,
 )
 from openchargeback.output.journal_template import (
+    _PACKAGE_TEMPLATE_DIR,
     JournalEntry,
+    assert_journal_balanced,
     build_journal_entries,
     export_journal_with_template,
     get_source_config,
     parse_fund_org,
     render_journal_template,
+    resolve_template_dir,
 )
+
+
+class TestTemplateResolution:
+    """The GL template must resolve without a CWD templates/ dir — that is the
+    container reality (repo-root templates/ is not shipped), where this export
+    used to 500 with TemplateNotFound."""
+
+    def test_packaged_template_exists(self):
+        assert (_PACKAGE_TEMPLATE_DIR / "journal_gl.csv").exists()
+
+    def test_falls_back_to_package_when_no_override(self, tmp_path, monkeypatch):
+        # Simulate the container: cwd has no templates/journal_gl.csv.
+        monkeypatch.chdir(tmp_path)
+        assert resolve_template_dir("journal_gl.csv") == _PACKAGE_TEMPLATE_DIR
+
+    def test_institution_override_wins(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        override = tmp_path / "templates"
+        override.mkdir()
+        (override / "journal_gl.csv").write_text("custom")
+        resolved = resolve_template_dir("journal_gl.csv")
+        assert (resolved / "journal_gl.csv").read_text() == "custom"
+
+    def test_export_works_without_cwd_templates(self, tmp_path, monkeypatch):
+        """The end-to-end proof: render the GL from a cwd with no templates/."""
+        monkeypatch.chdir(tmp_path)
+
+        @dataclass
+        class _C:
+            source_id: int = 1
+            pi_email: str = "pi@example.edu"
+            project_id: str = "p"
+            fund_org: str = "123456-1000"
+            billed_cost: float = 50.0
+            list_cost: float | None = None
+            service_name: str = "EC2"
+            raw_tags: dict | None = None
+
+        config = Config(
+            journal=JournalConfig(fund_org_regex=r"^(?P<fund>\d{6})-(?P<orgn>\d{4})$")
+        )
+        out = export_journal_with_template(
+            charges=[_C()], period="2025-01", config=config,
+            source_id_to_name={1: "AWS"},
+        )
+        assert "Fund,Orgn,Account" in out  # the header rendered
+        assert "50.00" in out
 
 
 class TestParseFundOrg:
@@ -429,8 +479,9 @@ class TestBuildJournalEntries:
             if entry.is_debit and found_credit:
                 pytest.fail("Found debit after credit")
 
-    def test_source_without_fund_org_skips_credit(self, mock_charge):
-        """Source without fund_org configured skips credit entry."""
+    def test_source_without_fund_org_still_balances(self, mock_charge):
+        """A source with no fund_org is credited to a clearing account, not
+        dropped — the journal must balance (dropping the credit was a bug)."""
         config = Config(
             imports=ImportConfig(
                 known_sources=[
@@ -454,12 +505,16 @@ class TestBuildJournalEntries:
 
         entries = build_journal_entries(charges, "2025-01", config, source_map)
 
-        # Should only have debit, no credit
-        assert len(entries) == 1
-        assert entries[0].is_debit
+        # Debit + a clearing credit — balanced, not a lone unbalanced debit.
+        debits = [e for e in entries if e.is_debit]
+        credits = [e for e in entries if e.is_credit]
+        assert len(debits) == 1 and len(credits) == 1
+        assert sum(e.amount for e in debits) == sum(e.amount for e in credits)
+        assert "CLEARING" in credits[0].fund_org
 
-    def test_unknown_source_skips_credit(self, basic_config, mock_charge):
-        """Unknown source (not in config) skips credit entry."""
+    def test_unknown_source_still_balances(self, basic_config, mock_charge):
+        """Unknown source (not in config) is credited to a clearing account so
+        the entry balances, rather than shipping a debit with no offset."""
         charges = [
             mock_charge(
                 source_id=99,
@@ -473,9 +528,33 @@ class TestBuildJournalEntries:
 
         entries = build_journal_entries(charges, "2025-01", basic_config, source_map)
 
-        # Should only have debit, no credit (source not in known_sources)
-        assert len(entries) == 1
-        assert entries[0].is_debit
+        debits = [e for e in entries if e.is_debit]
+        credits = [e for e in entries if e.is_credit]
+        assert len(debits) == 1 and len(credits) == 1
+        assert sum(e.amount for e in debits) == sum(e.amount for e in credits)
+
+    def test_configured_clearing_fund_org_is_used(self, mock_charge):
+        """When journal.clearing_fund_org is set, a fund_org-less source credits
+        there instead of the CLEARING-<source> placeholder."""
+        config = Config(
+            imports=ImportConfig(
+                known_sources=[KnownSourceConfig(name="AWS", fund_org="")]
+            ),
+            journal=JournalConfig(
+                fund_org_regex=r"^(?P<orgn>[^-]+)-(?P<fund>.+)$",
+                clearing_fund_org="CLR-9999",
+            ),
+        )
+        charges = [
+            mock_charge(
+                source_id=1, pi_email="pi@example.edu", project_id="p",
+                fund_org="DEPT-PROJECT", billed_cost=100.00,
+            ),
+        ]
+        entries = build_journal_entries(charges, "2025-01", config, {1: "AWS"})
+        credits = [e for e in entries if e.is_credit]
+        assert len(credits) == 1
+        assert credits[0].fund_org == "CLR-9999"
 
 
 class TestRenderJournalTemplate:

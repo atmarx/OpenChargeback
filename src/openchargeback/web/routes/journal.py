@@ -4,7 +4,6 @@ import csv
 import io
 from datetime import datetime
 from decimal import Decimal
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, Form, Query, Request
@@ -271,13 +270,13 @@ async def export_journal(
         sources = db.list_sources()
         source_id_to_name = {s.id: s.name for s in sources}
 
-        # Render using template
-        template_dir = Path("templates")
+        # Render using the configured template. Pass no dir — the exporter
+        # resolves an institution override, else the packaged copy (a bare
+        # CWD lookup 500s in the container, where templates/ isn't shipped).
         content = export_journal_with_template(
             charges=charges,
             period=period.period,
             config=config,
-            template_dir=template_dir,
             source_id_to_name=source_id_to_name,
         )
         output.write(content)
