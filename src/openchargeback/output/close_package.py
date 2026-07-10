@@ -133,6 +133,7 @@ def _collect_files(period_str: str, config: Config, db: Database) -> dict[str, b
             + ". Regenerate statements before closing the package."
         )
     for stmt in statements:
+        assert stmt.pdf_path is not None  # missing_pdfs check above guarantees this
         pdf = Path(stmt.pdf_path)
         files[f"statements/{_safe_name(pdf.name)}"] = pdf.read_bytes()
 

@@ -639,6 +639,7 @@ def review_approve(
             flagged = db.get_flagged_charges(bp.id)
             count = db.approve_all_charges(bp.id, performed_by=_cli_user())
             for charge in flagged:
+                assert charge.id is not None  # persisted charges always have an id
                 db.log_review_action(
                     billing_period_id=bp.id,
                     charge_id=charge.id,

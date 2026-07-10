@@ -42,7 +42,6 @@ steps:
       - mypy src/ --ignore-missing-imports
     volumes:
       - /opt/cache/pip:/cache/pip
-    failure: ignore  # Don't fail build on type errors (yet)
 
   - name: sbom
     image: python:3.12-slim
@@ -76,3 +75,5 @@ steps:
       branch: main
     depends_on:
       - sbom
+      - close-package-determinism
+      - typecheck

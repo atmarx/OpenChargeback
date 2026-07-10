@@ -388,6 +388,7 @@ class Database:
         current = self.get_period(period)
         is_transition = current is not None and status != current.status
         if is_transition:
+            assert current is not None  # is_transition guarantees this
             allowed = self.VALID_TRANSITIONS.get(current.status, set())
             if status not in allowed:
                 raise ValueError(
