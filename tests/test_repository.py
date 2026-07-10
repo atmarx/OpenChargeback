@@ -564,11 +564,20 @@ class TestChargeOperations:
         ]
         db.insert_charges(charges)
 
-        count = db.approve_all_charges(period.id)
+        count = db.approve_all_charges(period.id, performed_by="reg")
         assert count == 3
 
         flagged = db.get_flagged_charges(period.id)
         assert len(flagged) == 0
+
+        # Every bulk approval must be recorded in review_logs — the close
+        # package's audit.csv is built from these, so a blank trail would mean
+        # the forensic artifact silently omits a whole period's approvals.
+        logs = db.get_review_logs(period.id, action="approved")
+        assert len(logs) == 3
+        assert {log.resource_id for log in logs} == {"res-1", "res-2", "res-3"}
+        assert all(log.performed_by == "reg" for log in logs)
+        assert all(log.amount == 10.00 for log in logs)
 
     def test_reject_charge_soft_delete(self, db, period, source):
         """Reject a charge — soft-delete, stays in DB but excluded from queries."""

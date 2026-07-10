@@ -42,11 +42,18 @@ def create_db_engine(connection_string: str | Path) -> Engine:
             # SQLite-specific: enable foreign key enforcement
             connect_args={"check_same_thread": False},
         )
-        # Enable foreign keys for SQLite (must be done per-connection)
+        # Per-connection SQLite pragmas.  WAL lets the web UI and the CLI touch
+        # the same ledger concurrently without "database is locked" (readers
+        # don't block the writer), and makes the documented `sqlite3 .backup`
+        # of a live DB safe.  busy_timeout waits out a transient writer lock
+        # instead of failing instantly.  foreign_keys must be re-enabled per
+        # connection.
         @event.listens_for(engine, "connect")
         def set_sqlite_pragma(dbapi_connection: Any, connection_record: Any) -> None:
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA busy_timeout=5000")
             cursor.close()
 
     elif dialect in ("postgresql", "postgres"):

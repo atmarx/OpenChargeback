@@ -759,20 +759,57 @@ class Database:
             return result.rowcount > 0
 
     def approve_all_charges(self, billing_period_id: int, performed_by: str | None = None) -> int:
-        """Approve all flagged charges for a period."""
+        """Approve all flagged charges for a period.
+
+        Writes one review_logs row per charge in the same transaction as the
+        approval, so a bulk approval is recorded in the close package's
+        audit.csv exactly like a single approval.  Previously the web
+        "Approve all" button cleared the whole queue and left the forensic
+        trail blank; only the CLI logged (in a separate loop), so the audit
+        record depended on which interface you used.
+        """
         self._assert_period_not_finalized(billing_period_id)
         with self.engine.begin() as conn:
-            result = conn.execute(
+            flagged = conn.execute(
+                select(
+                    charges.c.id,
+                    charges.c.pi_email,
+                    charges.c.billed_cost,
+                    charges.c.resource_id,
+                    charges.c.service_name,
+                )
+                .where(charges.c.billing_period_id == billing_period_id)
+                .where(charges.c.needs_review == True)  # noqa: E712
+            ).fetchall()
+
+            if not flagged:
+                return 0
+
+            now = datetime.now()
+            conn.execute(
                 update(charges)
                 .where(charges.c.billing_period_id == billing_period_id)
                 .where(charges.c.needs_review == True)  # noqa: E712
-                .values(
-                    needs_review=False,
-                    reviewed_at=datetime.now(),
-                    reviewed_by=performed_by,
-                )
+                .values(needs_review=False, reviewed_at=now, reviewed_by=performed_by)
             )
-            return result.rowcount
+            conn.execute(
+                review_logs.insert(),
+                [
+                    {
+                        "billing_period_id": billing_period_id,
+                        "charge_id": row.id,
+                        "action": "approved",
+                        "pi_email": row.pi_email,
+                        "resource_id": row.resource_id,
+                        "service_name": row.service_name,
+                        "amount": row.billed_cost,
+                        "note": None,
+                        "performed_by": performed_by,
+                    }
+                    for row in flagged
+                ],
+            )
+            return len(flagged)
 
     def reject_charge(
         self, charge_id: int, performed_by: str | None = None, note: str | None = None
@@ -1450,7 +1487,10 @@ class Database:
                         review_logs.c.billing_period_id == billing_periods.c.id,
                     )
                 )
-                .order_by(review_logs.c.performed_at.desc())
+                # id tiebreaker so same-second review rows have a stable order —
+                # the close package's audit.csv is byte-deterministic even when
+                # a bulk approval stamps many rows in the same second.
+                .order_by(review_logs.c.performed_at.desc(), review_logs.c.id.desc())
             )
 
             if billing_period_id:

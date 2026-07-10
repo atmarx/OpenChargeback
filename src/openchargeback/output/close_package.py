@@ -218,8 +218,10 @@ def _audit_csv(billing_period: BillingPeriod, review_logs: list[ReviewLog]) -> b
             log.note or "",
         ))
 
-    # Columns 2 (actor), 4 (pi_email), 6 (detail) carry provider/user text.
-    for row in sorted(events, key=lambda e: (e[0] or "", e[1])):
+    # Sort by (timestamp, event, charge_id) so same-second review rows have a
+    # stable order and the package stays byte-deterministic.  Columns 2 (actor),
+    # 4 (pi_email), 6 (detail) carry provider/user text and are formula-guarded.
+    for row in sorted(events, key=lambda e: (e[0] or "", e[1], str(e[3]))):
         writer.writerow([
             row[0], row[1], csv_safe(row[2]), row[3],
             csv_safe(row[4]), row[5], csv_safe(row[6]),

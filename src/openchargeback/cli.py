@@ -636,20 +636,9 @@ def review_approve(
             if not bp:
                 console.print(f"[red]Period {period} not found[/red]")
                 raise typer.Exit(1)
-            flagged = db.get_flagged_charges(bp.id)
+            # approve_all_charges now writes the per-charge review_logs itself
+            # (same transaction), so both interfaces produce an honest audit.
             count = db.approve_all_charges(bp.id, performed_by=_cli_user())
-            for charge in flagged:
-                assert charge.id is not None  # persisted charges always have an id
-                db.log_review_action(
-                    billing_period_id=bp.id,
-                    charge_id=charge.id,
-                    action="approved",
-                    pi_email=charge.pi_email,
-                    amount=charge.billed_cost,
-                    resource_id=charge.resource_id,
-                    service_name=charge.service_name,
-                    performed_by=_cli_user(),
-                )
             console.print(f"[green]{count} charges approved for {period}[/green]")
     except PeriodLockedError as e:
         console.print(f"[red]{e}[/red]")
