@@ -136,11 +136,18 @@ journal:
   # Regex to validate account codes (optional, leave empty to skip)
   account_code_regex: ""
 
-  # Template file in templates/ directory
+  # Template file. A default journal_gl.csv ships with the package; a file of
+  # this name in your templates/ directory overrides it.
   template: journal_gl.csv
 
   # Default account code if not specified on charge or source
   default_account: ""
+
+  # Where a source with no configured fund_org is credited, so the journal still
+  # balances instead of dropping the credit. Leave empty to use a visible
+  # "CLEARING-<source>" placeholder that both balances the entry and flags that
+  # the source needs a real fund_org.
+  clearing_fund_org: ""
 
   # Description templates for journal entries
   # Available variables: {source}, {period}, {fund_org}, {pi_email}, {project_id}

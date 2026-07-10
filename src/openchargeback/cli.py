@@ -263,7 +263,7 @@ def export_package(
 ) -> None:
     """Export the forensic monthly close package (zip or pdf portfolio).
 
-    Same canonical data produces the same bytes and the same sha256 — the last
+    Same canonical data produces the same bytes and the same sha256 — the first
     6 chars of which are embedded in the filename for content-addressing.
     """
     from . import audit

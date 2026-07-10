@@ -2,10 +2,13 @@
 
 This guide covers exporting billing data for your accounting system (Banner, Workday, PeopleSoft, etc.).
 
-> **Note:** The journal export is also bundled — as `journal.csv` — inside the monthly
-> [close package](billing-workflow.md#step-6-download-the-close-package), the deterministic
-> hashed archive handed to research accounting. Use the standalone export below for ad-hoc
-> needs; the package is the canonical month-end handoff.
+> **Note:** The monthly [close package](billing-workflow.md#step-6-download-the-close-package)
+> — the deterministic hashed archive handed to research accounting — bundles the GL
+> as **`journal.csv`**: the balanced, account-coded **Custom Template (GL)** export
+> described below, the file your ERP actually imports. It also bundles
+> **`journal_summary.csv`**, the human-readable PI/project/service rollup, clearly
+> labeled a convenience view rather than the handoff. Use the standalone exports
+> below for ad-hoc needs; the package is the canonical month-end handoff.
 
 ## Export Formats
 
@@ -71,11 +74,19 @@ exporter that builds true balanced GL entries:
 - **Debit entries**: Charges to each PI's fund_org (expense), with account
   codes resolved from charge tags, per-source config, or `journal.default_account`
 - **Credit entries**: Offsetting entries to each service provider's configured
-  fund_org (revenue)
+  fund_org (revenue). A source with **no** configured `fund_org` is credited to
+  `journal.clearing_fund_org` (or a visible `CLEARING-<source>` placeholder if
+  that too is unset) rather than dropped — so the journal **always balances**.
+  The exporter asserts debits equal credits before returning; an unbalanced
+  journal is a hard error, never a silently shipped file.
 
 All of the `journal:` configuration below (fund/org parsing, account codes,
 credit fund/orgs) applies to this format.  See [Templates](templates.md) for
 template customization.
+
+The template (`journal_gl.csv`) ships inside the package, so this export works
+out of the box — including in the Docker image. Dropping a `journal_gl.csv` into
+your own `templates/` directory still overrides it.
 
 ---
 
@@ -274,6 +285,12 @@ Ensure either:
 
 ### "Journal doesn't balance"
 
-1. Verify all sources have `fund_org` configured for credits
-2. Check for charges without a source assignment
-3. Review the template for missing entries
+The Custom Template (GL) export balances by construction — every debit gets an
+offsetting credit, and the exporter asserts debits equal credits before it
+returns. If you ever see the balance assertion fail, it points to a real bug,
+not a config gap; capture the period and file it.
+
+What a missing source `fund_org` *does* cause is credits landing in a placeholder
+`CLEARING-<source>` account instead of a real one. To route them somewhere
+meaningful, set each source's `fund_org` (or a global `journal.clearing_fund_org`).
+The entry still balances either way.

@@ -541,9 +541,9 @@ Fund,Orgn,Account,Program,Activity,Location,Debit,Credit,Description,Reference I
 
 For each billing period, the journal export creates:
 1. **Debit entries**: One per unique (PI fund_org, source) combination, charging the PI's fund
-2. **Credit entries**: One per source, crediting the source's configured fund_org
+2. **Credit entries**: One per source, crediting the source's configured fund_org — or, when a source has no `fund_org`, a `clearing_fund_org` (falling back to a visible `CLEARING-<source>` placeholder) so the credit is never dropped
 
-This creates balanced double-entry accounting where charges to PIs are offset by credits to the service provider's fund.
+This creates balanced double-entry accounting where charges to PIs are offset by credits to the service provider's fund. The export asserts debits equal credits before returning — an unbalanced journal is a hard error, not a shipped file.
 
 ---
 

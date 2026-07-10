@@ -154,13 +154,23 @@ Uses the same variables as the PDF template, plus:
 
 **File**: `templates/journal_gl.csv`
 
+A default `journal_gl.csv` ships inside the package, so the GL export works out
+of the box (including in the Docker image). A file at `templates/journal_gl.csv`
+in your working directory overrides it.
+
 ### Available Variables
 
 | Variable | Type | Description |
 |----------|------|-------------|
 | `entries` | list | List of JournalEntry objects |
 | `period` | str | Billing period |
-| `config` | Config | Full application config |
+| `journal` | JournalConfig | Journal display settings (non-secret) |
+| `organization_name` | str | Your organization's display name |
+
+> The full application `config` is **not** exposed to templates — it carries
+> SMTP passwords, the web secret key, and per-source API keys, which a template
+> line could otherwise render straight into the GL CSV. Only the secret-free
+> fields above are available.
 
 ### JournalEntry Fields
 
