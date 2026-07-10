@@ -401,3 +401,22 @@ def test_both_months_both_wrappers_agree(temp_db, tmp_path):
     # The hash tracks the data: a different month is a different package.
     assert pkg_hashes["2025-01"]["zip"] != pkg_hashes["2025-12"]["zip"]
     assert pkg_hashes["2025-01"]["pdf"] != pkg_hashes["2025-12"]["pdf"]
+
+
+def test_statement_filenames_are_injective():
+    """Distinct (pi_email, project_id) pairs must never share a filename —
+    otherwise one PI's statement overwrites another's and the package drops it."""
+    from openchargeback.output.pdf import statement_pdf_filename
+
+    # Same local-part, different domain — the classic cross-PI collision.
+    a = statement_pdf_filename("2026-05", "smith@dept-a.edu", "genomics")
+    b = statement_pdf_filename("2026-05", "smith@dept-b.edu", "genomics")
+    assert a != b
+
+    # Project ids differing only by slash-vs-underscore.
+    c = statement_pdf_filename("2026-05", "pi@x.edu", "R01/CA/1")
+    d = statement_pdf_filename("2026-05", "pi@x.edu", "R01_CA_1")
+    assert c != d
+
+    # Deterministic: same inputs -> same name (needed for package determinism).
+    assert a == statement_pdf_filename("2026-05", "smith@dept-a.edu", "genomics")

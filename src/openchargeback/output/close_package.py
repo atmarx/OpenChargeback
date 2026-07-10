@@ -136,7 +136,15 @@ def _collect_files(period_str: str, config: Config, db: Database) -> dict[str, b
     for stmt in statements:
         assert stmt.pdf_path is not None  # missing_pdfs check above guarantees this
         pdf = Path(stmt.pdf_path)
-        files[f"statements/{_safe_name(pdf.name)}"] = pdf.read_bytes()
+        archive_name = f"statements/{_safe_name(pdf.name)}"
+        if archive_name in files:
+            # Two statements must never map to one member — that would silently
+            # drop a PI's statement from a "complete" forensic package.
+            raise ValueError(
+                f"Cannot build close package for {period_str}: two statements "
+                f"map to the same archive name {archive_name!r}."
+            )
+        files[archive_name] = pdf.read_bytes()
 
     # 3. Original input files retained at import time
     input_root = config.output.archive_dir / _safe_name(period_str)

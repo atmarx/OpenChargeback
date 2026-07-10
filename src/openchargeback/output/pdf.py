@@ -1,5 +1,6 @@
 """PDF statement generation using WeasyPrint."""
 
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -7,6 +8,24 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from ..config import Config
 from ..processing.aggregator import ProjectSummary
+
+
+def statement_pdf_filename(period: str, pi_email: str, project_id: str) -> str:
+    """Build an injective statement PDF filename.
+
+    The name must be unique across (pi_email, project_id): two PIs sharing an
+    email local-part across domains (smith@a.edu vs smith@b.edu), or projects
+    differing only by slash-vs-underscore, must not collapse to one file — the
+    second render would overwrite the first on disk, both statement rows would
+    point at it, the download route would serve the wrong PI's PDF, and the
+    close package would silently ship one statement instead of two.  A short
+    hash of the full pair restores uniqueness while keeping a readable prefix.
+    """
+    safe_project_id = project_id.replace("/", "_").replace("\\", "_")
+    safe_pi = pi_email.split("@")[0]
+    disambig = hashlib.sha256(f"{pi_email}|{project_id}".encode()).hexdigest()[:8]
+    return f"{period}_{safe_pi}_{safe_project_id}_{disambig}.pdf"
+
 
 # Default template if no custom template exists
 DEFAULT_STATEMENT_TEMPLATE = """
@@ -351,10 +370,8 @@ def generate_pdf_statement(
         generated_at=datetime.now().strftime("%Y-%m-%d %H:%M"),
     )
 
-    # Generate PDF
-    safe_project_id = project_summary.project_id.replace("/", "_").replace("\\", "_")
-    safe_pi = pi_email.split("@")[0]
-    pdf_filename = f"{period}_{safe_pi}_{safe_project_id}.pdf"
+    # Generate PDF under an injective name (see statement_pdf_filename).
+    pdf_filename = statement_pdf_filename(period, pi_email, project_summary.project_id)
     pdf_path = config.output.pdf_dir / pdf_filename
 
     HTML(string=html_content).write_pdf(pdf_path)
