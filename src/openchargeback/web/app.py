@@ -10,25 +10,40 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import Response
+from starlette.types import ASGIApp
 
 from openchargeback import audit
 from openchargeback.config import load_config
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """Add security headers including CSP that allows our static assets."""
+    """Add security headers: CSP (allowing our static assets), anti-clickjacking,
+    nosniff, referrer policy, and HSTS in production."""
+
+    def __init__(self, app: ASGIApp, hsts: bool = False) -> None:
+        super().__init__(app)
+        self._hsts = hsts
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         response = await call_next(request)
-        # Allow our own static files and inline styles (for htmx)
+        # Allow our own static files and inline styles (for htmx); frame-ancestors
+        # 'none' blocks the state-changing POST forms from being clickjacked.
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline'; "
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data:; "
             "font-src 'self'; "
-            "connect-src 'self'"
+            "connect-src 'self'; "
+            "frame-ancestors 'none'"
         )
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "same-origin"
+        if self._hsts:
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=63072000; includeSubDomains"
+            )
         return response
 
 
@@ -101,13 +116,14 @@ def create_app(config_path: Path | None = None) -> FastAPI:
         version="0.4.1",
         docs_url=None,  # Disable Swagger UI in production
         redoc_url=None,  # Disable ReDoc in production
+        openapi_url=None,  # Don't expose the full API schema anonymously
     )
 
     # Store config in app state
     app.state.config = config
 
-    # Security headers middleware (CSP, etc.)
-    app.add_middleware(SecurityHeadersMiddleware)
+    # Security headers middleware (CSP, HSTS in prod, etc.)
+    app.add_middleware(SecurityHeadersMiddleware, hsts=not config.dev_mode)
 
     # Session middleware for authentication
     # Check config first, then fall back to WEB_SECRET_KEY env var
@@ -216,7 +232,7 @@ def create_app(config_path: Path | None = None) -> FastAPI:
     @app.get("/health")
     async def health_check() -> dict[str, str]:
         """Health check endpoint."""
-        return {"status": "ok", "templates_dir": str(templates_dir)}
+        return {"status": "ok"}
 
     @app.exception_handler(401)
     async def unauthorized_handler(request: Request, exc: Exception) -> Response:

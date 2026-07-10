@@ -9,6 +9,7 @@ from openchargeback.web.auth import authenticate_user
 from openchargeback.web.deps import (
     add_flash_message,
     get_config,
+    get_current_user_optional,
     get_db,
     get_flash_messages,
     get_templates,
@@ -23,9 +24,15 @@ async def login_page(
     config: Config = Depends(get_config),
 ) -> Response:
     """Render the login page."""
-    # If already logged in, redirect to dashboard
+    # If already logged in as a still-valid user, go to the dashboard.  But if
+    # the session points at a user that no longer exists (deleted, or removed
+    # from config.yaml), clear the stale session and show the form — otherwise
+    # this page and the 401 handler bounce each other forever (ERR_TOO_MANY_
+    # REDIRECTS) after a routine user deletion.
     if request.session.get("user_id"):
-        return RedirectResponse(url="/", status_code=302)
+        if get_current_user_optional(request) is not None:
+            return RedirectResponse(url="/", status_code=302)
+        request.session.clear()
 
     templates = get_templates(request)
     flash_messages = get_flash_messages(request)
