@@ -240,6 +240,30 @@ DEFAULT_STATEMENT_TEMPLATE = """
         </tbody>
     </table>
 
+    {% if is_mixed_fund %}
+    <h2>Charges by Fund</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Fund/Org</th>
+                <th class="amount">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for fund, amount in fund_breakdown|dictsort %}
+            <tr>
+                <td>{{ fund or 'N/A' }}</td>
+                <td class="amount">${{ "%.2f"|format(amount) }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="total-row">
+                <td>Total</td>
+                <td class="amount">${{ "%.2f"|format(total_cost) }}</td>
+            </tr>
+        </tbody>
+    </table>
+    {% endif %}
+
     <h2>Charge Details</h2>
     <table>
         <thead>
@@ -328,6 +352,53 @@ def get_template_env(config: Config) -> Environment:
     return Environment(loader=StringLoader(), autoescape=select_autoescape(["html", "xml"]))
 
 
+def render_statement_html(
+    period: str,
+    pi_email: str,
+    project_summary: ProjectSummary,
+    config: Config,
+) -> str:
+    """Render the statement HTML for a project (the PDF's source markup).
+
+    Split out from generate_pdf_statement so the markup can be asserted without
+    running WeasyPrint.
+    """
+    from datetime import datetime
+
+    env = get_template_env(config)
+    template = env.get_template("statement.html")
+
+    # A mixed-fund project must not display a single (wrong) fund in the meta
+    # box. Show the real fund when uniform; "Multiple" (with a per-fund breakdown
+    # table below) when the charges span funds — so the statement reconciles with
+    # the per-fund GL export. Even a custom template that only prints fund_org
+    # then reads honestly.
+    fund_display = (
+        "Multiple (see Charges by Fund)"
+        if project_summary.is_mixed_fund
+        else project_summary.fund_org
+    )
+
+    return template.render(
+        period=period,
+        pi_email=pi_email,
+        project_id=project_summary.project_id,
+        fund_org=fund_display,
+        is_mixed_fund=project_summary.is_mixed_fund,
+        fund_breakdown=project_summary.fund_breakdown,
+        total_list_cost=project_summary.total_list_cost,
+        total_cost=project_summary.total_cost,
+        total_discount=project_summary.total_discount,
+        discount_percent=project_summary.discount_percent,
+        service_breakdown=project_summary.service_breakdown,
+        service_list_breakdown=project_summary.service_list_breakdown,
+        charges=project_summary.charges,
+        organization_name=config.email.from_name if config.email else "Research Computing",
+        contact_email=config.email.from_address if config.email else "support@example.edu",
+        generated_at=datetime.now().strftime("%Y-%m-%d %H:%M"),
+    )
+
+
 def generate_pdf_statement(
     period: str,
     pi_email: str,
@@ -345,30 +416,9 @@ def generate_pdf_statement(
     Returns:
         Path to generated PDF file.
     """
-    from datetime import datetime
-
     from weasyprint import HTML
 
-    env = get_template_env(config)
-    template = env.get_template("statement.html")
-
-    # Render HTML
-    html_content = template.render(
-        period=period,
-        pi_email=pi_email,
-        project_id=project_summary.project_id,
-        fund_org=project_summary.fund_org,
-        total_list_cost=project_summary.total_list_cost,
-        total_cost=project_summary.total_cost,
-        total_discount=project_summary.total_discount,
-        discount_percent=project_summary.discount_percent,
-        service_breakdown=project_summary.service_breakdown,
-        service_list_breakdown=project_summary.service_list_breakdown,
-        charges=project_summary.charges,
-        organization_name=config.email.from_name if config.email else "Research Computing",
-        contact_email=config.email.from_address if config.email else "support@example.edu",
-        generated_at=datetime.now().strftime("%Y-%m-%d %H:%M"),
-    )
+    html_content = render_statement_html(period, pi_email, project_summary, config)
 
     # Generate PDF under an injective name (see statement_pdf_filename).
     pdf_filename = statement_pdf_filename(period, pi_email, project_summary.project_id)

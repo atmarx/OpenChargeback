@@ -2,6 +2,8 @@
 
 import pytest
 
+from openchargeback.config import Config
+from openchargeback.output.pdf import render_statement_html
 from openchargeback.processing.aggregator import (
     ProjectSummary,
     PISummary,
@@ -275,3 +277,48 @@ class TestAggregateCharges:
         # PI 2
         assert result["pi2@edu"].total_cost == pytest.approx(500.0)
         assert result["pi2@edu"].project_count == 1
+
+
+class TestMixedFund:
+    """A project whose charges span >1 fund_org (e.g. a charge was moved to
+    another fund after import). The statement must not present a single wrong
+    fund, and must reconcile with the per-fund GL export."""
+
+    def test_single_fund_project_is_not_mixed(self):
+        result = aggregate_charges([make_charge(fund_org="F-AAA", billed_cost=50.0)])
+        proj = result["test@example.edu"].projects["project-1"]
+        assert not proj.is_mixed_fund
+        assert proj.fund_orgs == ["F-AAA"]
+        assert proj.fund_breakdown["F-AAA"] == pytest.approx(50.0)
+
+    def test_mixed_fund_breakdown_sums_per_fund(self):
+        result = aggregate_charges([
+            make_charge(fund_org="F-AAA", billed_cost=30.0),
+            make_charge(fund_org="F-BBB", billed_cost=20.0),
+        ])
+        proj = result["test@example.edu"].projects["project-1"]
+        assert proj.is_mixed_fund
+        assert proj.fund_orgs == ["F-AAA", "F-BBB"]
+        assert proj.fund_breakdown["F-AAA"] == pytest.approx(30.0)
+        assert proj.fund_breakdown["F-BBB"] == pytest.approx(20.0)
+        # The per-fund breakdown reconciles with the project total to the cent.
+        assert sum(proj.fund_breakdown.values()) == pytest.approx(proj.total_cost)
+
+    def test_single_fund_statement_omits_fund_section(self):
+        result = aggregate_charges([make_charge(fund_org="F-AAA", billed_cost=50.0)])
+        proj = result["test@example.edu"].projects["project-1"]
+        html = render_statement_html("2025-01", "test@example.edu", proj, Config())
+        assert "Charges by Fund" not in html
+        assert "F-AAA" in html  # shown in the meta box
+
+    def test_mixed_fund_statement_shows_honest_fund(self):
+        result = aggregate_charges([
+            make_charge(fund_org="F-AAA", billed_cost=30.0),
+            make_charge(fund_org="F-BBB", billed_cost=20.0),
+        ])
+        proj = result["test@example.edu"].projects["project-1"]
+        html = render_statement_html("2025-01", "test@example.edu", proj, Config())
+        # No single wrong fund in the meta box; a per-fund breakdown instead.
+        assert "Multiple" in html
+        assert "Charges by Fund" in html
+        assert "F-AAA" in html and "F-BBB" in html

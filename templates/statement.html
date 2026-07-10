@@ -209,6 +209,30 @@
         </tbody>
     </table>
 
+    {% if is_mixed_fund %}
+    <h2>Charges by Fund</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Fund/Org</th>
+                <th class="amount">Amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for fund, amount in fund_breakdown|dictsort %}
+            <tr>
+                <td>{{ fund or 'N/A' }}</td>
+                <td class="amount">${{ "%.2f"|format(amount) }}</td>
+            </tr>
+            {% endfor %}
+            <tr class="total-row">
+                <td>Total</td>
+                <td class="amount">${{ "%.2f"|format(total_cost) }}</td>
+            </tr>
+        </tbody>
+    </table>
+    {% endif %}
+
     <h2>Charge Details</h2>
     <table>
         <thead>

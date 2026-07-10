@@ -20,6 +20,21 @@ class ProjectSummary:
     total_cost: float = 0.0
     service_breakdown: dict[str, float] = field(default_factory=dict)
     service_list_breakdown: dict[str, float] = field(default_factory=dict)
+    # Billed cost per fund_org (exact cents from atoms). Usually one fund; more
+    # than one when a charge was moved to a different fund after import. The
+    # statement uses this so it never displays a single wrong fund for a
+    # mixed-fund project, and so it reconciles with the per-fund GL export.
+    fund_breakdown: dict[str, float] = field(default_factory=dict)
+
+    @property
+    def fund_orgs(self) -> list[str]:
+        """Distinct fund_orgs this project's charges belong to, sorted."""
+        return sorted(self.fund_breakdown)
+
+    @property
+    def is_mixed_fund(self) -> bool:
+        """True when the project's charges span more than one fund_org."""
+        return len(self.fund_breakdown) > 1
 
     def add_charge(self, charge: Charge) -> None:
         """Add a charge to this project summary."""
@@ -162,6 +177,7 @@ def _apply_atom_money(
         for project_id, project in summary.projects.items():
             service_billed: dict[str, Decimal] = {}
             service_listed: dict[str, Decimal] = {}
+            fund_billed: dict[str, Decimal] = {}
             for atom in by_pi_project.get((pi_email, project_id), []):
                 service = atom.key.service_name
                 service_billed[service] = (
@@ -170,12 +186,15 @@ def _apply_atom_money(
                 service_listed[service] = (
                     service_listed.get(service, Decimal("0")) + atom.listed
                 )
+                fund = atom.key.fund_org or ""
+                fund_billed[fund] = fund_billed.get(fund, Decimal("0")) + atom.billed
             project.service_breakdown = {
                 k: float(v) for k, v in service_billed.items()
             }
             project.service_list_breakdown = {
                 k: float(v) for k, v in service_listed.items()
             }
+            project.fund_breakdown = {k: float(v) for k, v in fund_billed.items()}
             project_billed = sum(service_billed.values(), Decimal("0"))
             project_listed = sum(service_listed.values(), Decimal("0"))
             project.total_cost = float(project_billed)
