@@ -13,6 +13,7 @@ from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from openchargeback import audit
 from openchargeback.db import Database
 from openchargeback.money import NO_PROJECT, build_atoms
+from openchargeback.output.csv_safe import csv_safe
 from openchargeback.output.journal_template import export_journal_with_template
 from openchargeback.web.auth import User
 from openchargeback.web.deps import (
@@ -47,9 +48,9 @@ def render_summary_format(charges: list[Any], period_str: str) -> str:
     for (pi_email, project_id, fund_org), data in sorted(summary.items()):
         writer.writerow({
             "period": period_str,
-            "pi_email": pi_email,
-            "project_id": project_id,
-            "fund_org": fund_org,
+            "pi_email": csv_safe(pi_email),
+            "project_id": csv_safe(project_id),
+            "fund_org": csv_safe(fund_org),
             "total_cost": f"{data['total']:.2f}",
             "charge_count": data["charge_count"],
         })
@@ -75,7 +76,7 @@ def render_gl_format(charges: list[Any], period_str: str) -> str:
     for fund, amount in sorted(by_fund.items()):
         writer.writerow({
             "period": period_str,
-            "account": fund,
+            "account": csv_safe(fund),
             "description": f"Cloud computing charges - {period_str}",
             "debit": f"{amount:.2f}",
             "credit": "",
@@ -243,12 +244,12 @@ async def export_journal(
         for charge in charges:
             writer.writerow({
                 "period": period.period,
-                "pi_email": charge.pi_email,
-                "project_id": charge.project_id or "",
-                "fund_org": charge.fund_org or "",
-                "service_name": charge.service_name or "",
-                "resource_id": charge.resource_id or "",
-                "resource_name": charge.resource_name or "",
+                "pi_email": csv_safe(charge.pi_email),
+                "project_id": csv_safe(charge.project_id or ""),
+                "fund_org": csv_safe(charge.fund_org or ""),
+                "service_name": csv_safe(charge.service_name or ""),
+                "resource_id": csv_safe(charge.resource_id or ""),
+                "resource_name": csv_safe(charge.resource_name or ""),
                 "billed_cost": f"{charge.billed_cost:.2f}",
                 "list_cost": f"{charge.list_cost:.2f}" if charge.list_cost else "",
                 "discount_amount": f"{charge.discount_amount:.2f}" if charge.list_cost else "",

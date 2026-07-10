@@ -43,6 +43,7 @@ import pikepdf
 
 from ..config import Config
 from ..db.repository import BillingPeriod, Database, EmailLog, ReviewLog
+from .csv_safe import csv_safe
 from .journal import export_journal_csv
 
 # Pinned fallback timestamp for periods that have no closed_at yet (e.g. a
@@ -167,10 +168,10 @@ def _email_log_csv(rows: list[EmailLog]) -> bytes:
     for r in sorted(rows, key=lambda x: (x.sent_at or "", x.recipient or "")):
         writer.writerow([
             r.sent_at or "",
-            r.recipient or "",
-            r.subject or "",
+            csv_safe(r.recipient or ""),
+            csv_safe(r.subject or ""),
             r.status or "",
-            r.error_message or "",
+            csv_safe(r.error_message or ""),
         ])
     return buf.getvalue().encode("utf-8")
 
@@ -217,8 +218,12 @@ def _audit_csv(billing_period: BillingPeriod, review_logs: list[ReviewLog]) -> b
             log.note or "",
         ))
 
+    # Columns 2 (actor), 4 (pi_email), 6 (detail) carry provider/user text.
     for row in sorted(events, key=lambda e: (e[0] or "", e[1])):
-        writer.writerow(row)
+        writer.writerow([
+            row[0], row[1], csv_safe(row[2]), row[3],
+            csv_safe(row[4]), row[5], csv_safe(row[6]),
+        ])
     return buf.getvalue().encode("utf-8")
 
 

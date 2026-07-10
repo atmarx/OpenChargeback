@@ -8,6 +8,7 @@ from typing import Any
 from ..config import Config
 from ..db.repository import Database
 from ..processing.aggregator import aggregate_charges
+from .csv_safe import csv_safe
 
 
 def export_journal_csv(
@@ -93,10 +94,10 @@ def _export_default_format(
 
                     writer.writerow([
                         period,
-                        pi_email,
-                        project_id,
-                        project.fund_org or "",
-                        service,
+                        csv_safe(pi_email),
+                        csv_safe(project_id),
+                        csv_safe(project.fund_org or ""),
+                        csv_safe(service),
                         f"{amount:.2f}",
                         resource_count,
                     ])
