@@ -43,6 +43,18 @@ steps:
     volumes:
       - /opt/cache/pip:/cache/pip
 
+  # Build the wheel the Docker image installs.  CI's editable `pip install -e`
+  # never exercises the wheel path, so a packaging break (e.g. a duplicate
+  # force-include) sailed through green tests and only blew up at deploy.  This
+  # step reproduces the image's build so packaging errors fail CI first.
+  - name: build-wheel
+    image: python:3.12-slim
+    commands:
+      - pip install --cache-dir /cache/pip build
+      - python -m build --wheel
+    volumes:
+      - /opt/cache/pip:/cache/pip
+
   - name: sbom
     image: python:3.12-slim
     commands:
@@ -77,3 +89,4 @@ steps:
       - sbom
       - close-package-determinism
       - typecheck
+      - build-wheel
