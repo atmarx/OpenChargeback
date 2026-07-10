@@ -76,7 +76,14 @@ steps:
       # mismatched CI-client path (e.g. /projects/...) would be passed verbatim
       # to dockerd and bind-mount a stale host directory.
       - cd /opt/projects/${CI_REPO_NAME} || git clone ${CI_REPO_CLONE_URL} /opt/projects/${CI_REPO_NAME}
-      - cd /opt/projects/${CI_REPO_NAME} && git fetch && git checkout ${CI_COMMIT_BRANCH} && git pull
+      # Deterministic checkout: `git checkout <branch> && git pull` leaves a dirty
+      # or diverged /opt/projects tree pinned to a stale commit, so the docker
+      # build ran OLD code (it kept hitting a packaging error already fixed on
+      # main). Hard-reset to the exact commit that triggered this build, so what
+      # deploys is always what CI just tested. NOTE: no `git clean` here — the
+      # untracked ./instance dir holds the live DB/archives and must survive;
+      # reset --hard only touches tracked files.
+      - cd /opt/projects/${CI_REPO_NAME} && git fetch origin && git reset --hard ${CI_COMMIT_SHA}
       - docker network inspect gateway-stack_gateway >/dev/null 2>&1 || docker network create gateway-stack_gateway
       - cd /opt/projects/${CI_REPO_NAME} && docker compose up -d --build
       - docker image prune -f || true
