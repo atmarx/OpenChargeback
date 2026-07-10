@@ -85,16 +85,19 @@ steps:
       # with the untracked ./instance data), so every git fetch/reset silently
       # failed and the docker build kept using the stale tree.
       #
-      # Self-heal: init a repo if missing, ensure the origin remote, then
-      # hard-reset to the fetched branch tip. This touches only tracked files —
-      # the untracked, gitignored ./instance (live DB + archives) is left
-      # completely alone (no `git clean`). `set -e` (below) makes any git
-      # failure abort the step instead of silently building stale code.
+      # ROOT CAUSE (from the #42 deploy log): "fatal: detected dubious ownership
+      # in repository at '/opt/projects/openchargeback'". The checkout dir is
+      # owned by a different UID than this deploy container's user, so git 2.35+
+      # refused EVERY command there — which is why no fetch/reset ever advanced
+      # the tree and the docker build kept reusing stale code. Mark it safe
+      # first, then hard-reset to the fetched branch tip. Touches only tracked
+      # files — the untracked, gitignored ./instance (live DB + archives) is left
+      # alone (no `git clean`). `set -e` aborts on any git failure so we never
+      # silently ship stale code again.
       - |
         cd /opt/projects/${CI_REPO_NAME}
         set -e
-        git rev-parse --is-inside-work-tree >/dev/null 2>&1 || git init
-        git remote get-url origin >/dev/null 2>&1 || git remote add origin ${CI_REPO_CLONE_URL}
+        git config --global --add safe.directory /opt/projects/${CI_REPO_NAME}
         git fetch origin ${CI_COMMIT_BRANCH}
         git reset --hard FETCH_HEAD
         echo "deploying commit:" && git log -1 --oneline
