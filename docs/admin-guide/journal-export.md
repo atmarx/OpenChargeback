@@ -79,6 +79,12 @@ exporter that builds true balanced GL entries:
   that too is unset) rather than dropped — so the journal **always balances**.
   The exporter asserts debits equal credits before returning; an unbalanced
   journal is a hard error, never a silently shipped file.
+- **Zero-dollar lines are omitted**: a fund/source combination whose charges
+  net to exactly `$0.00` moves nothing — the dollars are already reflected in
+  the PI's invoice — so it produces no GL row. This never affects the balance
+  (a `$0.00` line adds nothing to either side) and keeps the handoff clean for
+  ERPs that reject zero-dollar rows. Zero-cost activity still appears on the
+  statement and in `journal_summary.csv`; it just isn't a ledger transfer.
 
 All of the `journal:` configuration below (fund/org parsing, account codes,
 credit fund/orgs) applies to this format.  See [Templates](templates.md) for

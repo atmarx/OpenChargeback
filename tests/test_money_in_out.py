@@ -197,3 +197,35 @@ def test_web_export_formats_agree(db, config):
     credits = sum(Decimal(r["credit"]) for r in rows if r["credit"])
     assert debits == atom_total
     assert credits == atom_total
+
+
+def test_web_gl_omits_zero_fund_lines_and_stays_balanced():
+    """A fund whose charges net to $0.00 produces no GL line — the GL moves
+    charges and a zero moves nothing — and the entry still balances: the
+    CLOUD-CLEARING credit equals the surviving debits."""
+    from openchargeback.web.routes.journal import render_gl_format
+
+    def charge(pi, fund, billed):
+        return Charge(
+            id=None, billing_period_id=1, source_id=1,
+            charge_period_start="2025-01-01", charge_period_end=None,
+            list_cost=None, contracted_cost=None, billed_cost=billed,
+            effective_cost=None, resource_id=f"r-{pi}-{fund}", resource_name=None,
+            service_name="EC2", pi_email=pi, project_id="p",
+            fund_org=fund, raw_tags=None,
+        )
+
+    charges = [
+        charge("a@example.edu", "111111-1111", 100.00),
+        charge("z@example.edu", "222222-2222", 0.00),  # zero-net fund
+    ]
+    rows = list(csv.DictReader(io.StringIO(render_gl_format(charges, "2025-01"))))
+
+    # No emitted line is $0.00, and the zero fund is absent entirely.
+    for r in rows:
+        assert r["debit"] != "0.00" and r["credit"] != "0.00"
+    assert not any(r["account"] == "222222-2222" for r in rows)
+
+    # Still balanced: one $100 debit offset by one $100 clearing credit.
+    assert sum(Decimal(r["debit"]) for r in rows if r["debit"]) == Decimal("100.00")
+    assert sum(Decimal(r["credit"]) for r in rows if r["credit"]) == Decimal("100.00")

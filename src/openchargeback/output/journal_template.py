@@ -78,6 +78,16 @@ class JournalEntry:
     activity: str = ""
     location: str = ""
 
+    @property
+    def is_zero(self) -> bool:
+        """True when this line rounds to $0.00 — nothing to move.
+
+        Entry amounts are exact-cents floats: money atoms are quantized once at
+        their grain (see money.py) and only summed afterward, so an integer-cent
+        comparison is exact and matches the ``%.2f`` the template renders.
+        """
+        return round(self.amount * 100) == 0
+
 
 def parse_fund_org(fund_org: str, regex_pattern: str) -> dict[str, str]:
     """Parse a fund_org string using a regex with named capture groups.
@@ -137,7 +147,10 @@ def build_journal_entries(
         source_id_to_name: Mapping from source_id to source name
 
     Returns:
-        List of JournalEntry objects (sorted: debits first, then credits)
+        List of JournalEntry objects, sorted debits-first. Lines that net to
+        $0.00 are omitted — the GL moves charges and a zero moves nothing —
+        which leaves the debit==credit balance intact (a zero adds nothing to
+        either side).
     """
     journal_config = config.journal
     fund_org_regex = journal_config.fund_org_regex
@@ -268,6 +281,14 @@ def build_journal_entries(
             pi_email="",
             project_id="",
         ))
+
+    # The GL records charges being *moved*. A line that nets to $0.00 moves
+    # nothing — those dollars are already accounted for in the invoices — and
+    # some ERPs reject zero-dollar rows outright, so drop them. This cannot
+    # unbalance the journal: a $0.00 line adds zero cents to whichever side it
+    # sits on, so removing zeros subtracts nothing from either the debit total
+    # or the credit total. Balance is re-asserted below on exactly what ships.
+    entries = [e for e in entries if not e.is_zero]
 
     # Sort debits first, then credits, each fully ordered by content so the GL
     # row order (and therefore the close-package bytes) is deterministic even

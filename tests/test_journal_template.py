@@ -1,7 +1,6 @@
 """Tests for journal template rendering system."""
 
 from dataclasses import dataclass
-from pathlib import Path
 
 import pytest
 
@@ -556,6 +555,52 @@ class TestBuildJournalEntries:
         assert len(credits) == 1
         assert credits[0].fund_org == "CLR-9999"
 
+    def test_zero_cost_charge_emits_no_gl_line(self, basic_config, mock_charge):
+        """A charge that nets to $0.00 moves nothing, so it produces no GL row.
+
+        Zero-cost line items are routine on cloud bills (free tier, provisioned-
+        but-idle). The GL records charges being *moved*; a zero moves nothing and
+        those dollars are already reflected in the invoices. The row must not
+        appear — and dropping it must not trip the balance assertion, since
+        0 debits still equals 0 credits."""
+        charges = [
+            mock_charge(
+                source_id=1, pi_email="pi@example.edu", project_id="proj-1",
+                fund_org="DEPT-PROJECT", billed_cost=0.00,
+            ),
+        ]
+        entries = build_journal_entries(charges, "2025-01", basic_config, {1: "AWS"})
+        assert entries == []
+
+    def test_zero_lines_dropped_real_lines_kept_and_balanced(
+        self, basic_config, mock_charge
+    ):
+        """Zero-net lines vanish while real charges to the same source survive,
+        and the journal still balances to the penny."""
+        charges = [
+            mock_charge(
+                source_id=1, pi_email="a@example.edu", project_id="proj-1",
+                fund_org="DEPT-REAL", billed_cost=100.00,
+            ),
+            mock_charge(
+                source_id=1, pi_email="b@example.edu", project_id="proj-2",
+                fund_org="DEPT-ZERO", billed_cost=0.00,
+            ),
+        ]
+        entries = build_journal_entries(charges, "2025-01", basic_config, {1: "AWS"})
+
+        # Nothing that ships is $0.00, and the zero charge's fund_org is gone.
+        assert all(not e.is_zero for e in entries)
+        assert not any(e.fund_org == "DEPT-ZERO" for e in entries)
+
+        # The real charge remains on both sides and balances.
+        debits = [e for e in entries if e.is_debit]
+        credits = [e for e in entries if e.is_credit]
+        assert len(debits) == 1
+        assert debits[0].amount == 100.00
+        assert sum(d.amount for d in debits) == sum(c.amount for c in credits)
+        assert_journal_balanced(entries)  # must not raise
+
 
 class TestRenderJournalTemplate:
     """Tests for render_journal_template function."""
@@ -729,6 +774,41 @@ class TestExportJournalWithTemplate:
         # Credit line
         assert "CLOUD-AWS,IT,54100,,250.00" in lines[2]
 
+    def test_zero_cost_charge_produces_no_row_in_rendered_gl(self, mock_charge):
+        """End to end, through the packaged GL template: a zero-cost charge mixed
+        with a real one renders only the real debit (and its credit). No $0.00
+        row reaches the CSV that accounting imports."""
+        config = Config(
+            imports=ImportConfig(
+                known_sources=[
+                    KnownSourceConfig(
+                        name="AWS", fund_org="IT-CLOUD-AWS", account_code="54100"
+                    ),
+                ]
+            ),
+            journal=JournalConfig(
+                fund_org_regex=r"^(?P<orgn>[^-]+)-(?P<fund>.+)$",
+                default_account="54000",
+            ),
+        )
+        charges = [
+            mock_charge(
+                source_id=1, pi_email="a@example.edu", project_id="p1",
+                fund_org="REAL-DEPT", billed_cost=100.00,
+            ),
+            mock_charge(
+                source_id=1, pi_email="b@example.edu", project_id="p2",
+                fund_org="ZERO-DEPT", billed_cost=0.00,
+            ),
+        ]
+        result = export_journal_with_template(
+            charges=charges, period="2025-01", config=config,
+            source_id_to_name={1: "AWS"},
+        )
+        # The real charge is present; the zero charge's fund_org appears nowhere.
+        assert "100.00" in result
+        assert "ZERO" not in result
+
     def test_empty_charges_returns_header_only(self, tmp_path):
         """Empty charge list returns just the header."""
         config = Config(
@@ -832,3 +912,18 @@ class TestJournalEntryDataclass:
         assert entry.program == ""
         assert entry.activity == ""
         assert entry.location == ""
+
+    def test_is_zero_is_exact_at_the_cent(self):
+        """is_zero is exact at the cent: $0.00 is zero, a single cent is not."""
+
+        def entry(amount):
+            return JournalEntry(
+                fund_org="F", fund="F", orgn="O", account="54100", amount=amount,
+                is_debit=True, is_credit=False, description="x", reference_id="",
+                source_name="AWS", period="2025-01", pi_email="p@e.edu",
+                project_id="p",
+            )
+
+        assert entry(0.00).is_zero is True
+        assert entry(0.01).is_zero is False
+        assert entry(100.00).is_zero is False

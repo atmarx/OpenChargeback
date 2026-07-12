@@ -73,6 +73,13 @@ def render_gl_format(charges: list[Any], period_str: str) -> str:
 
     total = Decimal("0")
     for fund, amount in sorted(by_fund.items()):
+        total += amount
+        # A fund whose charges net to $0.00 moves nothing — the GL records
+        # charges being moved, and those dollars are already on the invoices.
+        # Dropping a zero line keeps the entry balanced: it adds nothing to the
+        # debits, and nothing to the clearing credit (total is the full sum).
+        if amount == 0:
+            continue
         writer.writerow({
             "period": period_str,
             "account": csv_safe(fund),
@@ -80,15 +87,16 @@ def render_gl_format(charges: list[Any], period_str: str) -> str:
             "debit": f"{amount:.2f}",
             "credit": "",
         })
-        total += amount
 
-    writer.writerow({
-        "period": period_str,
-        "account": "CLOUD-CLEARING",
-        "description": f"Cloud computing charges - {period_str}",
-        "debit": "",
-        "credit": f"{total:.2f}",
-    })
+    # If nothing moved this period at all, there is no clearing line to write.
+    if total != 0:
+        writer.writerow({
+            "period": period_str,
+            "account": "CLOUD-CLEARING",
+            "description": f"Cloud computing charges - {period_str}",
+            "debit": "",
+            "credit": f"{total:.2f}",
+        })
     return output.getvalue()
 
 
