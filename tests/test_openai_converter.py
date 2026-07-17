@@ -214,6 +214,56 @@ class TestDirectoryResolver:
 
 
 # -----------------------------
+# URL sources and auth (the live-API path of load_json_source)
+# -----------------------------
+class TestUrlSourceAuth:
+    class _FakeResponse:
+        def __init__(self, payload: dict):
+            self._body = json.dumps(payload).encode()
+
+        def read(self, *a):
+            return self._body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    def _capture_urlopen(self, monkeypatch, payload):
+        import urllib.request
+        seen = {}
+
+        def fake_urlopen(request, timeout=None):
+            seen["request"] = request
+            seen["timeout"] = timeout
+            return self._FakeResponse(payload)
+
+        monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+        return seen
+
+    def test_url_source_sends_bearer_token_from_env(self, monkeypatch):
+        seen = self._capture_urlopen(monkeypatch, {"ok": True})
+        monkeypatch.setenv("OCB_DIRECTORY_API_TOKEN", "s3cret")
+        result = conv.load_json_source("https://cmdb.example.edu/api/licenses")
+        assert result == {"ok": True}
+        assert seen["request"].get_header("Authorization") == "Bearer s3cret"
+        assert seen["timeout"] == 30
+
+    def test_url_source_without_token_sends_no_auth_header(self, monkeypatch):
+        seen = self._capture_urlopen(monkeypatch, {"ok": True})
+        monkeypatch.delenv("OCB_DIRECTORY_API_TOKEN", raising=False)
+        conv.load_json_source("https://cmdb.example.edu/api/licenses")
+        assert seen["request"].get_header("Authorization") is None
+
+    def test_file_source_ignores_token(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("OCB_DIRECTORY_API_TOKEN", "s3cret")
+        path = tmp_path / "d.json"
+        path.write_text('{"ok": true}')
+        assert conv.load_json_source(str(path)) == {"ok": True}
+
+
+# -----------------------------
 # Showback formatting
 # -----------------------------
 class TestShowbackFormatting:

@@ -149,6 +149,7 @@ package if a funder ever wants to drill in.
 
 | File | The interface it stands in for | Owner |
 |------|-------------------------------|-------|
+| `API-SPEC.md` | **The build spec** — hand this to whoever implements the endpoints | Helpdesk + Finance |
 | `directory.example.json` | **Lookup (1)** — license → fund/org, `master_fund_org` on a miss | Helpdesk / CMDB |
 | `fund-orgs.example.json` | **Lookup (2)** — fund/org → Principal Invoicee(s) | Research Finance |
 | `user-usage-feedback.example.csv` | **Showback** — per-user monthly usage, one line per user | OpenChargeback → CMDB |
@@ -184,7 +185,11 @@ python ../convert-openai-usage-to-focus-v2.py \
 ```
 
 Point `--directory` and `--fund-orgs` at the live endpoints instead of files once the
-helpdesk and finance stand them up; the JSON shape is the same either way. Out come two
+helpdesk and finance stand them up; the JSON shape is the same either way. URL sources
+send `Authorization: Bearer <token>` when `OCB_DIRECTORY_API_TOKEN` is set in the
+environment (an env var, not a flag, so the secret stays out of `ps` and shell
+history). [`API-SPEC.md`](API-SPEC.md) is the build-ready spec for the two endpoints
+and the showback capture — field tables, failure semantics, and an acceptance test. Out come two
 files: the FOCUS CSV for `openchargeback ingest`, and the showback —
 `user-usage-feedback_<YYYY-MM>.csv` — for the helpdesk to load into the CMDB.
 `--subsidies` is optional and uses the same two-row mechanism as the flat method; in

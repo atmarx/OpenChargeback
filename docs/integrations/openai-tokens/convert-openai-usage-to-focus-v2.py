@@ -24,6 +24,7 @@ State is maintained in subsidy_state.json to track running totals across runs.
 import argparse
 import csv
 import json
+import os
 import urllib.request
 from calendar import monthrange
 from dataclasses import dataclass
@@ -76,9 +77,19 @@ class Attribution:
 # Directory API (license -> fund/org -> Principal Invoicee)
 # -----------------------------
 def load_json_source(source: str) -> dict:
-    """Load a JSON lookup from a file path or an http(s) URL."""
+    """Load a JSON lookup from a file path or an http(s) URL.
+
+    URL sources send `Authorization: Bearer <token>` when the
+    OCB_DIRECTORY_API_TOKEN environment variable is set — an env var, not a
+    flag, so the secret never appears in `ps` or shell history. File paths
+    ignore it.
+    """
     if source.startswith(("http://", "https://")):
-        with urllib.request.urlopen(source, timeout=30) as resp:
+        request = urllib.request.Request(source)
+        token = os.environ.get("OCB_DIRECTORY_API_TOKEN")
+        if token:
+            request.add_header("Authorization", f"Bearer {token}")
+        with urllib.request.urlopen(request, timeout=30) as resp:
             return json.load(resp)
     with open(source) as f:
         return json.load(f)
