@@ -174,7 +174,7 @@ DEFAULT_STATEMENT_TEMPLATE = """
             <div class="value">{{ period }}</div>
         </div>
         <div>
-            <label>Principal Investigator</label>
+            <label>Principal Invoicee</label>
             <div class="value">{{ pi_email }}</div>
         </div>
         <div>

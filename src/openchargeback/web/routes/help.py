@@ -18,7 +18,7 @@ The Dashboard provides an at-a-glance overview of your current billing period.
 
 **Stats Cards:**
 - **Total Charges** - Sum of all charges for the current period. Click to view all charges.
-- **Active PIs** - Number of Principal Investigators with charges this period.
+- **Active PIs** - Number of Principal Invoicees with charges this period.
 - **Projects** - Number of unique projects billed this period.
 - **Pending Review** - Charges flagged for review. Click to review them.
 
@@ -58,7 +58,7 @@ Charges are individual line items from imported FOCUS CSV files.
 
 **Charge Fields:**
 - **Service** - The cloud service or resource type
-- **PI Email** - Principal Investigator responsible for the charge
+- **PI Email** - Principal Invoicee responsible for the charge (a research PI, dept head, or core director — whoever holds the fund and gets the bill)
 - **Project ID** - Project or account identifier
 - **Fund/Org** - Funding source or organization code
 - **Billed Cost** - Amount to bill the PI
