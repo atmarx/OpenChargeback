@@ -4,20 +4,31 @@ Convert OpenAI EDU usage CSV to FOCUS-format CSV with subsidy support.
 
 This preprocessor:
 1. Loads usage from OpenAI's EDU billing export
-2. Attributes charges to projects/PIs
-3. Applies subsidy rules (e.g., "Provost covers first $500/project/year")
-4. Splits charges between subsidy fund_org and department fund_org
+2. Attributes charges to a fund/org and Principal Invoicee, one of two ways:
+   - flat file (the original method): projects.json maps users to projects/PIs
+   - directory API (--directory/--fund-orgs): license -> fund/org -> Principal
+     Invoicee, with master_fund_org catching any user the directory doesn't know
+3. Applies subsidy rules (e.g., "Provost covers first $500/fund/year")
+4. Splits charges between subsidy fund_org and the PI's fund_org
 5. Outputs FOCUS-format CSV for import into openchargeback
+6. In directory mode, also emits a per-user showback CSV for the CMDB — each
+   user's OWN monthly usage, a line for their license timeline, never a bill
+
+Both attribution methods coexist; the flags pick one per run. The directory-API
+contract (lookup shapes, master-fund fallback, showback columns) lives in
+directory-api/README.md.
 
 State is maintained in subsidy_state.json to track running totals across runs.
 """
 
-import json
 import argparse
+import csv
+import json
+import urllib.request
 from calendar import monthrange
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from dataclasses import dataclass
 
 import pandas as pd
 
@@ -46,6 +57,118 @@ class ChargeAllocation:
     subsidized_subsidy_name: str | None
     billable_amount: float
     billable_fund_org: str
+
+
+@dataclass
+class Attribution:
+    """Where one user's usage lands: the fund, its invoicee, and how we got there."""
+    username: str
+    email: str
+    fund_org: str
+    pi_email: str  # the first Principal Invoicee — the statement addressee
+    project_id: str
+    principal_invoicees: str  # every invoicee email, ";"-joined
+    routed_to_master: bool
+    warning: str | None = None
+
+
+# -----------------------------
+# Directory API (license -> fund/org -> Principal Invoicee)
+# -----------------------------
+def load_json_source(source: str) -> dict:
+    """Load a JSON lookup from a file path or an http(s) URL."""
+    if source.startswith(("http://", "https://")):
+        with urllib.request.urlopen(source, timeout=30) as resp:
+            return json.load(resp)
+    with open(source) as f:
+        return json.load(f)
+
+
+class DirectoryResolver:
+    """
+    Attribution via the two directory-API lookups instead of projects.json:
+
+      (1) license -> fund/org   (helpdesk/CMDB; keyed by the seat's email)
+      (2) fund/org -> Principal Invoicee(s)   (research finance)
+
+    Lookup (1) never answers empty: an unknown user, a license with no
+    fund/org, or a fund/org finance doesn't recognize all land on the
+    master_fund_org — one hop, so every charge reaches a fund with a human
+    attached. "PI" = Principal Invoicee: the fund decides who pays, not the
+    user. In this mode project_id IS the fund/org, which keys the subsidy
+    state per fund/org — the cap and its rollup follow the fund, not the user.
+    """
+
+    def __init__(self, directory_cfg: dict, fund_orgs_cfg: dict):
+        master = directory_cfg.get("master_fund_org")
+        if not master:
+            raise ValueError(
+                "directory has no master_fund_org — the license lookup must never "
+                "answer empty, so a catch-all fund/org is required"
+            )
+        self.master_fund_org = master
+        self.licenses_by_email = {
+            lic["email"]: lic for lic in directory_cfg.get("licenses", [])
+        }
+        self.funds = {f["fund_org"]: f for f in fund_orgs_cfg.get("fund_orgs", [])}
+        master_fund = self.funds.get(master)
+        if not master_fund or not master_fund.get("principal_invoicees"):
+            raise ValueError(
+                f"master fund/org {master} must be in the fund registry with at "
+                "least one principal invoicee — it is where unroutable charges land"
+            )
+
+    def resolve_fund(self, fund_org: str, context: str) -> tuple[str, list[str], str | None]:
+        """
+        Resolve a fund/org to its invoicee emails; unknown or invoicee-less
+        funds fall back to the master. Returns (fund_org, invoicees, warning).
+        """
+        fund = self.funds.get(fund_org)
+        if fund and fund.get("principal_invoicees"):
+            return fund_org, [p["email"] for p in fund["principal_invoicees"]], None
+        reason = "is not in the fund registry" if fund is None else "has no principal invoicees"
+        master = self.funds[self.master_fund_org]
+        return (
+            self.master_fund_org,
+            [p["email"] for p in master["principal_invoicees"]],
+            f"{context}: fund/org {fund_org} {reason}",
+        )
+
+    def resolve(self, email: str) -> Attribution:
+        """License lookup by the seat's email; every miss routes to the master."""
+        lic = self.licenses_by_email.get(email)
+        if lic is None:
+            # No license at all — the username is unknowable, so best-effort
+            # echo the email's local part for the showback line.
+            username = email.split("@", 1)[0]
+            wanted = self.master_fund_org
+            routed = True
+            base_warning = f"no license found for user {email}"
+        else:
+            username = lic.get("username") or email.split("@", 1)[0]
+            wanted = lic.get("fund_org") or ""
+            if wanted:
+                routed = False
+                base_warning = None
+            else:
+                wanted = self.master_fund_org
+                routed = True
+                base_warning = f"license for {email} has no fund/org"
+
+        fund_org, invoicees, fund_warning = self.resolve_fund(wanted, context=f"user {email}")
+        if fund_warning:
+            routed = True
+
+        return Attribution(
+            username=username,
+            email=email,
+            fund_org=fund_org,
+            pi_email=invoicees[0],
+            project_id=fund_org,
+            principal_invoicees=";".join(invoicees),
+            routed_to_master=routed,
+            warning=base_warning or fund_warning,
+        )
 
 
 # -----------------------------
@@ -228,6 +351,39 @@ def apply_subsidy_rules(
 
 
 # -----------------------------
+# Showback (directory mode) — one line per user per month, back to the CMDB
+# -----------------------------
+def format_credits(credits: float) -> str:
+    """Render credits without float fuzz: up to 3 decimals, trailing zeros trimmed."""
+    text = f"{credits:.3f}".rstrip("0").rstrip(".")
+    return text or "0"
+
+
+def write_showback_csv(path: Path, showback: dict) -> int:
+    """
+    Write the per-user showback CSV — each user's OWN usage for the month,
+    for the CMDB to attach to their license timeline. Never a bill, never a
+    multi-user rollup. amount_usd is gross (list) usage: what they used, not
+    what their fund was billed after subsidies. Returns the line count.
+    """
+    fieldnames = [
+        "username", "email", "period", "service",
+        "credits", "amount_usd", "fund_org", "status",
+    ]
+    rows = sorted(showback.values(), key=lambda r: (r["period"], r["username"]))
+    with open(path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({
+                **row,
+                "credits": format_credits(row["credits"]),
+                "amount_usd": f"{row['amount_usd']:.2f}",
+            })
+    return len(rows)
+
+
+# -----------------------------
 # FOCUS row generation
 # -----------------------------
 def create_focus_row(
@@ -240,7 +396,8 @@ def create_focus_row(
     project_id: str,
     fund_org: str,
     charge_type: str,
-    subsidy_name: str | None = None
+    subsidy_name: str | None = None,
+    extra_tags: dict[str, str] | None = None
 ) -> dict:
     """Create a single FOCUS-format row."""
     service_date = usage_date.date().isoformat()
@@ -255,6 +412,9 @@ def create_focus_row(
 
     if subsidy_name:
         tags["subsidy_name"] = subsidy_name
+
+    if extra_tags:
+        tags.update(extra_tags)
 
     # Make ResourceId unique by including charge_type
     resource_id = f"openai:{usage_type}:{user_email}:{service_date}:{charge_type}"
@@ -291,29 +451,62 @@ def main():
     parser.add_argument("--subsidies", default="subsidies.json", help="Path to subsidies config")
     parser.add_argument("--state", default="subsidy_state.json", help="Path to state file")
     parser.add_argument("--dry-run", action="store_true", help="Don't update state file")
+    parser.add_argument(
+        "--directory",
+        help="Directory lookup (license -> fund/org): file path or http(s) URL. "
+             "Enables directory-API mode; projects.json is not used. "
+             "See directory-api/README.md"
+    )
+    parser.add_argument(
+        "--fund-orgs",
+        help="Fund/org registry (fund/org -> Principal Invoicees): file path or "
+             "http(s) URL. Required with --directory"
+    )
+    parser.add_argument(
+        "--showback",
+        help="Per-user showback CSV path (directory mode; default: "
+             "user-usage-feedback_<YYYY-MM>.csv beside the output)"
+    )
 
     args = parser.parse_args()
+
+    if bool(args.directory) != bool(args.fund_orgs):
+        parser.error(
+            "--directory and --fund-orgs go together: license -> fund/org -> "
+            "Principal Invoicee needs both lookups"
+        )
 
     input_csv = Path(args.input)
     df = pd.read_csv(input_csv)
 
     # -----------------------------
-    # Determine output filename
+    # Determine output filenames
     # -----------------------------
+    usage_dates = pd.to_datetime(df["date_partition"])
+    year_months = usage_dates.dt.to_period("M").unique()
+
+    def single_month(flag: str) -> str:
+        if len(year_months) != 1:
+            raise ValueError(
+                f"ERROR: Input file contains multiple months "
+                f"({', '.join(str(m) for m in sorted(year_months))}); "
+                f"pass {flag} explicitly."
+            )
+        return year_months[0].strftime("%Y-%m")
+
     if args.output:
         output_csv = Path(args.output)
     else:
-        usage_dates = pd.to_datetime(df["date_partition"])
-        year_months = usage_dates.dt.to_period("M").unique()
+        output_csv = Path(f"openai-tokens_{single_month('--output')}.csv")
 
-        if len(year_months) != 1:
-            raise ValueError(
-                f"ERROR: Input file contains multiple months: "
-                f"{', '.join(str(m) for m in year_months)}"
+    showback_csv: Path | None = None
+    if args.directory:
+        if args.showback:
+            showback_csv = Path(args.showback)
+        else:
+            showback_csv = output_csv.parent / (
+                f"user-usage-feedback_{single_month('--showback')}.csv"
             )
-
-        year_month = year_months[0].strftime("%Y-%m")
-        output_csv = Path(f"openai-tokens_{year_month}.csv")
 
     # -----------------------------
     # Load configs
@@ -325,15 +518,28 @@ def main():
     unit_cost = pool["purchase_amount"] / pool["credits_purchased"]
     print(f"INFO: Derived unit cost = ${unit_cost:.4f} per credit")
 
-    with open(args.projects) as f:
-        projects_cfg = json.load(f)
+    # Attribution source: the directory API or the flat projects.json.
+    # Both methods coexist; the flags pick one per run.
+    resolver: DirectoryResolver | None = None
+    user_to_project: dict = {}
+    project_lookup: dict = {}
+    if args.directory:
+        resolver = DirectoryResolver(
+            load_json_source(args.directory),
+            load_json_source(args.fund_orgs),
+        )
+        print(
+            f"INFO: Directory mode — {len(resolver.licenses_by_email)} license(s), "
+            f"{len(resolver.funds)} fund/org(s), master fund/org {resolver.master_fund_org}"
+        )
+    else:
+        with open(args.projects) as f:
+            projects_cfg = json.load(f)
 
-    user_to_project = {}
-    project_lookup = {}
-    for project in projects_cfg["projects"]:
-        project_lookup[project["project_id"]] = project
-        for user in project["users"]:
-            user_to_project[user["email"]] = project["project_id"]
+        for project in projects_cfg["projects"]:
+            project_lookup[project["project_id"]] = project
+            for user in project["users"]:
+                user_to_project[user["email"]] = project["project_id"]
 
     # Load subsidies (optional)
     subsidies = []
@@ -354,6 +560,7 @@ def main():
     # Process usage rows
     # -----------------------------
     focus_rows = []
+    showback: dict[tuple[str, str], dict] = {}
     warnings = 0
     stats = {
         "total_usage": 0.0,
@@ -371,18 +578,50 @@ def main():
 
         stats["total_usage"] += cost
 
-        # Attribution
-        project_id = user_to_project.get(user_email, "unassigned")
+        # Attribution — directory mode resolves license -> fund -> invoicee;
+        # flat mode keeps the original projects.json behavior.
+        extra_tags = None
+        if resolver is not None:
+            att = resolver.resolve(user_email)
+            if att.warning:
+                warnings += 1
+                print(
+                    f"WARNING: {att.warning}; "
+                    f"routed to master fund/org {resolver.master_fund_org}"
+                )
+            pi_email = att.pi_email
+            project_id = att.project_id  # the fund/org — subsidy caps key on it
+            fund_org = att.fund_org
+            extra_tags = {"principal_invoicees": att.principal_invoicees}
 
-        if project_id == "unassigned":
-            warnings += 1
-            print(f"WARNING: No project mapping for user {user_email}")
-            pi_email = "unassigned"
-            fund_org = "unassigned"
+            # Accumulate this user's own usage for the showback line. Gross
+            # (list) cost on purpose: it shows what they used, not what their
+            # fund was billed after subsidies.
+            period = usage_date.strftime("%Y-%m")
+            line = showback.setdefault((user_email, period), {
+                "username": att.username,
+                "email": user_email,
+                "period": period,
+                "service": "OpenAI",
+                "credits": 0.0,
+                "amount_usd": 0.0,
+                "fund_org": att.fund_org,
+                "status": "routed_to_master" if att.routed_to_master else "charged",
+            })
+            line["credits"] += credits
+            line["amount_usd"] += cost
         else:
-            project = project_lookup[project_id]
-            pi_email = project["pi_email"]
-            fund_org = project["fund_org"]
+            project_id = user_to_project.get(user_email, "unassigned")
+
+            if project_id == "unassigned":
+                warnings += 1
+                print(f"WARNING: No project mapping for user {user_email}")
+                pi_email = "unassigned"
+                fund_org = "unassigned"
+            else:
+                project = project_lookup[project_id]
+                pi_email = project["pi_email"]
+                fund_org = project["fund_org"]
 
         # Apply subsidy rules
         allocation = apply_subsidy_rules(
@@ -408,24 +647,47 @@ def main():
             project_id=project_id,
             fund_org=allocation.billable_fund_org,  # PI's department
             charge_type="usage",
-            subsidy_name=allocation.subsidized_subsidy_name if allocation.subsidized_amount > 0 else None
+            subsidy_name=allocation.subsidized_subsidy_name if allocation.subsidized_amount > 0 else None,
+            extra_tags=extra_tags
         ))
         stats["rows_generated"] += 1
 
         # If there's a subsidy, emit a separate row billing the subsidy provider
         # Provost row: ListCost = BilledCost = subsidized amount
         if allocation.subsidized_amount > 0:
+            subsidy_fund_org = allocation.subsidized_fund_org
+            subsidy_pi_email = pi_email  # flat mode: attribute to PI for reporting
+            subsidy_extra = extra_tags
+            if resolver is not None:
+                # The fund decides who pays — including the subsidy fund. Its
+                # own invoicee gets the subsidy statement; project_id stays the
+                # SUBSIDIZED fund, so their statement rolls up one line per
+                # fund whose cap the subsidy absorbed (never per user/usage).
+                subsidy_fund_org, sub_invoicees, sub_warning = resolver.resolve_fund(
+                    allocation.subsidized_fund_org,
+                    context=f"subsidy '{allocation.subsidized_subsidy_name}'",
+                )
+                if sub_warning:
+                    warnings += 1
+                    print(
+                        f"WARNING: {sub_warning}; "
+                        f"routed to master fund/org {resolver.master_fund_org}"
+                    )
+                subsidy_pi_email = sub_invoicees[0]
+                subsidy_extra = {"principal_invoicees": ";".join(sub_invoicees)}
+
             focus_rows.append(create_focus_row(
                 usage_date=usage_date,
                 user_email=user_email,
                 usage_type=usage_type,
                 list_cost=allocation.subsidized_amount,
                 billed_cost=allocation.subsidized_amount,
-                pi_email=pi_email,  # Still attribute to PI for reporting
+                pi_email=subsidy_pi_email,
                 project_id=project_id,
-                fund_org=allocation.subsidized_fund_org,  # Provost's fund_org
+                fund_org=subsidy_fund_org,  # the subsidy provider's fund_org
                 charge_type="subsidy",
-                subsidy_name=allocation.subsidized_subsidy_name
+                subsidy_name=allocation.subsidized_subsidy_name,
+                extra_tags=subsidy_extra
             ))
             stats["rows_generated"] += 1
 
@@ -438,6 +700,10 @@ def main():
     focus_df = pd.DataFrame(focus_rows)
     focus_df.to_csv(output_csv, index=False)
 
+    showback_count = 0
+    if showback_csv is not None:
+        showback_count = write_showback_csv(showback_csv, showback)
+
     if not args.dry_run:
         state.save()
         print(f"INFO: State saved to {args.state}")
@@ -448,7 +714,7 @@ def main():
     # Summary
     # -----------------------------
     print(f"\n{'='*50}")
-    print(f"CONVERSION SUMMARY")
+    print("CONVERSION SUMMARY")
     print(f"{'='*50}")
     print(f"Input rows:      {len(df)}")
     print(f"Output rows:     {stats['rows_generated']}")
@@ -457,6 +723,12 @@ def main():
     print(f"  Billable:      ${stats['billable']:.2f}")
     print(f"Warnings:        {warnings}")
     print(f"Output file:     {output_csv}")
+    if showback_csv is not None:
+        routed = sum(
+            1 for line in showback.values() if line["status"] == "routed_to_master"
+        )
+        print(f"Showback:        {showback_count} user-month line(s) -> {showback_csv}")
+        print(f"Routed to master: {routed} user-month line(s)")
     print(f"{'='*50}\n")
 
     # Show subsidy state for affected projects

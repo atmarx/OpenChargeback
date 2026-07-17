@@ -102,9 +102,10 @@ CMDB. Dr. Mirk Nonanda's systems group (gift fund) and Dr. Myrna Selwick's chemi
 A charge must always land on a real code. So the license API never answers empty: any
 username it doesn't recognize resolves to the configured **`master_fund_org`**
 (`110000-10000` in the example, held by Research Finance — Pomeline Natterjack). In the
-sample month, `nprothero` used ChatGPT but isn't in the directory yet; his usage lands
-on the master fund, flagged `routed_to_master` on his showback line, and Natterjack
-journals it to the right place and prompts the helpdesk to map the license.
+sample month, Nix Prothero used ChatGPT but isn't in the directory yet; his usage lands
+on the master fund, flagged `routed_to_master` on his showback line (with no license to
+name him, the converter echoes his email's local part, `nix.prothero`, as the username),
+and Natterjack journals it to the right place and prompts the helpdesk to map the license.
 
 This is deliberately **one hop, not a chain.** We considered walking
 fund → dept → college → central, gated on a fund's status — and cut it, because it's
@@ -167,11 +168,30 @@ the `.csv` is what OpenChargeback **emits**. `fund_org` is the join key across a
 
 ---
 
-## What this is, and what still needs building
+## Running it
 
-This folder is the **contract plus a worked example** — the shape helpdesk and finance
-map their systems onto, and enough real-looking data to argue about. The OpenChargeback
-side (call the two lookups during the OpenAI conversion instead of reading
-`projects.json`, and emit the showback CSV at the end) is a straightforward next build on
-the existing converter — deliberately not done here, so the interface can be agreed
-first. The flat-file method keeps working the whole time.
+The OpenChargeback side is built into the converter: it calls both lookups during the
+conversion and emits the showback at the end. Each lookup flag takes a **file path or
+an `http(s)` URL** — the worked examples in this folder run as-is:
+
+```bash
+python ../convert-openai-usage-to-focus-v2.py \
+  --input openai-usage-2026-01.csv \
+  --pricing ../pricing.json \
+  --directory directory.example.json \
+  --fund-orgs fund-orgs.example.json \
+  --subsidies ../subsidies.json
+```
+
+Point `--directory` and `--fund-orgs` at the live endpoints instead of files once the
+helpdesk and finance stand them up; the JSON shape is the same either way. Out come two
+files: the FOCUS CSV for `openchargeback ingest`, and the showback —
+`user-usage-feedback_<YYYY-MM>.csv` — for the helpdesk to load into the CMDB.
+`--subsidies` is optional and uses the same two-row mechanism as the flat method; in
+directory mode the cap is tracked **per fund/org**, matching the rollup rule above.
+
+Omitting `--directory`/`--fund-orgs` runs the flat `projects.json` method exactly as
+before — nothing about it changed.
+
+`tests/test_openai_converter.py` runs the converter against the example files in this
+folder, so the contract and the code can't drift apart without a test noticing.

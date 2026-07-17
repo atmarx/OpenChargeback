@@ -8,6 +8,9 @@ This integration provides:
 - **Preprocessor scripts** to convert OpenAI's billing export to FOCUS format
 - **Subsidy tracking** for institutional subsidies (e.g., "Provost covers first $500/project/year")
 - **User-to-project mapping** for attributing charges to PIs and fund/org codes
+- **Directory API mode** (optional) — resolve each user's fund/org and Principal
+  Invoicee from live helpdesk/finance lookups instead of a hand-edited file, and
+  emit a per-user showback CSV back to the CMDB. See [directory-api/](directory-api/README.md)
 
 ## Quick Start
 
@@ -43,6 +46,7 @@ openchargeback ingest openai-tokens_2026-01.csv --source openai
 | `projects.json` | User-to-project mappings |
 | `subsidies.json` | Subsidy rules (optional) |
 | `SUBSIDY-OPTIONS.md` | Policy guide for subsidy models |
+| `directory-api/` | Directory API mode: contract, worked example, and docs |
 
 ## Configuration
 
@@ -79,6 +83,26 @@ Maps user emails to projects, PIs, and fund/org codes:
   }]
 }
 ```
+
+### Directory API mode (optional alternative to projects.json)
+
+If the helpdesk tracks each ChatGPT Edu seat as a license in a CMDB, the converter
+can resolve attribution live instead of from `projects.json`:
+
+```bash
+python convert-openai-usage-to-focus-v2.py \
+  --input openai-usage-2026-01.csv \
+  --pricing pricing.json \
+  --directory https://cmdb.example.edu/api/openai-licenses \
+  --fund-orgs https://finance.example.edu/api/fund-orgs
+```
+
+Two lookups in — license → fund/org (helpdesk) and fund/org → Principal Invoicee(s)
+(finance), with any unmapped user landing on a `master_fund_org` — and one extra file
+out: a per-user showback CSV for the CMDB. Both flags take a file path or an http(s)
+URL. The full contract, the worked Northwinds example, and the reasoning live in
+[directory-api/README.md](directory-api/README.md). The flat `projects.json` method
+is untouched — pick whichever fits the group.
 
 ### subsidies.json (Optional)
 
@@ -138,6 +162,9 @@ Options:
   --subsidies FILE  Subsidy rules (default: subsidies.json)
   --state FILE      State file for tracking (default: subsidy_state.json)
   --dry-run         Don't update state file
+  --directory SRC   Directory lookup, path or http(s) URL (enables directory mode)
+  --fund-orgs SRC   Fund/org registry, path or http(s) URL (required with --directory)
+  --showback FILE   Showback CSV path (default: user-usage-feedback_<YYYY-MM>.csv)
 ```
 
 ## State Tracking
@@ -215,6 +242,12 @@ Please review convert-openai-usage-to-focus-v2.py and suggest modifications for:
 ### "No project mapping for user X"
 
 Add the user to `projects.json` under the appropriate project.
+
+### `routed_to_master` lines in the showback (directory mode)
+
+The user has no license in the directory (or their license has no fund/org), so the
+charge landed on the `master_fund_org`. Have the helpdesk map the license in the CMDB;
+finance journals the already-billed month to the right fund.
 
 ### Subsidy not applying
 
