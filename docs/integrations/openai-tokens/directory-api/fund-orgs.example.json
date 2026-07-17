@@ -1,0 +1,75 @@
+{
+  "_comment": [
+    "FUND/ORG REGISTRY (the finance lookup) — resolves a fund_org to its Principal Invoicee(s).",
+    "'PI' here = Principal Invoicee, not necessarily a Principal Investigator: a department head,",
+    "a research PI, or a core director — whoever holds the fund and gets the bill. A fund can have",
+    "more than one. That is the ONLY thing OpenChargeback needs from finance to route an invoice.",
+    "No fallback chain and no fund-status routing live here. Fallback is ONE hop, handled entirely",
+    "in the license API: any unmapped user resolves to master_fund_org (see directory.example.json).",
+    "And whether a live fund can actually take a charge is finance's call at journal time, not ours —",
+    "an overdrawn or closed fund is theirs to re-home downstream.",
+    "One fund = one PDF, sent to that fund's invoicee(s), itemized by the users on it — so a PI can",
+    "forward a sponsored fund's statement straight to its funder with an annual report.",
+    "Codes follow a Banner-style fund-orgn convention (1xxxxx unrestricted, 2xxxxx sponsored; the",
+    "-NNNNN suffix is the owning org: 11045 = Computer Science, 11720 = Chemistry, 10000 = central).",
+    "Worked EXAMPLE populated from the Northwinds directory."
+  ],
+  "schema_version": "1.0",
+  "as_of": "2026-01-31",
+  "fund_orgs": [
+    {
+      "fund_org": "110200-11045",
+      "name": "Computer Science — Departmental Operating",
+      "type": "department",
+      "principal_invoicees": [
+        { "email": "gildas.rensby@northwinds.edu", "name": "Dr. Gildas Rensby", "role": "department_head" },
+        { "email": "nim.catchpole@northwinds.edu", "name": "Nim Catchpole", "role": "finance_admin" }
+      ],
+      "_note": "Dept-covered case. Two invoicees: the head owns it, the finance admin is copied. One PDF, sent to both, itemized by the faculty/staff/lecturers who charged to it. The individual is never billed; the head is."
+    },
+    {
+      "fund_org": "210431-11045",
+      "name": "NSF #2431109 — Transom (Foundation Models for Scientific Reasoning)",
+      "type": "sponsored_project",
+      "principal_invoicees": [
+        { "email": "yev.transom@northwinds.edu", "name": "Dr. Yev Transom", "role": "research_pi" }
+      ],
+      "_note": "Grad-student case. The lab's seats roll up here; Transom gets ONE PDF, itemized by student, forwardable to NSF."
+    },
+    {
+      "fund_org": "140310-11045",
+      "name": "Nonanda Systems Group — Discretionary/Gift",
+      "type": "discretionary",
+      "principal_invoicees": [
+        { "email": "mirk.nonanda@northwinds.edu", "name": "Dr. Mirk Nonanda", "role": "research_pi" }
+      ]
+    },
+    {
+      "fund_org": "215052-11720",
+      "name": "NIH R01 #GM152050 — Selwick (Computational Reaction Design)",
+      "type": "sponsored_project",
+      "principal_invoicees": [
+        { "email": "myrna.selwick@northwinds.edu", "name": "Dr. Myrna Selwick", "role": "research_pi" }
+      ],
+      "_note": "Second department — the model isn't CS-specific."
+    },
+    {
+      "fund_org": "110000-10000",
+      "name": "Office of Research — Master / Catch-all Fund",
+      "type": "master",
+      "principal_invoicees": [
+        { "email": "pomeline.natterjack@northwinds.edu", "name": "Pomeline Natterjack", "role": "research_finance" }
+      ],
+      "_note": "The master_fund_org the license API emits for any username it doesn't recognize. Whatever lands here is Natterjack's to journal back to where it belongs. This is what guarantees a charge is never orphaned — one hop, not a chain."
+    },
+    {
+      "fund_org": "130050-10000",
+      "name": "Provost's Office — AI Access Initiative (Subsidy)",
+      "type": "subsidy",
+      "principal_invoicees": [
+        { "email": "pomeline.natterjack@northwinds.edu", "name": "Pomeline Natterjack", "role": "subsidy_administrator" }
+      ],
+      "_note": "The subsidy owner's fund. When a subsidy covers part of a fund's usage, that covered slice is charged HERE — see subsidies.json for the cap rule. The subsidy rollup is PER FUND/ORG, not per user and not per usage: one line per subsidized fund showing how much of its cap the subsidy absorbed (e.g. 'covered $500 of Transom's grant'). Who used it is on that PI's own invoice, one level down."
+    }
+  ]
+}

@@ -1,0 +1,120 @@
+{
+  "_comment": [
+    "DIRECTORY (the license lookup) — the API-driven alternative to the flat projects.json.",
+    "One record per OpenAI ChatGPT Edu user = one 'license' the helpdesk tracks in their CMDB.",
+    "The only question this answers: given a username, which fund/org pays for that seat?",
+    "OpenAI usage carries no project/tag attributes, so a user maps to exactly ONE fund_org.",
+    "OpenChargeback calls this per user seen in the monthly usage export:  GET user -> fund_org.",
+    "The API NEVER answers empty: any username not listed here resolves to master_fund_org below,",
+    "so a charge is always attributable to *something*. Whether that something can actually take",
+    "the charge is finance's call at journal time, not ours — an overdrawn or closed fund is theirs",
+    "to re-home downstream. We only guarantee every charge lands on a real code.",
+    "KNOWN LIMITATION (accepted): this lookup has no time dimension. It returns the fund_org that is",
+    "current when billing runs, and that fund_org takes the WHOLE month. A mid-month reassignment is",
+    "not pro-rated — the new fund/org gets the entire month. There is no way to ask what a user's",
+    "fund/org was on a given date, so we don't try; finance re-homes anything that lands wrong.",
+    "Vendor-neutral: the helpdesk exposes it as an API; the shape below is the contract, not the",
+    "storage. fund_org is a code that joins to fund-orgs.example.json.",
+    "This file is a worked EXAMPLE populated with the Northwinds faculty/staff directory."
+  ],
+  "schema_version": "1.0",
+  "as_of": "2026-01-31",
+  "master_fund_org": "110000-10000",
+  "licenses": [
+    {
+      "username": "grensby",
+      "email": "gildas.rensby@northwinds.edu",
+      "display_name": "Dr. Gildas Rensby",
+      "department": "Computer Science",
+      "role": "faculty",
+      "fund_org": "110200-11045",
+      "_note": "Dept head. A Principal Invoicee of the CS dept fund AND a user of it — a manager can be a user."
+    },
+    {
+      "username": "ncatchpole",
+      "email": "nim.catchpole@northwinds.edu",
+      "display_name": "Nim Catchpole",
+      "department": "Computer Science",
+      "role": "staff",
+      "fund_org": "110200-11045",
+      "_note": "Dept finance admin; dept covers her seat."
+    },
+    {
+      "username": "vthorbin",
+      "email": "vesla.thorbin@northwinds.edu",
+      "display_name": "Vesla Thorbin",
+      "department": "Computer Science",
+      "role": "lecturer",
+      "fund_org": "110200-11045",
+      "_note": "Non-grant teaching faculty — the department picks up her AI use. Dept head is invoiced, not her."
+    },
+    {
+      "username": "ytransom",
+      "email": "yev.transom@northwinds.edu",
+      "display_name": "Dr. Yev Transom",
+      "department": "Computer Science",
+      "role": "faculty",
+      "fund_org": "210431-11045",
+      "_note": "Research PI (ML/LLM). Charges his own seat to his grant; also the Principal Invoicee for his lab's seats."
+    },
+    {
+      "username": "pwickstrand",
+      "email": "pell.wickstrand@northwinds.edu",
+      "display_name": "Pell Wickstrand",
+      "department": "Computer Science",
+      "role": "grad_student",
+      "fund_org": "210431-11045",
+      "_note": "Transom lab. Never invoiced directly; usage rolls up to Transom, itemized by user."
+    },
+    {
+      "username": "demberly",
+      "email": "doss.emberly@northwinds.edu",
+      "display_name": "Doss Emberly",
+      "department": "Computer Science",
+      "role": "grad_student",
+      "fund_org": "210431-11045"
+    },
+    {
+      "username": "fhallowbry",
+      "email": "fain.hallowbry@northwinds.edu",
+      "display_name": "Fain Hallowbry",
+      "department": "Computer Science",
+      "role": "grad_student",
+      "fund_org": "210431-11045"
+    },
+    {
+      "username": "mnonanda",
+      "email": "mirk.nonanda@northwinds.edu",
+      "display_name": "Dr. Mirk Nonanda",
+      "department": "Computer Science",
+      "role": "faculty",
+      "fund_org": "140310-11045",
+      "_note": "Systems PI. Charges to a discretionary/gift fund rather than a sponsored award."
+    },
+    {
+      "username": "jvantle",
+      "email": "jesk.vantle@northwinds.edu",
+      "display_name": "Jesk Vantle",
+      "department": "Computer Science",
+      "role": "grad_student",
+      "fund_org": "140310-11045"
+    },
+    {
+      "username": "mselwick",
+      "email": "myrna.selwick@northwinds.edu",
+      "display_name": "Dr. Myrna Selwick",
+      "department": "Chemistry",
+      "role": "faculty",
+      "fund_org": "215052-11720",
+      "_note": "Second research group, a different department — shows the model isn't CS-specific."
+    },
+    {
+      "username": "bcindrell",
+      "email": "bex.cindrell@northwinds.edu",
+      "display_name": "Bex Cindrell",
+      "department": "Chemistry",
+      "role": "grad_student",
+      "fund_org": "215052-11720"
+    }
+  ]
+}
