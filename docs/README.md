@@ -13,6 +13,7 @@ OpenChargeback is a billing and chargeback system for research computing service
 | Run billing workflows | [Admin Guide](admin-guide/) |
 | Customize templates | [Admin Guide: Templates](admin-guide/templates.md) |
 | Set up Azure/AWS/HPC integration | [Integrations](integrations/) |
+| Pitch pre-usage budget guardrails (NSF prevention) | [Before the Meter](BEFORE-THE-METER.md) |
 | Understand security model | [Security](security/) |
 | Deploy and maintain | [Operations](operations/) |
 | Contribute to development | [Development](development/) |
@@ -23,6 +24,7 @@ OpenChargeback is a billing and chargeback system for research computing service
 docs/
 ├── README.md                 # This file
 ├── EXECSUMMARY.md           # Executive summary for leadership
+├── BEFORE-THE-METER.md      # Pre-usage budget guardrails — what belongs upstream
 ├── TECHNOLOGY.md            # Technology stack overview
 │
 ├── getting-started/         # Installation and initial setup
@@ -88,6 +90,7 @@ docs/
 | **PI/Researcher** | [FOCUS Format](user-guide/focus-format.md) - understand your statements |
 | **IT Administrator** | [Getting Started](getting-started/), [Admin Guide](admin-guide/), [Operations](operations/) |
 | **Cloud Team** | [TAG-SPECIFICATION.md](integrations/TAG-SPECIFICATION.md), [Integrations](integrations/) |
+| **Finance / Budget Office** | [EXECSUMMARY.md](EXECSUMMARY.md), [Before the Meter](BEFORE-THE-METER.md) |
 | **Security Auditor** | [Security](security/) |
 | **Developer** | [Development](development/), [TECHNOLOGY.md](TECHNOLOGY.md) |
 
