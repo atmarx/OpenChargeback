@@ -1,0 +1,13 @@
+username,email,period,service,credits,amount_usd,fund_org,status
+bcindrell,bex.cindrell@northwinds.edu,2026-01,OpenAI,1100,55.00,215052-11720,charged
+demberly,doss.emberly@northwinds.edu,2026-01,OpenAI,2900,145.00,210431-11045,charged
+fhallowbry,fain.hallowbry@northwinds.edu,2026-01,OpenAI,4100,205.00,210431-11045,charged
+grensby,gildas.rensby@northwinds.edu,2026-01,OpenAI,300,15.00,110200-11045,charged
+jvantle,jesk.vantle@northwinds.edu,2026-01,OpenAI,900,45.00,140310-11045,charged
+mnonanda,mirk.nonanda@northwinds.edu,2026-01,OpenAI,400,20.00,140310-11045,charged
+mselwick,myrna.selwick@northwinds.edu,2026-01,OpenAI,350,17.50,215052-11720,charged
+ncatchpole,nim.catchpole@northwinds.edu,2026-01,OpenAI,150,7.50,110200-11045,charged
+nix.prothero,nix.prothero@northwinds.edu,2026-01,OpenAI,800,40.00,110000-10000,routed_to_master
+pwickstrand,pell.wickstrand@northwinds.edu,2026-01,OpenAI,3400,170.00,210431-11045,charged
+vthorbin,vesla.thorbin@northwinds.edu,2026-01,OpenAI,500,25.00,110200-11045,charged
+ytransom,yev.transom@northwinds.edu,2026-01,OpenAI,1200,60.00,210431-11045,charged

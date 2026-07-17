@@ -1,6 +1,6 @@
 # Sample close packages
 
-Two months, two wrappers — the forensic monthly close package as OpenChargeback
+Three months, two wrappers — the forensic monthly close package as OpenChargeback
 delivers it. Each `.zip` and its matching `.pdf` for the same month carry
 **byte-identical members**: the wrapper an org picks never changes a number.
 
@@ -8,6 +8,10 @@ delivers it. Each `.zip` and its matching `.pdf` for the same month carry
 |---------|----------------------------------|----------------------------------|
 | 2025-01 | `openchargeback-close-2025-01-*.zip` | `openchargeback-close-2025-01-*.pdf` |
 | 2025-12 | `openchargeback-close-2025-12-*.zip` | `openchargeback-close-2025-12-*.pdf` |
+| 2026-01 | `openchargeback-close-2026-01-*.zip` | `openchargeback-close-2026-01-*.pdf` |
+
+2026-01 is the OpenAI/Northwinds month — converted from a raw vendor export via
+the directory API, with the Provost subsidy split baked into its FOCUS rows.
 
 The 6-character suffix in each filename is the last 6 chars of the file's
 sha256. `SHA256SUMS.txt` records the full hashes — verify with:

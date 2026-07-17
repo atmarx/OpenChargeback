@@ -1,0 +1,46 @@
+BillingPeriod,PIEmail,ProjectID,FundOrg,ServiceName,Amount,ResourceCount
+2025-01,drix.kelvington@example.edu,labor-economics,ECON-DEPT-2024,Amazon EC2,467.50,1
+2025-01,drix.kelvington@example.edu,labor-economics,ECON-DEPT-2024,Amazon RDS,102.00,1
+2025-01,drix.kelvington@example.edu,labor-economics,ECON-DEPT-2024,Amazon S3,72.25,1
+2025-01,drix.kelvington@example.edu,labor-economics,ECON-DEPT-2024,Research Storage - Home,0.00,1
+2025-01,drix.kelvington@example.edu,labor-economics,ECON-DEPT-2024,Secure File Services,70.00,2
+2025-01,frin.bumberly@example.edu,cfd-turbulence,ENGR-STARTUP,HPC Cluster,0.00,2
+2025-01,frin.bumberly@example.edu,cfd-turbulence,ENGR-STARTUP,Research Storage - Archive,5.00,1
+2025-01,frin.bumberly@example.edu,cfd-turbulence,ENGR-STARTUP,Research Storage - Home,0.00,1
+2025-01,frin.bumberly@example.edu,cfd-turbulence,ENGR-STARTUP,Research Storage - Scratch,0.00,1
+2025-01,grix.mottershaw@example.edu,alzheimers-biomarkers,ADNI-PILOT-2024,Amazon EC2,935.00,1
+2025-01,grix.mottershaw@example.edu,alzheimers-biomarkers,ADNI-PILOT-2024,Amazon RDS,80.75,1
+2025-01,grix.mottershaw@example.edu,alzheimers-biomarkers,ADNI-PILOT-2024,Amazon S3,552.50,1
+2025-01,grix.mottershaw@example.edu,alzheimers-biomarkers,ADNI-PILOT-2024,HPC GPU Cluster,0.00,1
+2025-01,grix.mottershaw@example.edu,alzheimers-biomarkers,ADNI-PILOT-2024,Research Storage - Archive,7.50,1
+2025-01,grix.mottershaw@example.edu,alzheimers-biomarkers,ADNI-PILOT-2024,Research Storage - Scratch,0.00,1
+2025-01,grix.mottershaw@example.edu,alzheimers-biomarkers,ADNI-PILOT-2024,Secure File Services,180.00,2
+2025-01,grix.mottershaw@example.edu,neuroimaging-atlas,NIMH-2024-003,Amazon EC2,1615.00,2
+2025-01,grix.mottershaw@example.edu,neuroimaging-atlas,NIMH-2024-003,Amazon RDS,148.75,1
+2025-01,grix.mottershaw@example.edu,neuroimaging-atlas,NIMH-2024-003,Amazon S3,1870.00,1
+2025-01,grix.mottershaw@example.edu,neuroimaging-atlas,NIMH-2024-003,Research Storage - Home,10.00,1
+2025-01,grix.mottershaw@example.edu,neuroimaging-atlas,NIMH-2024-003,Secure File Services,110.00,2
+2025-01,plex.wombsworth@example.edu,exoplanet-survey,NASA-EXOP-2024,Amazon EC2,1156.00,2
+2025-01,plex.wombsworth@example.edu,exoplanet-survey,NASA-EXOP-2024,Amazon S3,3731.50,2
+2025-01,plex.wombsworth@example.edu,exoplanet-survey,NASA-EXOP-2024,Amazon S3 Glacier,212.50,1
+2025-01,plex.wombsworth@example.edu,exoplanet-survey,NASA-EXOP-2024,Research Storage - Home,0.00,1
+2025-01,quib.flannister@example.edu,climate-modeling,NSF-ATM-2024,HPC Cluster,0.00,3
+2025-01,quib.flannister@example.edu,climate-modeling,NSF-ATM-2024,Research Storage - Archive,12.50,1
+2025-01,quib.flannister@example.edu,climate-modeling,NSF-ATM-2024,Research Storage - Home,0.00,1
+2025-01,quib.flannister@example.edu,climate-modeling,NSF-ATM-2024,Research Storage - Scratch,0.00,1
+2025-01,quib.flannister@example.edu,ocean-circulation,NOAA-CPO-2024,Amazon EC2,1326.00,2
+2025-01,quib.flannister@example.edu,ocean-circulation,NOAA-CPO-2024,Amazon S3,357.00,1
+2025-01,quib.flannister@example.edu,ocean-circulation,NOAA-CPO-2024,HPC Cluster,0.00,2
+2025-01,quib.flannister@example.edu,ocean-circulation,NOAA-CPO-2024,Research Storage - Archive,10.00,1
+2025-01,quib.flannister@example.edu,ocean-circulation,NOAA-CPO-2024,Research Storage - Scratch,0.00,1
+2025-01,tarn.voxley@example.edu,quantum-materials,DOE-SC-2024,Azure Blob Storage,38.25,1
+2025-01,tarn.voxley@example.edu,quantum-materials,DOE-SC-2024,Azure Cosmos DB,153.00,1
+2025-01,tarn.voxley@example.edu,quantum-materials,DOE-SC-2024,Azure Virtual Machines,544.00,2
+2025-01,tarn.voxley@example.edu,quantum-materials,DOE-SC-2024,HPC GPU Cluster,0.00,1
+2025-01,tarn.voxley@example.edu,quantum-materials,DOE-SC-2024,Research Storage - Home,0.00,1
+2025-01,zorp.blinkman@example.edu,genomics-sequencing,BIO-2024-001,Amazon EBS,382.50,1
+2025-01,zorp.blinkman@example.edu,genomics-sequencing,BIO-2024-001,Amazon EC2,1819.00,2
+2025-01,zorp.blinkman@example.edu,genomics-sequencing,BIO-2024-001,Amazon S3,106.25,1
+2025-01,zorp.blinkman@example.edu,genomics-sequencing,BIO-2024-001,Research Storage - Home,0.00,1
+2025-01,zorp.blinkman@example.edu,protein-folding-ml,NIH-R01-2023,Amazon EC2,4080.00,2
+2025-01,zorp.blinkman@example.edu,protein-folding-ml,NIH-R01-2023,Amazon S3,72.25,1

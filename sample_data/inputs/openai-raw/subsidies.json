@@ -1,0 +1,15 @@
+{
+  "subsidies": [
+    {
+      "name": "provost_ai_access",
+      "description": "Provost's AI Access Initiative — covers the first $500 of OpenAI usage per fund/org per fiscal year",
+      "fund_org": "130050-10000",
+      "type": "per_project_cap",
+      "cap_amount": 500.00,
+      "period": "fiscal_year",
+      "fiscal_year_start": "07-01",
+      "applies_to_services": ["OpenAI"],
+      "enabled": true
+    }
+  ]
+}

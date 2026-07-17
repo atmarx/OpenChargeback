@@ -5,10 +5,16 @@
 # end, how FOCUS-format input files become the delivered outputs: PDF statements,
 # the GL journal, and the forensic close package in BOTH wrappers (zip and pdf).
 #
-# The result is a 2x2 under sample_data/outputs/packages/: two months, two
-# wrappers, identical facts inside each pair. These are committed as reference
-# samples. They are deterministic — same input data + same toolchain produces
-# the same bytes and the same sha256 (recorded in SHA256SUMS.txt).
+# The result under sample_data/outputs/packages/ is months x wrappers: each
+# month as both a zip and a pdf portfolio, identical facts inside each pair.
+# These are committed as reference samples. They are deterministic — same input
+# data + same toolchain produces the same bytes and the same sha256 (recorded
+# in SHA256SUMS.txt).
+#
+# The 2026-01 month starts one step earlier: a raw OpenAI usage export is run
+# through the converter (directory-API mode) to produce its FOCUS input and the
+# per-user showback, so the repo shows the WHOLE chain — vendor export ->
+# converter -> FOCUS -> ingest -> statements/emails -> GL -> close package.
 
 set -e
 
@@ -17,7 +23,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_ROOT"
 
 CONFIG="config.example.yaml"
-PERIODS=("2025-01" "2025-12")
+PERIODS=("2025-01" "2025-12" "2026-01")
 
 echo "=== OpenChargeback Sample Output Generator ==="
 echo ""
@@ -38,6 +44,26 @@ cleanup() {
     sed -i "s/^dev_mode: .*/dev_mode: $ORIG_DEV_MODE/" "$CONFIG"
 }
 trap cleanup EXIT
+
+# Step 0: Convert the raw OpenAI export to FOCUS (directory-API mode).
+# License -> fund/org -> Principal Invoicee via the contract examples in docs/,
+# the Provost $500/fund subsidy applied as two-row splits, and the per-user
+# showback emitted for the CMDB. The FOCUS output lands in inputs/ where the
+# ingest loop below picks it up like any other source. Subsidy state is
+# throwaway (mktemp -u): every regeneration is a fresh fiscal year.
+echo "Step 0: Converting the raw OpenAI export (directory-API mode)..."
+OPENAI_INT="docs/integrations/openai-tokens"
+python "$OPENAI_INT/convert-openai-usage-to-focus-v2.py" \
+    --input sample_data/inputs/openai-raw/openai-usage-export_2026-01.csv \
+    --output sample_data/inputs/openai-tokens_2026-01.csv \
+    --pricing "$OPENAI_INT/pricing.json" \
+    --directory "$OPENAI_INT/directory-api/directory.example.json" \
+    --fund-orgs "$OPENAI_INT/directory-api/fund-orgs.example.json" \
+    --subsidies sample_data/inputs/openai-raw/subsidies.json \
+    --state "$(mktemp -u)" \
+    --showback sample_data/inputs/openai-raw/user-usage-feedback_2026-01.csv \
+    > /dev/null
+echo "  Wrote inputs/openai-tokens_2026-01.csv + openai-raw/user-usage-feedback_2026-01.csv"
 
 # Step 1: Reset database and clear prior sample outputs
 echo "Step 1: Resetting database and output dirs..."
@@ -106,7 +132,7 @@ echo "Step 4: Recording package hashes..."
 cat > sample_data/outputs/packages/README.md <<'EOF'
 # Sample close packages
 
-Two months, two wrappers — the forensic monthly close package as OpenChargeback
+Three months, two wrappers — the forensic monthly close package as OpenChargeback
 delivers it. Each `.zip` and its matching `.pdf` for the same month carry
 **byte-identical members**: the wrapper an org picks never changes a number.
 
@@ -114,6 +140,10 @@ delivers it. Each `.zip` and its matching `.pdf` for the same month carry
 |---------|----------------------------------|----------------------------------|
 | 2025-01 | `openchargeback-close-2025-01-*.zip` | `openchargeback-close-2025-01-*.pdf` |
 | 2025-12 | `openchargeback-close-2025-12-*.zip` | `openchargeback-close-2025-12-*.pdf` |
+| 2026-01 | `openchargeback-close-2026-01-*.zip` | `openchargeback-close-2026-01-*.pdf` |
+
+2026-01 is the OpenAI/Northwinds month — converted from a raw vendor export via
+the directory API, with the Provost subsidy split baked into its FOCUS rows.
 
 The 6-character suffix in each filename is the last 6 chars of the file's
 sha256. `SHA256SUMS.txt` records the full hashes — verify with:

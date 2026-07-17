@@ -118,10 +118,10 @@ imports:
     pattern: hpc
     fund_org: ""
     account_code: ""
-  - name: OpenAI
+  - name: openai-tokens    # Must equal the ingest source name for journal credits
     pattern: openai        # ChatGPT EDU / OpenAI API usage
-    fund_org: ""
-    account_code: ""
+    fund_org: "110900-10000"   # Central IT — the fund that bought the credit pool
+    account_code: "54500"
   - name: Storage
     pattern: storage
     fund_org: ""
@@ -129,9 +129,14 @@ imports:
 
 # Journal/GL export configuration
 journal:
-  # Regex with named capture groups to parse fund_org into components
-  # Example: "DEPT-PROJECT-2024" -> orgn="DEPT", fund="PROJECT-2024"
-  fund_org_regex: "^(?P<orgn>[^-]+)-(?P<fund>.+)$"
+  # Regex with named capture groups to parse fund_org into components.
+  # Match YOUR institution's code shape; a fund_org that doesn't match lands
+  # whole in the Fund column with Orgn blank (visible, never dropped).
+  # Banner-style fund-orgn codes (the 2026-01 OpenAI sample): "130050-10000"
+  #   -> fund="130050", orgn="10000"
+  # For orgn-first codes like "DEPT-PROJECT-2024" use:
+  #   '^(?P<orgn>[^-]+)-(?P<fund>.+)$'
+  fund_org_regex: '^(?P<fund>[0-9]{6})-(?P<orgn>[0-9]{5})$'
 
   # Regex to validate account codes (optional, leave empty to skip)
   account_code_regex: ""
