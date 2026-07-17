@@ -68,7 +68,7 @@ echo "  Wrote inputs/openai-tokens_2026-01.csv + openai-raw/user-usage-feedback_
 # Step 1: Reset database and clear prior sample outputs
 echo "Step 1: Resetting database and output dirs..."
 rm -f instance/billing.db
-rm -rf instance/output/emails
+rm -rf instance/output/emails instance/output/journals instance/output/pdfs
 rm -rf sample_data/outputs/pdfs sample_data/outputs/journals \
        sample_data/outputs/emails sample_data/outputs/packages
 mkdir -p sample_data/outputs/pdfs sample_data/outputs/journals \
