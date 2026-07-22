@@ -15,7 +15,9 @@
         <h3 class="card-title">Export Options</h3>
     </div>
     <div class="card-body">
-        <form method="post" action="/journal/export">
+        {# hx-boost=false: the export answers with a CSV attachment — a boosted
+           form would AJAX-swap the bytes into the page instead of saving a file #}
+        <form method="post" action="/journal/export" hx-boost="false">
             <div class="form-group" style="margin-bottom: 20px;">
                 <label for="period_id" style="display: block; margin-bottom: 8px; font-weight: 500;">
                     Billing Period

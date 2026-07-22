@@ -72,7 +72,9 @@
                         <td>
                             <div class="btn-group">
                                 {% if stmt.pdf_path %}
-                                <a href="/statements/{{ stmt.id }}/download" class="btn btn-sm btn-outline">Download</a>
+                                {# hx-boost=false: boosted anchors AJAX-swap the response — a binary
+                                   attachment must be a real browser navigation or no file ever lands #}
+                                <a href="/statements/{{ stmt.id }}/download" download hx-boost="false" class="btn btn-sm btn-outline">Download</a>
                                 {% endif %}
                                 {% if not stmt.sent_at %}
                                 <form method="post" action="/statements/{{ stmt.id }}/send" style="display: inline;">
