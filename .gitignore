@@ -55,3 +55,6 @@ planning/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Generated review storyboard (rebuild: python3 tools/review/build_ocb_review.py)
+tools/review/ocb-review/
