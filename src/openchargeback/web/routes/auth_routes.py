@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
+from openchargeback import audit
 from openchargeback.config import Config
 from openchargeback.db import Database
 from openchargeback.web.auth import authenticate_user
@@ -16,6 +17,16 @@ from openchargeback.web.deps import (
 )
 
 router = APIRouter(tags=["auth"])
+
+
+def _source_ip(request: Request) -> str | None:
+    """Peer address for the audit line.
+
+    Behind a reverse proxy this is the proxy, not the browser.  We log what we
+    can actually see rather than trusting X-Forwarded-For, which any client can
+    set; the proxy's own logs are the authority on the real client address.
+    """
+    return request.client.host if request.client else None
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -32,6 +43,10 @@ async def login_page(
     if request.session.get("user_id"):
         if get_current_user_optional(request) is not None:
             return RedirectResponse(url="/", status_code=302)
+        audit.log_session_invalidated(
+            user_id=str(request.session.get("user_id")),
+            source_ip=_source_ip(request),
+        )
         request.session.clear()
 
     templates = get_templates(request)
@@ -62,6 +77,11 @@ async def login_submit(
     # Check if there are any users (DB or config)
     db_users = db.list_users()
     if not db_users and not config.web.users:
+        audit.log_login_failed(
+            username=username,
+            reason="no_users_configured",
+            source_ip=_source_ip(request),
+        )
         return templates.TemplateResponse(
             request,
             "pages/login.html",
@@ -76,6 +96,7 @@ async def login_submit(
     user = authenticate_user(username, password, config, db)
 
     if user is None:
+        audit.log_login_failed(username=username, source_ip=_source_ip(request))
         return templates.TemplateResponse(
             request,
             "pages/login.html",
@@ -85,6 +106,23 @@ async def login_submit(
                 "username": username,
             },
         )
+
+    # Which credential store answered.  A recovery login bypasses the database
+    # entirely, so it is called out separately rather than folded into "config".
+    user_config = config.web.users.get(username)
+    if user.is_db_user:
+        method = "database"
+    elif user_config is not None and user_config.recovery:
+        method = "recovery"
+    else:
+        method = "config"
+
+    audit.log_login(
+        username=user.username,
+        role=user.role,
+        method=method,
+        source_ip=_source_ip(request),
+    )
 
     # Set session
     request.session["user_id"] = user.id
@@ -109,5 +147,8 @@ async def login_submit(
 @router.post("/logout")
 async def logout(request: Request) -> RedirectResponse:
     """Log out the current user."""
+    user = get_current_user_optional(request)
+    if user is not None:
+        audit.log_logout(username=user.username, source_ip=_source_ip(request))
     request.session.clear()
     return RedirectResponse(url="/login", status_code=302)

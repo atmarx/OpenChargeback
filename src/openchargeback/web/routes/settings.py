@@ -8,7 +8,7 @@ import yaml
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from openchargeback import __version__
+from openchargeback import __version__, audit
 from openchargeback.db import Database
 from openchargeback.web.auth import User
 from openchargeback.web.deps import (
@@ -119,6 +119,14 @@ async def update_review_patterns(
         config.review.flag_patterns = flag_list
         config.review.fund_org_patterns = fund_org_list
 
+        audit.log_settings_changed(
+            setting="review_patterns",
+            detail=(
+                f"{len(flag_list)} flag pattern(s), "
+                f"{len(fund_org_list)} fund/org pattern(s); persisted to config"
+            ),
+            user=user.username,
+        )
         add_flash_message(request, "success", "Review patterns updated successfully.")
     else:
         add_flash_message(
@@ -129,6 +137,15 @@ async def update_review_patterns(
         # Still update in-memory config
         config.review.flag_patterns = flag_list
         config.review.fund_org_patterns = fund_org_list
+
+        audit.log_settings_changed(
+            setting="review_patterns",
+            detail=(
+                f"{len(flag_list)} flag pattern(s), "
+                f"{len(fund_org_list)} fund/org pattern(s); session only, config file not found"
+            ),
+            user=user.username,
+        )
 
     return RedirectResponse(url="/settings", status_code=303)
 
@@ -381,6 +398,7 @@ async def reset_data(
         results.append(f"Deleted {count} source(s)")
 
     if results:
+        audit.log_data_reset(tables="; ".join(results), user=user.username)
         add_flash_message(request, "success", "; ".join(results))
     else:
         add_flash_message(request, "warning", "No data selected to reset.")

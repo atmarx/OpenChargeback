@@ -6,7 +6,11 @@ OpenChargeback maintains audit trails for compliance and troubleshooting.
 
 ### 1. Application Logs
 
-Structured logs capture significant events. See [Logging](../operations/logging.md) for configuration.
+Structured logs capture every action the application takes.  See
+[Logging](../operations/logging.md) for **configuration** — formats, log
+levels, file output, and forwarding to a remote syslog collector.  **This page
+is the canonical list of event names**; `tests/test_audit_events.py` fails the
+build if the code and this document disagree.
 
 Audit events are emitted by `openchargeback.audit` as structured log lines.  Event
 names are dotted, in the form `{event_type}.{action}` (e.g. `import.completed`,
@@ -89,17 +93,47 @@ These are the events actually emitted by `openchargeback.audit`:
 | `user.password_reset` | username, user |
 | `user.password_changed` | username |
 
-### Not Yet Implemented
+### Authentication Events
 
-The following are **not** currently emitted as audit events.  Do not build
-compliance reporting on them:
+| Event | Logged Data |
+|-------|-------------|
+| `auth.login` | username, role, method, source_ip, user |
+| `auth.login_failed` | username, reason, source_ip, user |
+| `auth.logout` | username, source_ip, user |
+| `auth.session_invalidated` | username, reason, source_ip, user |
+| `auth.password_change_failed` | username, reason, user |
 
-- Authentication events (`login`, `logout`, failed logins, session expiry).
-  Login attempts are not audit-logged today; if you need authentication
-  auditing, capture it at the reverse proxy / SSO layer.
-- Settings changes (review patterns, fund/org patterns).
-- A separate "import started" / "charges flagged" event — flag counts are
-  carried on `import.completed` instead.
+`method` records which credential store answered: `database`, `config`, or
+`recovery`.  A **recovery login bypasses the database entirely** and is the
+single authentication event most worth alerting on.
+
+`source_ip` is the peer address the application can see.  Behind a reverse
+proxy that is the proxy's address — OCB does not trust `X-Forwarded-For`,
+since any client can set it.  Treat the proxy's logs as authoritative for the
+real client address.
+
+### Settings Events
+
+| Event | Logged Data |
+|-------|-------------|
+| `settings.changed` | setting, detail, user |
+| `settings.data_reset` | tables, user |
+
+`settings.data_reset` is destructive and dev-mode only.  It should never appear
+in a production index.
+
+### Not Emitted
+
+The following are **not** emitted, for structural reasons rather than as a
+backlog item.  Do not build compliance reporting on them:
+
+- **Session expiry.**  An expired session cookie is rejected by the session
+  middleware before the application sees the request, so there is no moment at
+  which OCB could observe it.  `auth.session_invalidated` is a different event
+  — a still-valid session whose user has since been deleted.  True session
+  expiry has to come from the proxy or SSO layer.
+- **A separate "import started" / "charges flagged" event.**  Flag counts ride
+  on `import.completed` instead.
 
 ## Database Audit Tables
 

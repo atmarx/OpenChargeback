@@ -47,6 +47,19 @@ logging:
   format: splunk                  # "splunk" (key=value) or "json"
   file: ./instance/logs/openchargeback.log  # Optional file output (also logs to stderr)
 
+  # Remote syslog.  OpenChargeback emits every action it takes and does not
+  # decide which ones are worth keeping -- that call belongs to whoever runs
+  # the collector.  Adds to stderr and file output rather than replacing them.
+  #
+  # UDP cannot tell whether anything is listening.  Use TCP if you need
+  # startup to complain when the collector is unreachable.
+  # syslog:
+  #   host: syslog.example.edu
+  #   port: 514
+  #   protocol: udp               # "udp" (fire-and-forget) or "tcp"
+  #   facility: local4            # user, daemon, or local0-local7
+  #   ident: openchargeback       # tag prefixed to every line
+
 # Web interface configuration
 web:
   enabled: true

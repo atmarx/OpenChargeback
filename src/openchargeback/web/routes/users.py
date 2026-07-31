@@ -350,6 +350,7 @@ async def change_password(
 
     # User must be a DB user to change password
     if not user.is_db_user or user.db_id is None:
+        audit.log_password_change_failed(user.username, reason="not_a_database_user")
         add_flash_message(
             request,
             "error",
@@ -360,16 +361,19 @@ async def change_password(
     # Verify current password
     db_user = db.get_user_by_id(user.db_id)
     if not db_user or not verify_password(current_password, db_user.password_hash):
+        audit.log_password_change_failed(user.username, reason="wrong_current_password")
         add_flash_message(request, "error", "Current password is incorrect.")
         return RedirectResponse(url="/settings/users/change-password", status_code=303)
 
     if new_password != confirm_password:
+        audit.log_password_change_failed(user.username, reason="confirmation_mismatch")
         add_flash_message(request, "error", "New passwords do not match.")
         return RedirectResponse(url="/settings/users/change-password", status_code=303)
 
     # Validate password against requirements
     is_valid, error_msg = config.web.password_requirements.validate_password(new_password)
     if not is_valid:
+        audit.log_password_change_failed(user.username, reason="policy_rejected")
         add_flash_message(request, "error", error_msg)
         return RedirectResponse(url="/settings/users/change-password", status_code=303)
 

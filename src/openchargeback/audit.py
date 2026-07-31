@@ -373,3 +373,136 @@ def log_user_password_changed(
         "password_changed",
         username=username,
     )
+
+
+# Authentication events
+#
+# These are emitted for the collector's benefit, not ours.  OpenChargeback does
+# not decide which of them matter -- every authentication action produces a line
+# and triage happens downstream.
+def log_login(
+    username: str,
+    role: str,
+    method: str,
+    source_ip: str | None = None,
+) -> None:
+    """Log a successful login.
+
+    Args:
+        username: The account that authenticated.
+        role: The role it authenticated as.
+        method: Which credential store answered -- database, config, or
+            recovery.  A recovery login bypasses the database entirely and is
+            the one worth alerting on.
+        source_ip: Peer address, or the reverse proxy's if OCB sits behind one.
+    """
+    _emit(
+        "auth",
+        "login",
+        username=username,
+        role=role,
+        method=method,
+        source_ip=source_ip or "unknown",
+        user=username,
+    )
+
+
+def log_login_failed(
+    username: str,
+    reason: str = "invalid_credentials",
+    source_ip: str | None = None,
+) -> None:
+    """Log a failed login attempt."""
+    _emit(
+        "auth",
+        "login_failed",
+        username=username,
+        reason=reason,
+        source_ip=source_ip or "unknown",
+        user=username,
+    )
+
+
+def log_logout(
+    username: str,
+    source_ip: str | None = None,
+) -> None:
+    """Log an explicit logout."""
+    _emit(
+        "auth",
+        "logout",
+        username=username,
+        source_ip=source_ip or "unknown",
+        user=username,
+    )
+
+
+def log_session_invalidated(
+    user_id: str,
+    reason: str = "user_no_longer_exists",
+    source_ip: str | None = None,
+) -> None:
+    """Log a session discarded because it no longer resolves to a user.
+
+    This is not session *expiry* -- an expired cookie is rejected by the session
+    middleware without the application ever seeing it, so there is nothing to
+    emit.  This fires when a live session names a user who has since been
+    deleted or removed from config.yaml.
+    """
+    _emit(
+        "auth",
+        "session_invalidated",
+        username=user_id,
+        reason=reason,
+        source_ip=source_ip or "unknown",
+        user=user_id,
+    )
+
+
+def log_password_change_failed(
+    username: str,
+    reason: str,
+) -> None:
+    """Log a rejected self-service password change."""
+    _emit(
+        "auth",
+        "password_change_failed",
+        username=username,
+        reason=reason,
+        user=username,
+    )
+
+
+# Settings events
+def log_settings_changed(
+    setting: str,
+    detail: str,
+    user: str | None = None,
+) -> None:
+    """Log a change to runtime settings.
+
+    Args:
+        setting: Which setting group changed (e.g. review_patterns).
+        detail: Human-readable summary of the change.
+        user: Who made it.
+    """
+    _emit(
+        "settings",
+        "changed",
+        setting=setting,
+        detail=detail,
+        user=user or "system",
+    )
+
+
+def log_data_reset(
+    tables: str,
+    user: str | None = None,
+) -> None:
+    """Log a destructive dev-mode data reset."""
+    _emit(
+        "settings",
+        "data_reset",
+        tables=tables,
+        user=user or "system",
+    )

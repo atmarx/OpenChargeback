@@ -76,6 +76,33 @@ class OutputConfig(BaseModel):
     archive_dir: Path = Field(default=Path("./instance/output/archive"))
 
 
+class SyslogConfig(BaseModel):
+    """Remote syslog destination.
+
+    OpenChargeback forwards everything it emits and does not decide what is
+    worth keeping — triage, retention, and forwarding to an analytics tier
+    belong to whoever runs the collector.
+    """
+
+    host: str
+    port: int = 514
+    protocol: Literal["udp", "tcp"] = "udp"
+    facility: Literal[
+        "user", "daemon", "local0", "local1", "local2", "local3",
+        "local4", "local5", "local6", "local7",
+    ] = "local4"
+    # Prefixed to every line so a shared collector can pick this app out.
+    ident: str = "openchargeback"
+
+    @field_validator("host", mode="before")
+    @classmethod
+    def expand_env(cls, v: str) -> str:
+        """Expand environment variables so the host can come from the env."""
+        if isinstance(v, str):
+            return expand_env_vars(v)
+        return v
+
+
 class LoggingConfig(BaseModel):
     """Logging configuration."""
 
@@ -83,6 +110,7 @@ class LoggingConfig(BaseModel):
     level: Literal["DEBUG", "INFO", "WARN", "WARNING", "ERROR"] = "INFO"
     format: Literal["splunk", "json"] = "splunk"
     file: Path | None = None
+    syslog: SyslogConfig | None = None
 
 
 class SourceCredentials(BaseModel):

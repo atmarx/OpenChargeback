@@ -58,3 +58,9 @@ Thumbs.db
 
 # Generated review storyboard (rebuild: python3 tools/review/build_ocb_review.py)
 tools/review/ocb-review/
+
+# Generated knowledge graph over docs/ + project memory (rebuild: /graphify)
+graphify-out/
+
+# Fleet agent worktrees
+.worktrees/

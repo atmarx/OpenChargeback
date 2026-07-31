@@ -1,14 +1,17 @@
 """Tests for logging configuration and formatters."""
 
-import re
 import json
-from unittest.mock import MagicMock
+import logging
+import logging.handlers
+import re
+import socket
 
-import pytest
-
+from openchargeback.config import Config, SyslogConfig
 from openchargeback.logging import (
-    splunk_processor,
+    build_syslog_handler,
+    configure_logging,
     json_processor,
+    splunk_processor,
 )
 
 
@@ -122,6 +125,92 @@ class TestSplunkProcessor:
         zebra_pos = result.find("zebra=")
 
         assert alpha_pos < middle_pos < zebra_pos
+
+
+class TestSyslogHandler:
+    """Tests for remote syslog forwarding.
+
+    OpenChargeback ships every event to a collector it does not own.  The
+    behaviour that matters here is what happens when that collector is *not*
+    there: a billing run must survive it, and the failure must be noisy, because
+    a silently dead syslog pipe looks identical to a quiet month.
+    """
+
+    def test_udp_handler_is_built(self):
+        """UDP is fire-and-forget, so construction always succeeds."""
+        handler = build_syslog_handler(
+            SyslogConfig(host="127.0.0.1", port=5514, protocol="udp")
+        )
+
+        assert isinstance(handler, logging.handlers.SysLogHandler)
+        assert handler.socktype == socket.SOCK_DGRAM
+
+    def test_ident_is_prefixed(self):
+        """A shared collector needs the tag to pick this app out."""
+        handler = build_syslog_handler(
+            SyslogConfig(host="127.0.0.1", port=5514, ident="ocb-prod")
+        )
+
+        assert handler.ident == "ocb-prod: "
+
+    def test_facility_is_mapped(self):
+        """Facility names resolve to their syslog constants."""
+        handler = build_syslog_handler(
+            SyslogConfig(host="127.0.0.1", port=5514, facility="local7")
+        )
+
+        assert handler.facility == logging.handlers.SysLogHandler.LOG_LOCAL7
+
+    def test_unreachable_tcp_collector_does_not_raise(self, capsys):
+        """A dead collector degrades the run, it does not end it.
+
+        Port 1 is reserved and nothing listens there, so the connect refuses.
+        """
+        handler = build_syslog_handler(
+            SyslogConfig(host="127.0.0.1", port=1, protocol="tcp")
+        )
+
+        assert handler is None
+        # The operator has to be able to see this happened.
+        stderr = capsys.readouterr().err
+        assert "ERROR" in stderr
+        assert "NOT reaching your collector" in stderr
+
+    def test_configure_logging_survives_a_dead_collector(self, tmp_path):
+        """The app still logs locally when syslog cannot be reached."""
+        config = Config()
+        config.logging.syslog = SyslogConfig(host="127.0.0.1", port=1, protocol="tcp")
+
+        configure_logging(config)
+
+        handlers = logging.getLogger().handlers
+        assert handlers, "logging must still be configured without syslog"
+        assert not any(
+            isinstance(h, logging.handlers.SysLogHandler) for h in handlers
+        )
+
+    def test_syslog_adds_to_local_handlers(self):
+        """Enabling syslog does not cost you the output you already had."""
+        config = Config()
+        config.logging.syslog = SyslogConfig(host="127.0.0.1", port=5514, protocol="udp")
+
+        configure_logging(config)
+
+        handlers = logging.getLogger().handlers
+        assert any(isinstance(h, logging.handlers.SysLogHandler) for h in handlers)
+        assert any(isinstance(h, logging.StreamHandler) for h in handlers)
+
+    def test_host_expands_env_vars(self, monkeypatch):
+        """The collector address can come from the environment."""
+        monkeypatch.setenv("SYSLOG_HOST", "collector.example.edu")
+
+        cfg = SyslogConfig(host="${SYSLOG_HOST}")
+
+        assert cfg.host == "collector.example.edu"
+
+    def test_no_syslog_configured_by_default(self):
+        """Syslog is opt-in -- an unconfigured install ships nothing offsite."""
+        assert Config().logging.syslog is None
 
 
 class TestJsonProcessor:

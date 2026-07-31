@@ -1,13 +1,15 @@
 """Structured logging configuration for Splunk compatibility."""
 
 import logging
+import logging.handlers
+import socket
 import sys
 from datetime import datetime, timezone
 from typing import Any
 
 import structlog
 
-from .config import Config
+from .config import Config, SyslogConfig
 
 
 def splunk_processor(
@@ -60,6 +62,44 @@ def json_processor(
     return event_dict
 
 
+def build_syslog_handler(cfg: SyslogConfig) -> logging.Handler | None:
+    """Build a handler that ships every log line to a remote syslog collector.
+
+    Returns None if the collector cannot be reached, after complaining loudly to
+    stderr.  A billing run must not die because a log collector is down, but a
+    silent failure here is worse than no syslog at all: whoever configured this
+    believes events are arriving, and an empty index reads like a quiet month
+    rather than a broken pipe.  So the failure is noisy, and callers can check
+    the return value.
+
+    Note the asymmetry: TCP refuses at connect time and is reported here, while
+    UDP is fire-and-forget and cannot detect a collector that never listens.
+    Use TCP if you need to know the pipe works.
+    """
+    facility = logging.handlers.SysLogHandler.facility_names[cfg.facility]
+    socktype = socket.SOCK_STREAM if cfg.protocol == "tcp" else socket.SOCK_DGRAM
+
+    try:
+        handler = logging.handlers.SysLogHandler(
+            address=(cfg.host, cfg.port),
+            facility=facility,
+            socktype=socktype,
+        )
+    except OSError as exc:
+        print(
+            f"ERROR: syslog is configured ({cfg.protocol}://{cfg.host}:{cfg.port}) "
+            f"but unreachable: {exc}.  Continuing WITHOUT remote logging -- "
+            f"events are NOT reaching your collector.",
+            file=sys.stderr,
+        )
+        return None
+
+    # RFC3164 collectors key off the leading tag; without it a shared relay
+    # cannot tell openchargeback lines from anything else on the host.
+    handler.ident = f"{cfg.ident}: "
+    return handler
+
+
 def configure_logging(config: Config) -> structlog.BoundLogger:
     """Configure structured logging based on config.
 
@@ -86,6 +126,14 @@ def configure_logging(config: Config) -> structlog.BoundLogger:
     if config.logging.file:
         config.logging.file.parent.mkdir(parents=True, exist_ok=True)
         handlers.append(logging.FileHandler(config.logging.file))
+
+    # Ship everything to the remote collector.  This sits alongside stderr and
+    # the file handler rather than replacing them, so a local operator keeps the
+    # output they had before syslog was turned on.
+    if config.logging.syslog:
+        syslog_handler = build_syslog_handler(config.logging.syslog)
+        if syslog_handler is not None:
+            handlers.append(syslog_handler)
 
     logging.basicConfig(
         format="%(message)s",
