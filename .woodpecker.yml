@@ -15,7 +15,7 @@ steps:
     commands:
       - apt-get update && apt-get install -y --no-install-recommends git
       - pip install --cache-dir /cache/pip -e ".[dev]"
-      - ruff check src/
+      - ruff check src/ tools/
       - pytest -v --tb=short
     volumes:
       - /opt/cache/pip:/cache/pip
@@ -39,7 +39,7 @@ steps:
     image: python:3.12-slim
     commands:
       - pip install --cache-dir /cache/pip -e ".[dev]" types-PyYAML
-      - mypy src/ --ignore-missing-imports
+      - mypy src/ tools/ --ignore-missing-imports
     volumes:
       - /opt/cache/pip:/cache/pip
 

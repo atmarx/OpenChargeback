@@ -33,6 +33,12 @@ import os
 import re
 import sys
 from pathlib import Path
+from typing import Any
+
+# A beat, a video, a metadata block: all string-keyed records whose values are
+# deliberately mixed (text, counts, lists of frames).  Named once so the six
+# annotations below say the same thing.
+Record = dict[str, Any]
 
 # ── Where things live ──────────────────────────────────────────────────
 # IVaC is a sibling checkout, not a dependency.  Override for a different box.
@@ -115,9 +121,9 @@ def collect_calls(tree: ast.AST) -> list[tuple[int, str, str]]:
     return found
 
 
-def script_metadata(tree: ast.AST) -> dict:
+def script_metadata(tree: ast.AST) -> Record:
     """Pull id / title / audience / duration / scenes off the VideoScript call."""
-    meta: dict = {"id": "", "title": "", "audience": "", "duration": "", "scenes": []}
+    meta: Record = {"id": "", "title": "", "audience": "", "duration": "", "scenes": []}
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
@@ -227,7 +233,7 @@ def resolve_still(out_dir: Path, kind: str, label: str, used: set[Path]) -> Path
 # ── Assembling one video ───────────────────────────────────────────────
 
 
-def load_beats(script_path: Path, out_dir: Path) -> dict:
+def load_beats(script_path: Path, out_dir: Path) -> Record:
     """Build a video's storyboard: metadata plus beats, each with its frames."""
     tree = ast.parse(script_path.read_text(encoding="utf-8"))
     meta = script_metadata(tree)
@@ -254,7 +260,7 @@ def load_beats(script_path: Path, out_dir: Path) -> dict:
             file=sys.stderr,
         )
 
-    beats: list[dict] = []
+    beats: list[Record] = []
     pending: list[Path] = []
     used: set[Path] = set()
     spoken_i = 0
@@ -538,7 +544,7 @@ h1{
 """
 
 
-def render(videos: list[dict]) -> str:
+def render(videos: list[Record]) -> str:
     body: list[str] = []
     add = body.append
 
@@ -658,10 +664,10 @@ def render(videos: list[dict]) -> str:
     # ── Footer
     add('<footer class="foot">')
     add(
-        f"<p>Generated from the IVaC demo scripts and their rendered output by "
-        f"<code>tools/review/build_ocb_review.py</code> in the OpenChargeback repo. "
-        f"Narration text is the rendered subtitle track &mdash; the words actually spoken. "
-        f"Frames are the review-worthy captures; navigation and typing frames are omitted.</p>"
+        "<p>Generated from the IVaC demo scripts and their rendered output by "
+        "<code>tools/review/build_ocb_review.py</code> in the OpenChargeback repo. "
+        "Narration text is the rendered subtitle track &mdash; the words actually spoken. "
+        "Frames are the review-worthy captures; navigation and typing frames are omitted.</p>"
     )
     add(f'<p>Notes to <a href="{mailto}">{FEEDBACK_EMAIL}</a>, citing beat numbers.</p>')
     add("</footer>")
@@ -691,7 +697,7 @@ def main() -> int:
         print("Set IVAC_ROOT or pass --ivac.", file=sys.stderr)
         return 1
 
-    videos: list[dict] = []
+    videos: list[Record] = []
     for script_path in scripts:
         tree = ast.parse(script_path.read_text(encoding="utf-8"))
         video_id = script_metadata(tree)["id"]
