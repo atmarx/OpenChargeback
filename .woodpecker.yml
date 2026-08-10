@@ -99,6 +99,15 @@ steps:
         set -e
         git config --global --add safe.directory /opt/projects/${CI_REPO_NAME}
         git fetch origin ${CI_COMMIT_BRANCH}
+        # Fleet deploy standard (2026-08-10): refuse to converge over a hot-
+        # patched host tree; untracked files never block.  See mydoulapage 00c6072.
+        if ! git diff --quiet || ! git diff --cached --quiet; then
+          echo "DEPLOY REFUSED: tracked files in $(pwd) were edited on the host."
+          echo "Commit the change (or git checkout -- <file> to discard) and re-run."
+          git status --short
+          git diff HEAD
+          exit 1
+        fi
         git reset --hard FETCH_HEAD
         echo "deploying commit:" && git log -1 --oneline
       - docker network inspect gateway-stack_gateway >/dev/null 2>&1 || docker network create gateway-stack_gateway
