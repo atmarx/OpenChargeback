@@ -3,6 +3,7 @@
 import json
 import math
 import re
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -31,8 +32,15 @@ FOCUS_COLUMNS = {
 }
 
 
+@lru_cache(maxsize=4096)
 def extract_period_from_date(date_str: str) -> str:
     """Extract YYYY-MM period from a date string.
+
+    Cached because this is a pure function of the string and a billing file
+    asks it the same question over and over -- a month's export has at most a
+    handful of distinct BillingPeriodStart values across tens of thousands of
+    rows.  Uncached, ``pd.to_datetime`` re-guesses the date format for every
+    single row, which was two thirds of the wall time of a 15 MB import.
 
     Args:
         date_str: Date in various formats (YYYY-MM-DD, ISO 8601, etc.)
@@ -218,13 +226,26 @@ class FocusIngester(BaseIngester):
         """
         # Use original filename for display, fallback to file_path name
         display_filename = original_filename or file_path.name
-        result = IngestResult()
+        result = IngestResult(error_limit=self.config.imports.max_errors_reported)
 
         # Read CSV file
         try:
             df = pd.read_csv(file_path)
         except Exception as e:
-            result.errors.append(f"Failed to read CSV: {e}")
+            result.add_error(f"Failed to read CSV: {e}")
+            return result
+
+        # Refuse an oversized file before the per-row work starts.  Everything
+        # below this point costs time proportional to the row count, so a file
+        # past the ceiling should be rejected with a number the operator can
+        # act on rather than left to run into a gateway timeout.
+        max_rows = self.config.imports.max_rows_per_file
+        if max_rows and len(df) > max_rows:
+            result.add_error(
+                f"File has {len(df):,} rows, over the {max_rows:,}-row import "
+                "limit. No rows imported. Split the export, or raise "
+                "imports.max_rows_per_file."
+            )
             return result
 
         # Normalize column names (handle case variations)
@@ -252,7 +273,7 @@ class FocusIngester(BaseIngester):
             if internal_col not in df.columns
         ]
         if missing_columns:
-            result.errors.append(
+            result.add_error(
                 f"Missing required column(s): {', '.join(missing_columns)}. "
                 "No rows imported."
             )
@@ -287,12 +308,12 @@ class FocusIngester(BaseIngester):
             # Extract billing period from BillingPeriodStart
             billing_period_start = row.get("billing_period_start", "")
             if pd.isna(billing_period_start) or not billing_period_start:
-                result.errors.append(f"Line {line_num}: Missing BillingPeriodStart")
+                result.add_error(f"Line {line_num}: Missing BillingPeriodStart")
                 continue
 
             period = extract_period_from_date(str(billing_period_start))
             if not period:
-                result.errors.append(f"Line {line_num}: Invalid BillingPeriodStart format")
+                result.add_error(f"Line {line_num}: Invalid BillingPeriodStart format")
                 continue
 
             periods_seen.add(period)
@@ -306,7 +327,7 @@ class FocusIngester(BaseIngester):
             # Extract PI email (required)
             pi_email = tags.get("pi_email", "")
             if not pi_email:
-                result.errors.append(f"Line {line_num}: Missing pi_email tag")
+                result.add_error(f"Line {line_num}: Missing pi_email tag")
                 continue
 
             # Parse cost fields.  An unparseable cost (e.g. an Excel-exported
@@ -327,7 +348,7 @@ class FocusIngester(BaseIngester):
                 contracted_cost = _opt_cost(row, "contracted_cost")
                 effective_cost = _opt_cost(row, "effective_cost")
             except (ValueError, TypeError):
-                result.errors.append(
+                result.add_error(
                     f"Line {line_num}: a cost column is not a number — remove "
                     "thousands separators like '1,234.56' if this is an Excel re-export"
                 )
@@ -342,7 +363,7 @@ class FocusIngester(BaseIngester):
                     effective_cost or 0.0,
                 )
             ):
-                result.errors.append(
+                result.add_error(
                     f"Line {line_num}: cost is not a finite number"
                 )
                 continue
@@ -450,7 +471,7 @@ class FocusIngester(BaseIngester):
                 # uploading "against" a different period. insert_charges
                 # raises the same error as a backstop.
                 if billing_period.status != "open":
-                    result.errors.append(
+                    result.add_error(
                         f"Period {period} is {billing_period.status}: "
                         f"{len(charges)} row(s) not imported. Reopen the "
                         "period to import corrections."
@@ -470,7 +491,7 @@ class FocusIngester(BaseIngester):
                 try:
                     counts = self.db.insert_charges(charges)
                 except PeriodLockedError as e:
-                    result.errors.append(str(e))
+                    result.add_error(str(e))
                     continue
                 result.inserted_rows += counts["inserted"]
                 result.updated_rows += counts["updated"]
@@ -495,7 +516,9 @@ class FocusIngester(BaseIngester):
 
             # Update source sync status
             if result.errors:
-                self.db.update_source_sync(source_name, "error", f"{len(result.errors)} errors")
+                self.db.update_source_sync(
+                    source_name, "error", f"{result.total_errors} errors"
+                )
             else:
                 self.db.update_source_sync(source_name, "success")
 

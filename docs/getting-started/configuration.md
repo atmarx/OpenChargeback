@@ -201,6 +201,35 @@ imports:
       pattern: storage        # Generic fallback
 ```
 
+### Import bounds
+
+A 15 MB vendor export is roughly 72,000 FOCUS rows and imports in about
+fifteen seconds. Nothing stops a file ten times that — and an unbounded import
+does not fail cleanly. It runs until whatever sits in front of the app gives
+up, and the operator gets a gateway error that reads like a crash rather than
+a limit. These settings make the ceiling a stated policy, with the number in
+the refusal:
+
+```yaml
+imports:
+  max_upload_mb: 64           # Whole POST body, so it covers multi-file uploads
+  max_rows_per_file: 1000000  # Checked after parse, before any row is written
+  max_errors_reported: 100    # Per-row errors kept; the rest are counted
+```
+
+| Setting | Default | What it bounds |
+|---------|---------|----------------|
+| `max_upload_mb` | 64 | The whole upload request. Refused with a `413` before the body is buffered, so an oversized file is rejected immediately rather than after the transfer. |
+| `max_rows_per_file` | 1,000,000 | Row count, checked once the CSV is parsed and before any row is written. Over the limit, **nothing is imported** — the file is refused whole, not half-applied. |
+| `max_errors_reported` | 100 | How many per-row errors are retained. A file that is wrong in a systematic way — every row missing `pi_email`, say — would otherwise build one error string per row. The rest are counted, and the count is reported. |
+
+If you raise `max_upload_mb`, raise the body limit on your reverse proxy to
+match, or the proxy refuses the upload first and the app never sees it.
+
+Splitting an export by month or by source is usually better than raising the
+limit: each import is then its own audit-trail entry, and a bad file costs you
+one source to re-do rather than the whole month.
+
 ## Next Steps
 
 - [CLI Reference](../user-guide/cli.md) - Command-line usage

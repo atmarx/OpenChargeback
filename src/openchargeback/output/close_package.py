@@ -33,6 +33,7 @@ reason: WeasyPrint can't run in the slim test image.
 import csv
 import hashlib
 import io
+import shutil
 import tempfile
 import zipfile
 from datetime import datetime
@@ -73,11 +74,36 @@ def archive_input_file(
 
     Returns the path the file was written to.
     """
-    dest_dir = config.output.archive_dir / _safe_name(period) / _safe_name(source)
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    dest = dest_dir / _safe_name(filename)
+    dest = _archive_dest(period, source, filename, config)
     dest.write_bytes(content)
     return dest
+
+
+def archive_input_path(
+    source_path: Path,
+    period: str,
+    source: str,
+    filename: str,
+    config: Config,
+) -> Path:
+    """Archive an input file that is already on disk, by copying it.
+
+    Same layout and purpose as :func:`archive_input_file`, but for a file the
+    caller streamed to a temp path.  A large upload never has to exist as a
+    bytes object just so we can write it back out again.
+
+    Returns the path the file was written to.
+    """
+    dest = _archive_dest(period, source, filename, config)
+    shutil.copyfile(source_path, dest)
+    return dest
+
+
+def _archive_dest(period: str, source: str, filename: str, config: Config) -> Path:
+    """Resolve (and create) the archive destination for one input file."""
+    dest_dir = config.output.archive_dir / _safe_name(period) / _safe_name(source)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    return dest_dir / _safe_name(filename)
 
 
 def _parse_dt(value: str | None) -> tuple[int, int, int, int, int, int]:

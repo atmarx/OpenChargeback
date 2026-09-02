@@ -271,10 +271,52 @@ imports:
 
 ### Slow Imports
 
-For large files (>10k rows):
-1. Import in batches if possible
-2. Consider increasing SQLite timeout
-3. Ensure database is on fast storage (SSD)
+Rough shape on ordinary hardware: a 15 MB FOCUS export is about 72,000 rows and
+imports in **10-20 seconds**. Roughly half is parsing the CSV, half is the
+upsert. If you are seeing minutes rather than seconds, the cause is usually one
+of these:
+
+1. **Many small imports rather than one large one.** Each import re-opens the
+   database and re-parses headers. One file per source per month is the
+   intended shape.
+2. **Database on network storage.** The upsert reads before it writes, so an
+   NFS-mounted `billing.db` pays the round trip twice per row. Keep it on
+   local disk.
+3. **A period with a very large history.** The natural-key lookup is indexed,
+   but the index still grows. Finalize and archive old periods.
+
+Note that SQLite itself is rarely the constraint — on a 72k-row import the
+database accounts for a couple of seconds of the total.
+
+---
+
+### Large import returns a server error
+
+**Symptoms**: Uploading a large CSV (10 MB or more) shows *"Server error (502)"*
+or *"Server error (504)"* in the import dialog rather than an import summary.
+Smaller files from the same export work fine.
+
+**Cause**: The response never came back as JSON, which means the app did not
+answer — the proxy in front of it did. Either the upload was larger than the
+proxy's body limit, or the request outlived a timeout somewhere in the chain.
+
+**Solutions**:
+1. Check whether the file is over the configured ceiling. Past
+   `imports.max_upload_mb` (64 MB by default) the app answers with a `413` and
+   a message naming the limit — if you are getting that message rather than a
+   `502`, the bound is working and the file genuinely needs splitting.
+2. Check the reverse proxy's body limit. It must be at least
+   `imports.max_upload_mb`, or the proxy refuses the upload before the app ever
+   sees it. See [Configuration → Import bounds](../getting-started/configuration.md#import-bounds).
+3. Split the export by month or by source. This is usually the better answer
+   than raising limits: each import becomes its own audit-trail entry, and a
+   bad file costs you one source to redo rather than the whole month.
+4. Import from the CLI instead, which has no HTTP timeout in the way:
+   ```bash
+   openchargeback ingest path/to/large-export.csv --source AWS --period 2026-08
+   ```
+   The CLI runs the same ingester and writes the same audit-trail entry and
+   archived input, so a month imported this way is not second-class.
 
 ### Slow Web Interface
 

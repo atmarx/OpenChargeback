@@ -245,6 +245,20 @@ class ImportConfig(BaseModel):
         KnownSourceConfig(name="Storage", pattern="storage"),
     ])
 
+    # Bounds for the web import path.  A 15 MB vendor export is roughly 80k
+    # FOCUS rows; without a ceiling the request simply runs until the gateway
+    # gives up, and the operator gets an opaque 502 instead of a number they
+    # can act on.  These make the limit a stated policy rather than whatever
+    # the proxy happened to tolerate that day.
+    #
+    # max_upload_mb bounds the whole POST body, so it covers a multi-file
+    # upload as well as a single large one.
+    max_upload_mb: int = 64
+    max_rows_per_file: int = 1_000_000
+    # Per-row errors are worth reporting, but a systematically bad file (every
+    # row missing pi_email, say) would otherwise build one string per row.
+    max_errors_reported: int = 100
+
 
 class WebConfig(BaseModel):
     """Web server configuration."""

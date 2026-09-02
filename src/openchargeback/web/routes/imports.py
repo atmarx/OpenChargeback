@@ -6,9 +6,11 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, Response
+from starlette.concurrency import run_in_threadpool
 
 from openchargeback import audit
 from openchargeback.db import Database
+from openchargeback.ingest.base import IngestResult
 from openchargeback.web.auth import User
 from openchargeback.web.deps import (
     get_current_period_id,
@@ -21,6 +23,19 @@ from openchargeback.web.deps import (
 )
 
 router = APIRouter(prefix="/imports", tags=["imports"])
+
+# Read size for streaming an upload to disk.  Big enough that a 15 MB file is
+# ~15 reads, small enough that the chunk itself is never the memory problem.
+UPLOAD_CHUNK_BYTES = 1024 * 1024
+
+
+def _summarize_errors(result: IngestResult) -> str:
+    """First few ingest errors, plus an honest count of what is not shown."""
+    shown = "; ".join(result.errors[:3])
+    remaining = result.total_errors - min(3, len(result.errors))
+    if remaining > 0:
+        shown += f" (+{remaining:,} more)"
+    return shown
 
 
 @router.get("", response_class=HTMLResponse)
@@ -96,10 +111,12 @@ async def upload_files(
     import traceback
 
     from openchargeback.ingest.focus import ingest_focus_file
-    from openchargeback.output.close_package import archive_input_file
+    from openchargeback.output.close_package import archive_input_path
 
     try:
         config = request.app.state.config
+        max_upload_mb = config.imports.max_upload_mb
+        max_upload_bytes = max_upload_mb * 1024 * 1024
         results: list[dict[str, Any]] = []
 
         # Parse per-file metadata if provided
@@ -153,15 +170,45 @@ async def upload_files(
                 })
                 continue
 
+            tmp_path: Path | None = None
             try:
-                # Save uploaded file to temp location
+                # Stream the upload to a temp file in chunks instead of
+                # materialising it as one bytes object.  A 15 MB vendor export
+                # otherwise exists twice in the worker at once -- once as the
+                # uploaded bytes, again as the DataFrame -- and the bytes stay
+                # alive for the whole ingest because the archive step wants
+                # them at the end.
+                oversize = False
+                written = 0
                 with tempfile.NamedTemporaryFile(mode="wb", suffix=".csv", delete=False) as tmp:
-                    content = await file.read()
-                    tmp.write(content)
                     tmp_path = Path(tmp.name)
+                    while chunk := await file.read(UPLOAD_CHUNK_BYTES):
+                        written += len(chunk)
+                        if written > max_upload_bytes:
+                            oversize = True
+                            break
+                        tmp.write(chunk)
 
-                # Process the file using the FOCUS ingester
-                result = ingest_focus_file(
+                if oversize:
+                    results.append({
+                        "filename": file.filename,
+                        "success": False,
+                        "error": (
+                            f"File exceeds the {max_upload_mb} MB import limit. "
+                            "Split the export by month or source, or raise "
+                            "imports.max_upload_mb in config."
+                        ),
+                    })
+                    continue
+
+                # Ingesting is CPU- and SQLite-bound and takes seconds to
+                # minutes on a real month.  Called inline it would block the
+                # event loop for that whole time, so the health check stops
+                # answering and the gateway returns a 502 that looks like a
+                # crash rather than a slow import.  Hand it to a worker thread
+                # and the rest of the app keeps serving.
+                result = await run_in_threadpool(
+                    ingest_focus_file,
                     file_path=tmp_path,
                     source_name=file_source,
                     expected_period=file_period,
@@ -171,23 +218,20 @@ async def upload_files(
                     original_filename=file.filename,
                 )
 
-                # Clean up temp file
-                tmp_path.unlink()
-
                 # Check for errors
                 if result.errors:
                     results.append({
                         "filename": file.filename,
                         "success": False,
-                        "error": "; ".join(result.errors[:3]),  # First 3 errors
+                        "error": _summarize_errors(result),
                     })
                 else:
                     # Retain the original source file for the forensic close
                     # package. These are the inputs that generated the month's
                     # results — research accounting keeps custody of them so the
                     # audit liability stays on their side, not ours.
-                    archive_input_file(
-                        content=content,
+                    archive_input_path(
+                        source_path=tmp_path,
                         period=file_period,
                         source=file_source,
                         filename=file.filename or "upload.csv",
@@ -222,6 +266,11 @@ async def upload_files(
                     "success": False,
                     "error": str(e),
                 })
+            finally:
+                # The old code unlinked between ingest and the error check, so
+                # any failure past that point leaked the temp file.
+                if tmp_path is not None:
+                    tmp_path.unlink(missing_ok=True)
 
         return JSONResponse({"results": results})
 

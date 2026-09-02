@@ -22,6 +22,24 @@ class IngestResult:
     inserted_rows: int = 0
     updated_rows: int = 0
     skipped_rows: int = 0
+    # Errors are recorded per row, so a file that is wrong in a systematic way
+    # produces one string per row -- 80k of them for a large export, costing
+    # more memory than the charges themselves and telling the operator nothing
+    # the first hundred did not.  Keep a bounded sample and count the rest.
+    error_limit: int = 100
+    suppressed_errors: int = 0
+
+    def add_error(self, message: str) -> None:
+        """Record an error, retaining at most ``error_limit`` of them."""
+        if self.error_limit and len(self.errors) >= self.error_limit:
+            self.suppressed_errors += 1
+            return
+        self.errors.append(message)
+
+    @property
+    def total_errors(self) -> int:
+        """How many errors occurred, including those not retained."""
+        return len(self.errors) + self.suppressed_errors
 
 
 class BaseIngester(ABC):

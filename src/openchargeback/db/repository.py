@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import bindparam, delete, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Engine
@@ -235,6 +235,22 @@ def _format_datetime(dt: datetime | str | None) -> str | None:
     if isinstance(dt, str):
         return dt
     return dt.isoformat()
+
+
+# How many rows one executemany carries.  Large enough that per-statement
+# overhead disappears, small enough that the pending batch stays a rounding
+# error next to the charges already in memory.
+_INSERT_BATCH_ROWS = 5_000
+
+# The natural key, in the order the unique constraint declares it.
+_CHARGE_KEY_COLUMNS = (
+    "billing_period_id",
+    "source_id",
+    "resource_id",
+    "charge_period_start",
+    "charge_category",
+    "sku_id",
+)
 
 
 class Database:
@@ -598,6 +614,28 @@ class Database:
                     "period to import corrections."
                 )
 
+        # Both statements are built once and executed with parameters.  Built
+        # inside the loop, SQLAlchemy re-coerces and re-cache-keys them for
+        # every row: on a 72k-row import that was ~100 seconds of statement
+        # construction against ~3 seconds of actual SQLite work.  The database
+        # was never the slow part.
+        lookup_stmt = select(charges).where(
+            *(charges.c[col] == bindparam(f"k_{col}") for col in _CHARGE_KEY_COLUMNS)
+        )
+        insert_stmt = charges.insert()
+
+        # Rows destined for one executemany, and the keys they will occupy.
+        # A charge colliding with a not-yet-flushed insert has to see it, so
+        # the pending batch is flushed before that lookup can miss.
+        pending: list[dict[str, Any]] = []
+        pending_keys: set[tuple[Any, ...]] = set()
+
+        def flush(conn: Any) -> None:
+            if pending:
+                conn.execute(insert_stmt, pending)
+                pending.clear()
+                pending_keys.clear()
+
         with self.engine.begin() as conn:
             for charge in charge_list:
                 raw_tags_json = json.dumps(charge.raw_tags) if charge.raw_tags else None
@@ -612,10 +650,11 @@ class Database:
                     "charge_category": charge.charge_category or "",
                     "sku_id": charge.sku_id or "",
                 }
+                key_tuple = tuple(key[col] for col in _CHARGE_KEY_COLUMNS)
+                if key_tuple in pending_keys:
+                    flush(conn)
                 existing = conn.execute(
-                    select(charges).where(
-                        *(charges.c[col] == val for col, val in key.items())
-                    )
+                    lookup_stmt, {f"k_{col}": val for col, val in key.items()}
                 ).first()
 
                 content = {
@@ -636,12 +675,17 @@ class Database:
 
                 if existing is None:
                     counts["inserted"] += 1
-                    conn.execute(charges.insert().values(
+                    pending.append({
                         **key,
                         **content,
-                        needs_review=charge.needs_review,
-                        review_reason=charge.review_reason,
-                    ))
+                        "needs_review": charge.needs_review,
+                        "review_reason": charge.review_reason,
+                    })
+                    pending_keys.add(key_tuple)
+                    # Bounded so the batch itself never becomes the memory
+                    # problem the batching was meant to avoid.
+                    if len(pending) >= _INSERT_BATCH_ROWS:
+                        flush(conn)
                     continue
 
                 existing_dict = _row_to_dict(existing)
@@ -679,12 +723,14 @@ class Database:
                         needs_review=charge.needs_review,
                         review_reason=charge.review_reason,
                     )
+                flush(conn)
                 conn.execute(
                     update(charges)
                     .where(charges.c.id == existing_dict["id"])
                     .values(**update_vals)
                 )
 
+            flush(conn)
             return counts
 
     def _charge_from_row(self, row: Any) -> Charge:

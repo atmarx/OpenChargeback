@@ -140,6 +140,15 @@ imports:
     fund_org: ""
     account_code: ""
 
+  # Import bounds.  A 15 MB vendor export is roughly 72k FOCUS rows, which
+  # imports in about 15 seconds — but nothing stops a file ten times that,
+  # and an unbounded import doesn't fail cleanly: it runs until the gateway
+  # in front of the app gives up, and the browser shows an opaque error.
+  # These make the ceiling a stated policy with a number in the message.
+  max_upload_mb: 64          # Whole POST body, so this covers multi-file uploads
+  max_rows_per_file: 1000000 # Checked after parse, before any row is written
+  max_errors_reported: 100   # Per-row errors kept; the rest are counted, not stored
+
 # Journal/GL export configuration
 journal:
   # Regex with named capture groups to parse fund_org into components.

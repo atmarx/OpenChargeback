@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.middleware.sessions import SessionMiddleware
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
 from starlette.types import ASGIApp
 
 from openchargeback import audit
@@ -52,6 +52,41 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
                 "max-age=63072000; includeSubDomains"
             )
         return response
+
+
+class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
+    """Refuse an oversized request body before anything buffers it.
+
+    Without this the whole upload is spooled and parsed first, and only then
+    does the handler get to object -- so the operator waits out the transfer to
+    be told no.  Worse, past a certain size the gateway gives up first and the
+    browser shows an opaque 502 that reads like a crash.  A stated limit,
+    enforced early, is the difference between "your file is too big" and
+    "something went wrong".
+
+    A request with no Content-Length (chunked) cannot be checked here; the
+    upload route counts bytes as it streams them and stops at the same limit.
+    """
+
+    def __init__(self, app: ASGIApp, max_bytes: int) -> None:
+        super().__init__(app)
+        self._max_bytes = max_bytes
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        content_length = request.headers.get("content-length")
+        if content_length and content_length.isdigit() and int(content_length) > self._max_bytes:
+            limit_mb = self._max_bytes // (1024 * 1024)
+            return JSONResponse(
+                {
+                    "error": (
+                        f"Upload is larger than the {limit_mb} MB limit. Split the "
+                        "export by month or source, or raise imports.max_upload_mb "
+                        "in config."
+                    )
+                },
+                status_code=413,
+            )
+        return await call_next(request)
 
 
 def simple_markdown(text: str) -> str:
@@ -136,6 +171,12 @@ def create_app(config_path: Path | None = None) -> FastAPI:
 
     # Security headers middleware (CSP, HSTS in prod, etc.)
     app.add_middleware(SecurityHeadersMiddleware, hsts=not config.dev_mode)
+
+    # Bound the request body before it is buffered or parsed.
+    app.add_middleware(
+        RequestSizeLimitMiddleware,
+        max_bytes=config.imports.max_upload_mb * 1024 * 1024,
+    )
 
     # Session middleware for authentication
     # Check config first, then fall back to WEB_SECRET_KEY env var
