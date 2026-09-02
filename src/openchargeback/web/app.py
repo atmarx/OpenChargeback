@@ -15,6 +15,12 @@ from starlette.types import ASGIApp
 from openchargeback import audit
 from openchargeback.config import load_config
 from openchargeback.logging import configure_logging
+from openchargeback.web.uploads import (
+    configure_upload_temp_dir,
+    free_bytes,
+    log_upload_capacity,
+    sweep_stale_uploads,
+)
 
 # The bcrypt hash the example config shipped for password "admin123".  Its user
 # has recovery: true, so it authenticates by bypassing the DB and cannot be
@@ -68,13 +74,18 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
     upload route counts bytes as it streams them and stops at the same limit.
     """
 
-    def __init__(self, app: ASGIApp, max_bytes: int) -> None:
+    def __init__(self, app: ASGIApp, max_bytes: int, temp_dir: Path) -> None:
         super().__init__(app)
         self._max_bytes = max_bytes
+        self._temp_dir = temp_dir
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         content_length = request.headers.get("content-length")
-        if content_length and content_length.isdigit() and int(content_length) > self._max_bytes:
+        if not (content_length and content_length.isdigit()):
+            return await call_next(request)
+        declared = int(content_length)
+
+        if declared > self._max_bytes:
             limit_mb = self._max_bytes // (1024 * 1024)
             return JSONResponse(
                 {
@@ -85,6 +96,24 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
                     )
                 },
                 status_code=413,
+            )
+
+        # Room for the spooled body plus the file staged out of it.  Without
+        # this the multipart parser fills the disk and dies there, upstream of
+        # any handler, and the browser gets a bare 500 with no explanation.
+        free = free_bytes(self._temp_dir)
+        if free is not None and declared * 2 > free:
+            return JSONResponse(
+                {
+                    "error": (
+                        f"Not enough room to stage a {declared // (1024 * 1024)} MB "
+                        f"upload: {free // (1024 * 1024)} MB free in "
+                        f"{self._temp_dir}, and parsing needs about twice the "
+                        "upload size. Free space there, or point "
+                        "imports.temp_dir at a larger volume."
+                    )
+                },
+                status_code=507,
             )
         return await call_next(request)
 
@@ -166,8 +195,18 @@ def create_app(config_path: Path | None = None) -> FastAPI:
         openapi_url=None,  # Don't expose the full API schema anonymously
     )
 
+    # Uploads spool here, not into whatever the platform decided /tmp should
+    # be.  Must run before any request, because the multipart parser is what
+    # does the spooling.
+    upload_temp_dir = configure_upload_temp_dir(config.imports.temp_dir)
+    sweep_stale_uploads(upload_temp_dir)
+    log_upload_capacity(upload_temp_dir, config.imports.max_upload_mb)
+
     # Store config in app state
     app.state.config = config
+    # The directory actually in use, which is not necessarily the configured
+    # one — the import route stages into the same place the parser spooled to.
+    app.state.upload_temp_dir = upload_temp_dir
 
     # Security headers middleware (CSP, HSTS in prod, etc.)
     app.add_middleware(SecurityHeadersMiddleware, hsts=not config.dev_mode)
@@ -176,6 +215,7 @@ def create_app(config_path: Path | None = None) -> FastAPI:
     app.add_middleware(
         RequestSizeLimitMiddleware,
         max_bytes=config.imports.max_upload_mb * 1024 * 1024,
+        temp_dir=upload_temp_dir,
     )
 
     # Session middleware for authentication

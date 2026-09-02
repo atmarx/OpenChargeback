@@ -296,22 +296,43 @@ database accounts for a couple of seconds of the total.
 or *"Server error (504)"* in the import dialog rather than an import summary.
 Smaller files from the same export work fine.
 
-**Cause**: The response never came back as JSON, which means the app did not
-answer — the proxy in front of it did. Either the upload was larger than the
-proxy's body limit, or the request outlived a timeout somewhere in the chain.
+**Cause**: The response never came back as JSON, which means the application
+did not answer. Something in front of it did — or it died before it could.
+
+**Most likely: no room to spool the upload.** An upload is written to disk by
+the web layer *before* any application code runs. If that disk is small, the
+request dies inside the multipart parser, upstream of anything that could
+report why, and you get a bare `500`. Hardened container platforms routinely
+mount `/tmp` as a small tmpfs — 128 MB is a common figure — which a single
+large export, or a handful of medium ones in one request, will fill.
+
+Check the startup log for where uploads actually land:
+
+```
+upload_temp_dir path=/app/instance/tmp free_mb=48213 max_upload_mb=64
+```
+
+An `upload_temp_dir_unusable` error there means the configured directory was
+not writable and uploads fell back to the system temp directory — which is very
+likely the small one. An `upload_temp_dir_too_small` warning means the volume
+cannot honour `max_upload_mb`.
 
 **Solutions**:
-1. Check whether the file is over the configured ceiling. Past
-   `imports.max_upload_mb` (64 MB by default) the app answers with a `413` and
-   a message naming the limit — if you are getting that message rather than a
-   `502`, the bound is working and the file genuinely needs splitting.
-2. Check the reverse proxy's body limit. It must be at least
+1. Point `imports.temp_dir` at a volume with room — normally the instance
+   directory, which is where it defaults. Parsing needs about **twice** the
+   upload size. See [Configuration → Why uploads do not use /tmp](../getting-started/configuration.md#why-uploads-do-not-use-tmp).
+2. Check whether the file is over the configured ceiling. Past
+   `imports.max_upload_mb` (64 MB by default) the app answers with a `413`
+   naming the limit; if the staging volume cannot hold it, a `507` naming the
+   free space. Getting either of those means the bounds are working and the
+   file genuinely needs splitting.
+3. Check the reverse proxy's body limit. It must be at least
    `imports.max_upload_mb`, or the proxy refuses the upload before the app ever
-   sees it. See [Configuration → Import bounds](../getting-started/configuration.md#import-bounds).
-3. Split the export by month or by source. This is usually the better answer
+   sees it.
+4. Split the export by month or by source. This is usually the better answer
    than raising limits: each import becomes its own audit-trail entry, and a
    bad file costs you one source to redo rather than the whole month.
-4. Import from the CLI instead, which has no HTTP timeout in the way:
+5. Import from the CLI instead, which has no HTTP layer in the way at all:
    ```bash
    openchargeback ingest path/to/large-export.csv --source AWS --period 2026-08
    ```

@@ -212,9 +212,10 @@ the refusal:
 
 ```yaml
 imports:
-  max_upload_mb: 64           # Whole POST body, so it covers multi-file uploads
-  max_rows_per_file: 1000000  # Checked after parse, before any row is written
-  max_errors_reported: 100    # Per-row errors kept; the rest are counted
+  max_upload_mb: 64            # Whole POST body, so it covers multi-file uploads
+  max_rows_per_file: 1000000   # Checked after parse, before any row is written
+  max_errors_reported: 100     # Per-row errors kept; the rest are counted
+  temp_dir: ./instance/tmp     # Where uploads spool while being parsed
 ```
 
 | Setting | Default | What it bounds |
@@ -222,6 +223,36 @@ imports:
 | `max_upload_mb` | 64 | The whole upload request. Refused with a `413` before the body is buffered, so an oversized file is rejected immediately rather than after the transfer. |
 | `max_rows_per_file` | 1,000,000 | Row count, checked once the CSV is parsed and before any row is written. Over the limit, **nothing is imported** — the file is refused whole, not half-applied. |
 | `max_errors_reported` | 100 | How many per-row errors are retained. A file that is wrong in a systematic way — every row missing `pi_email`, say — would otherwise build one error string per row. The rest are counted, and the count is reported. |
+| `temp_dir` | `./instance/tmp` | Where an upload is spooled and staged while it is parsed. Defaults to the instance directory rather than `/tmp` — see below. |
+
+#### Why uploads do not use `/tmp`
+
+An upload is written to disk by the web layer **before the application sees
+it**. If that disk is small, the request dies inside the multipart parser,
+upstream of any code that could explain itself, and the browser gets a bare
+`500`.
+
+This is easy to hit and hard to diagnose. Hardened container platforms commonly
+mount `/tmp` as a small tmpfs — 128 MB is a typical figure — and the
+application has no say in it. So OpenChargeback spools into `imports.temp_dir`,
+which defaults to the instance directory the deployment already had to
+provision for the database and the archive.
+
+At startup it logs where uploads land and how much room is there:
+
+```
+upload_temp_dir path=/app/instance/tmp free_mb=48213 max_upload_mb=64
+```
+
+If the configured directory is missing or not writable, it falls back to the
+system temp directory and logs `upload_temp_dir_unusable` at **error** level —
+the application still starts, because a bad temp path should not take billing
+down, but the fallback is never silent. If the volume cannot hold an upload at
+the configured limit it logs `upload_temp_dir_too_small` at **warning** level.
+
+Parsing needs room for roughly **twice** the upload: the body is spooled whole,
+then each file is staged out of it. A request that would not fit is refused
+with a `507` naming the free space, rather than being allowed to fill the disk.
 
 If you raise `max_upload_mb`, raise the body limit on your reverse proxy to
 match, or the proxy refuses the upload first and the app never sees it.

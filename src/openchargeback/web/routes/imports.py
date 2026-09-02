@@ -117,6 +117,9 @@ async def upload_files(
         config = request.app.state.config
         max_upload_mb = config.imports.max_upload_mb
         max_upload_bytes = max_upload_mb * 1024 * 1024
+        # Stage beside the spooled body rather than in /tmp, which on a
+        # hardened platform is often a small tmpfs the app does not control.
+        upload_temp_dir = getattr(request.app.state, "upload_temp_dir", None)
         results: list[dict[str, Any]] = []
 
         # Parse per-file metadata if provided
@@ -180,7 +183,9 @@ async def upload_files(
                 # them at the end.
                 oversize = False
                 written = 0
-                with tempfile.NamedTemporaryFile(mode="wb", suffix=".csv", delete=False) as tmp:
+                with tempfile.NamedTemporaryFile(
+                    mode="wb", suffix=".csv", delete=False, dir=upload_temp_dir
+                ) as tmp:
                     tmp_path = Path(tmp.name)
                     while chunk := await file.read(UPLOAD_CHUNK_BYTES):
                         written += len(chunk)

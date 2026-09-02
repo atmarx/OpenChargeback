@@ -255,6 +255,20 @@ class ImportConfig(BaseModel):
     # upload as well as a single large one.
     max_upload_mb: int = 64
     max_rows_per_file: int = 1_000_000
+
+    # Where an upload is spooled and staged while it is being parsed.
+    #
+    # This is not a detail.  A multipart upload is written to disk by the ASGI
+    # layer before the route ever sees it, and hardened container platforms
+    # routinely mount /tmp as a small tmpfs -- 128 MB is a common figure.  The
+    # request then dies inside the multipart parser on ENOSPC, well upstream of
+    # any handler that could explain itself, and the browser gets a bare 500.
+    # Defaulting to the instance directory puts uploads on the volume the
+    # deployment already had to provision for the database and the archive,
+    # rather than on whatever the platform decided /tmp should be.
+    #
+    # Falls back to the system temp directory, loudly, if this is not writable.
+    temp_dir: Path = Field(default=Path("./instance/tmp"))
     # Per-row errors are worth reporting, but a systematically bad file (every
     # row missing pi_email, say) would otherwise build one string per row.
     max_errors_reported: int = 100
