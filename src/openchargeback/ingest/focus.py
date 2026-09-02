@@ -104,6 +104,71 @@ def parse_tags(tags_value: str | dict[str, Any] | None, tag_mapping: dict[str, s
     return result
 
 
+@lru_cache(maxsize=1024)
+def canonical_fund_org(fund_org: str, patterns: tuple[str, ...]) -> str:
+    """Let the configured fund/org pattern decide a code's case.
+
+    The validation in ``_check_fund_org_patterns`` matches case-insensitively,
+    so ``bio-2024-001`` passes review — and then lands in the ledger as its own
+    fund, with its own journal row, next to ``BIO-2024-001``.  Case is not
+    OpenChargeback's to invent, but the institution already declared what a
+    valid code looks like: if a pattern is written with a definite case, the
+    code is conformed to it.  Where no pattern settles the question the value
+    is left exactly as tagged, because the string in this column is what gets
+    posted to the general ledger.
+    """
+    if not fund_org or not patterns:
+        return fund_org
+    # As-tagged first: a value that already satisfies a pattern is never touched.
+    for candidate in (fund_org, fund_org.upper(), fund_org.lower()):
+        for pattern in patterns:
+            try:
+                if re.match(pattern, candidate):
+                    return candidate
+            except re.error:
+                continue
+    return fund_org
+
+
+def normalize_tag_values(
+    tags: dict[str, Any], fund_org_patterns: tuple[str, ...] = ()
+) -> dict[str, Any]:
+    """Fold the identity tags so one project stays one project.
+
+    Tags are typed by humans into a cloud console, and the same project
+    arrives as ``genomics-sequencing``, ``Genomics-Sequencing`` and
+    ``GENOMICS-SEQUENCING`` in the same export.  Read literally those are
+    three projects with three statements for one PI, which is worse than
+    useless — it is wrong in a way that looks plausible.
+
+    ``pi_email`` and ``project_id`` are identifiers whose case carries no
+    meaning, so they fold to lowercase.  ``fund_org`` is deferred to the
+    configured pattern (see :func:`canonical_fund_org`) because that string
+    is posted to the general ledger.  Every value is stripped: a tag of
+    ``"  "`` is an absent tag, and collapsing it to empty is what makes the
+    missing-project and missing-fund_org review flags fire on it.
+
+    Mutates and returns ``tags``.  The ``raw`` entry is left untouched — it
+    is the vendor's record of what was actually tagged, and it is what the
+    charge row keeps in ``raw_tags``.
+    """
+    for field in ("pi_email", "project_id", "fund_org", "cost_center",
+                  "reference_1", "reference_2"):
+        value = tags.get(field)
+        if not isinstance(value, str):
+            continue
+        value = value.strip()
+        if field in ("pi_email", "project_id"):
+            value = value.lower()
+        elif field == "fund_org":
+            value = canonical_fund_org(value, fund_org_patterns)
+        if value:
+            tags[field] = value
+        else:
+            tags.pop(field, None)
+    return tags
+
+
 def _cell(row: Any, name: str) -> str:
     """Read a CSV cell as a string, with NaN/missing collapsing to ''."""
     value = row.get(name, "")
@@ -292,6 +357,11 @@ class FocusIngester(BaseIngester):
         if self.config.tag_mapping.reference_2:
             tag_mapping["reference_2"] = self.config.tag_mapping.reference_2
 
+        # Hashable for the canonical_fund_org cache, and read once rather than
+        # per row.
+        review_config = getattr(self.config, "review", None)
+        fund_org_patterns = tuple(getattr(review_config, "fund_org_patterns", ()) or ())
+
         # Get or create source
         source = None
         if self.db and not self.dry_run:
@@ -323,6 +393,7 @@ class FocusIngester(BaseIngester):
             if pd.isna(tags_raw):
                 tags_raw = None
             tags = parse_tags(tags_raw, tag_mapping)
+            normalize_tag_values(tags, fund_org_patterns)
 
             # Extract PI email (required)
             pi_email = tags.get("pi_email", "")

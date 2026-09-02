@@ -191,3 +191,92 @@ def test_fresh_database_is_current_version(temp_db):
         ).scalar()
     assert version == SCHEMA_VERSION
     db.close()
+
+
+def test_v12_folds_open_periods_and_leaves_filed_months_alone(v9_db):
+    """Case-split projects merge, but only where the books are still open.
+
+    A finalized month's charges are the ledger behind a journal entry someone
+    posted and statements someone sent. Restating them to make a later month
+    tidier is the one thing an accounting system must never do.
+    """
+    conn = sqlite3.connect(v9_db)
+    conn.execute("INSERT INTO billing_periods (id, period, status) VALUES (2, '2025-02', 'open')")
+    conn.execute(
+        "INSERT INTO billing_periods (id, period, status) VALUES (3, '2025-03', 'finalized')"
+    )
+    base = (
+        "INSERT INTO charges (id, billing_period_id, source_id, charge_period_start,"
+        " billed_cost, resource_id, pi_email, project_id, fund_org, needs_review)"
+        " VALUES "
+    )
+    # Open month: one project typed three ways, plus a PI typed two ways and a
+    # fund/org with stray whitespace.
+    conn.execute(base + "(10, 2, 1, '2025-02-01', 10.0, 'i-1', 'zorp@example.edu', 'genomics-seq', ' BIO-1 ', 0)")
+    conn.execute(base + "(11, 2, 1, '2025-02-01', 20.0, 'i-2', 'Zorp@Example.EDU', 'Genomics-Seq', 'BIO-1', 0)")
+    conn.execute(base + "(12, 2, 1, '2025-02-01', 30.0, 'i-3', 'zorp@example.edu', 'GENOMICS-SEQ', 'BIO-1', 0)")
+    # A project tagged as whitespace: truthy, so it never tripped the
+    # missing-project check and has been billing to a blank project.
+    conn.execute(base + "(13, 2, 1, '2025-02-01', 40.0, 'i-4', 'zorp@example.edu', '  ', 'BIO-1', 0)")
+    # Finalized month: filed as-is, stays as-is.
+    conn.execute(base + "(20, 3, 1, '2025-03-01', 50.0, 'i-5', 'Zorp@Example.EDU', 'Genomics-Seq', 'BIO-1', 0)")
+    conn.commit()
+    conn.close()
+
+    db = Database(v9_db)
+    db.initialize()
+
+    open_charges = db.get_charges_for_period(db.get_period("2025-02").id, include_flagged=True)
+    by_id = {c.id: c for c in open_charges}
+    assert {by_id[i].project_id for i in (10, 11, 12)} == {"genomics-seq"}
+    assert {c.pi_email for c in open_charges} == {"zorp@example.edu"}
+    # fund_org is trimmed but its case is the configured pattern's call at
+    # ingest, not this migration's — it has no config to consult.
+    assert by_id[10].fund_org == "BIO-1"
+    # No dollars moved.
+    assert sum(c.billed_cost for c in open_charges) == pytest.approx(100.0)
+
+    # The blank project surfaces for review instead of silently billing to
+    # "(no project)".
+    assert by_id[13].project_id is None
+    assert by_id[13].needs_review is True
+    assert by_id[13].review_reason == "migration_blank_project"
+
+    filed = db.get_charges_for_period(db.get_period("2025-03").id, include_flagged=True)[0]
+    assert filed.project_id == "Genomics-Seq"
+    assert filed.pi_email == "Zorp@Example.EDU"
+    db.close()
+
+
+def test_v12_statement_collision_keeps_the_one_that_was_sent(v9_db):
+    """Folding two drafts into one key must not throw away proof of send."""
+    from sqlalchemy import text
+
+    conn = sqlite3.connect(v9_db)
+    conn.execute("INSERT INTO billing_periods (id, period, status) VALUES (2, '2025-02', 'open')")
+    conn.execute(
+        "INSERT INTO statements (id, billing_period_id, pi_email, total_cost,"
+        " project_count, generated_at, sent_at) VALUES"
+        " (10, 2, 'Zorp@Example.EDU', 30.0, 1, '2025-03-01 09:00:00', '2025-03-01 10:00:00')"
+    )
+    conn.execute(
+        "INSERT INTO statements (id, billing_period_id, pi_email, total_cost,"
+        " project_count, generated_at, sent_at) VALUES"
+        " (11, 2, 'zorp@example.edu', 30.0, 1, '2025-03-02 09:00:00', NULL)"
+    )
+    conn.commit()
+    conn.close()
+
+    db = Database(v9_db)
+    db.initialize()
+
+    with db.engine.connect() as c:
+        rows = c.execute(
+            text("SELECT id, pi_email, sent_at FROM statements WHERE billing_period_id = 2")
+        ).fetchall()
+    assert len(rows) == 1
+    # The newer draft lost to the one that actually reached a PI.
+    assert rows[0][0] == 10
+    assert rows[0][1] == "zorp@example.edu"
+    assert rows[0][2] is not None
+    db.close()

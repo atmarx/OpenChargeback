@@ -96,7 +96,7 @@ review:
     - ".*gpu.*"           # Flag GPU instances for review
     - ".*training.*"      # Flag ML training jobs
   fund_org_patterns:
-    - "^\\d{6}-\\d{4}$"   # Valid fund/org format
+    - "^\\d{6}-\\d{4}$"   # Valid fund/org format — also settles its case
 
 # Known import sources (for web UI auto-detection and journal exports)
 imports:
@@ -200,6 +200,24 @@ imports:
     - name: Storage
       pattern: storage        # Generic fallback
 ```
+
+### Tag normalization
+
+The same project gets tagged `genomics-seq`, `Genomics-Seq` and `GENOMICS-SEQ`
+in one export. Read literally that is three projects for one PI. On import,
+`pi_email` and `project_id` are trimmed and lowercased so they are not; every
+tag is trimmed, so a value of `"   "` counts as absent and trips the
+missing-tag review flag instead of billing to a nameless project.
+
+`fund_org` is only trimmed. That exact string is posted to the general ledger,
+so its case is not OpenChargeback's to invent — it is taken from
+`review.fund_org_patterns`, which has already declared what a valid code looks
+like. A pattern written with a definite case (`[A-Z]`) conforms the value to
+it; a case-agnostic one leaves it as tagged.
+
+The original tag text is kept on every charge in `raw_tags` regardless. See
+[the tag specification](../integrations/TAG-SPECIFICATION.md) for the full
+contract.
 
 ### Import bounds
 

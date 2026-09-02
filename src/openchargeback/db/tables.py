@@ -306,4 +306,4 @@ review_logs = Table(
 Index("idx_review_logs_period", review_logs.c.billing_period_id)
 Index("idx_review_logs_performed_at", review_logs.c.performed_at)
 
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12

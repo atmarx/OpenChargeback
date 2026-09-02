@@ -55,6 +55,33 @@ openchargeback review list --period 2025-01
 
 ---
 
+### The same project appears several times
+
+**Symptom**: One project is listed two or three times on the Projects page,
+all under the same PI, splitting a month's spend between them.
+
+**Cause**: Somebody tagged it inconsistently — `genomics-seq` in one resource,
+`Genomics-Seq` in another. Older imports stored tag values exactly as typed, so
+each spelling became its own project.
+
+**Fix**: Imports from v12 onward fold `project_id` and `pi_email` to trimmed
+lowercase, so new data merges on its own. Charges already in the database are
+folded by the v12 migration, **in open periods only** — a closed or finalized
+month is the ledger behind a journal entry someone posted, and OpenChargeback
+does not restate a filed book to tidy up a later one. Those months keep their
+split projects.
+
+To merge a case-split project inside a still-open month that was imported
+before the upgrade, re-import the source file: the charge rows are matched on
+their natural key, so the project value is corrected in place and no charge is
+duplicated.
+
+For `fund_org`, case is settled by `review.fund_org_patterns` rather than by
+folding — see [the tag specification](../integrations/TAG-SPECIFICATION.md).
+If fund/org codes are splitting too, it usually means no pattern is configured,
+or the pattern is written case-agnostically (`[A-Za-z]`) and so declares
+nothing.
+
 ## Statement Issues
 
 ### PDF Generation Fails

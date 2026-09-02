@@ -90,6 +90,47 @@ review:
 - Unique within your organization
 - **Example**: `climate-model-2025`, `ai-research`
 
+### Case and whitespace
+
+Tags are typed by hand, and the same project reliably arrives spelled three
+ways in one export. Read literally, `genomics-sequencing`,
+`Genomics-Sequencing` and `GENOMICS-SEQUENCING` are three projects: three
+statements, three journal rows, one real project.
+
+OpenChargeback folds the identity tags on import so that does not happen:
+
+| Tag | Normalization |
+|-----|---------------|
+| `pi_email` | Trimmed, lowercased. Case in an address carries no meaning. |
+| `project_id` | Trimmed, lowercased. It is an identifier, not a label. |
+| `fund_org` | Trimmed. **Case is decided by `review.fund_org_patterns`** — see below. |
+| everything else | Trimmed. |
+
+`fund_org` is the exception because that exact string is posted to the general
+ledger, and OpenChargeback does not get to invent what your finance system
+receives. But the institution has already declared what a valid code looks
+like, in the validation pattern. So if a pattern is written with a definite
+case, a code is conformed to it:
+
+```yaml
+review:
+  fund_org_patterns:
+    - "^[A-Z]{2,4}-\\d{4}-\\d{3}$"
+```
+
+With that pattern, `bio-2024-001` is stored as `BIO-2024-001` and merges with
+the correctly-cased rows. With a case-agnostic pattern — or no pattern at all —
+nothing has declared an answer, so the value is stored exactly as tagged.
+
+Two consequences worth knowing:
+
+- **A tag of `"   "` is an absent tag.** Whitespace is truthy, so a blank
+  `project` tag used to sail past the missing-project check and bill to a
+  nameless project. It now trips `missing_project` and lands in review.
+- **The original spelling is never lost.** Every charge keeps the vendor's
+  literal tag JSON in `raw_tags`, and the uploaded CSV is retained whole in the
+  close package. Folding changes how charges group, not what was recorded.
+
 ### end_date / reconciliation_end
 
 - ISO 8601 date format: `YYYY-MM-DD`

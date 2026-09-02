@@ -264,6 +264,88 @@ def _run_migrations(conn: Any, from_version: int, to_version: int) -> None:
             "ON charges (needs_review) WHERE needs_review = 1"
         ))
 
+    if from_version < 12 <= to_version:
+        # v12: Fold the identity tags, so one project is one project.
+        #
+        # Tag values were stored exactly as typed, so "genomics-sequencing",
+        # "Genomics-Sequencing" and "GENOMICS-SEQUENCING" are three projects
+        # for one PI — three statements, three journal rows, one real project.
+        # pi_email and project_id are identifiers whose case carries no
+        # meaning and are folded to lowercase; fund_org is only trimmed,
+        # because that string is posted to the general ledger and its case is
+        # settled by the configured pattern at ingest, not by this migration,
+        # which has no config to consult.
+        #
+        # OPEN PERIODS ONLY.  A closed or finalized month has already been
+        # filed: its charges are the ledger behind a journal entry someone
+        # posted and statements someone sent.  Restating them here to make a
+        # later month tidier is exactly the thing an accounting system must
+        # never do.  Those months keep their split projects, honestly, and the
+        # original tag text survives in raw_tags on every row regardless.
+        open_periods = (
+            "SELECT id FROM billing_periods WHERE status = 'open'"
+        )
+        conn.execute(text(f"""
+            UPDATE charges SET
+                pi_email = LOWER(TRIM(pi_email)),
+                project_id = CASE
+                    WHEN project_id IS NULL THEN NULL
+                    WHEN TRIM(project_id) = '' THEN NULL
+                    ELSE LOWER(TRIM(project_id)) END,
+                fund_org = CASE
+                    WHEN fund_org IS NULL THEN NULL
+                    WHEN TRIM(fund_org) = '' THEN NULL
+                    ELSE TRIM(fund_org) END
+            WHERE billing_period_id IN ({open_periods})
+        """))
+
+        # A project tagged as whitespace was never caught by the missing-project
+        # check — it is truthy, so it passed. Those rows have been billing to a
+        # blank project. Surface them for review rather than letting them keep
+        # landing silently in "(no project)".
+        conn.execute(text(f"""
+            UPDATE charges SET
+                needs_review = 1,
+                review_reason = 'migration_blank_project',
+                reviewed_at = NULL,
+                reviewed_by = NULL
+            WHERE project_id IS NULL
+              AND rejected_at IS NULL
+              AND needs_review = 0
+              AND billing_period_id IN ({open_periods})
+        """))
+
+        # Statements for open periods are drafts, and are folded with the
+        # charges so regenerating does not leave a stale twin behind. Where
+        # folding collides, keep the one that was actually sent — that row is
+        # evidence a PI received something — then the most recently generated.
+        #
+        # The losers go first. Folding a survivor onto a name a loser still
+        # holds would trip UNIQUE (billing_period_id, pi_email, project_id)
+        # mid-migration, which is the same collision arriving as a crash.
+        collision_rank = f"""
+            SELECT id, ROW_NUMBER() OVER (
+                PARTITION BY billing_period_id, LOWER(TRIM(pi_email)),
+                             LOWER(TRIM(COALESCE(project_id, '')))
+                ORDER BY (sent_at IS NOT NULL) DESC,
+                         generated_at DESC, id DESC) AS rn
+            FROM statements
+            WHERE billing_period_id IN ({open_periods})
+        """
+        conn.execute(text(f"""
+            DELETE FROM statements
+            WHERE id IN (SELECT id FROM ({collision_rank}) WHERE rn > 1)
+        """))
+        conn.execute(text(f"""
+            UPDATE statements SET
+                pi_email = LOWER(TRIM(pi_email)),
+                project_id = CASE
+                    WHEN project_id IS NULL THEN NULL
+                    WHEN TRIM(project_id) = '' THEN NULL
+                    ELSE LOWER(TRIM(project_id)) END
+            WHERE billing_period_id IN ({open_periods})
+        """))
+
 
 def get_dialect(engine: Engine) -> str:
     """Get the database dialect name (sqlite, postgresql)."""
