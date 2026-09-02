@@ -11,7 +11,7 @@
 </div>
 
 {% if current_period and current_period.status == 'open' %}
-<div class="alert-banner" style="background: #fff3e0; border-color: #ffcc80;">
+<div class="alert-banner">
     <span class="icon" style="color: var(--warning);">&#9888;</span>
     <div class="message">
         <strong>Period {{ current_period.period }} is still open</strong>
@@ -22,7 +22,7 @@
 {% endif %}
 
 {% if period_flagged_count > 0 %}
-<div class="alert-banner" style="background: #ffebee; border-color: #ef9a9a;">
+<div class="alert-banner danger">
     <span class="icon" style="color: var(--danger);">&#9888;</span>
     <div class="message">
         <strong>{{ period_flagged_count }} charge{{ 's' if period_flagged_count != 1 else '' }} need{{ '' if period_flagged_count != 1 else 's' }} review</strong>

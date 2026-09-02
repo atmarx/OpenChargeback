@@ -74,7 +74,7 @@
                         <strong>Selected Files</strong>
                         <button type="button" class="btn btn-sm btn-outline" onclick="clearFiles()">Clear All</button>
                     </div>
-                    <div id="file-list-items" tabindex="0"></div>
+                    <div id="file-list-items" class="file-list-items" tabindex="0"></div>
                 </div>
 
                 <!-- Upload Progress -->
@@ -505,6 +505,83 @@
 .result-item-stats {
     font-size: 13px;
     color: var(--text-muted);
+}
+
+/* Dark Mode
+   The status colours below are the light palette's pastels re-expressed as
+   translucent tints of the theme accents, the same way app.css handles
+   alerts and flash messages.  Opaque pastels would sit on the dark card as
+   bright rectangles and drag the text contrast with them. */
+.dark .modal-content {
+    background: var(--card-bg);
+}
+
+.dark .drop-zone:hover,
+.dark .drop-zone.drag-over {
+    background: rgba(93, 173, 226, 0.1);
+}
+
+.dark .file-list-header {
+    background: var(--primary);
+}
+
+.dark .file-list-items {
+    background: var(--card-bg);
+}
+
+.dark .file-item-tag.detected {
+    background: rgba(93, 173, 226, 0.15);
+    color: var(--accent);
+}
+
+.dark .file-item-tag.warning {
+    background: rgba(241, 196, 15, 0.15);
+    color: var(--warning);
+}
+
+.dark .file-item-select {
+    background: var(--primary);
+    border-color: var(--border);
+    color: var(--text);
+}
+
+.dark .file-item-select.detected {
+    background: rgba(93, 173, 226, 0.15);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.dark .file-item-select.warning {
+    background: rgba(241, 196, 15, 0.15);
+    border-color: var(--warning);
+    color: var(--warning);
+}
+
+.dark .file-item-select.new-period {
+    background: rgba(46, 204, 113, 0.15);
+    border-color: var(--success);
+    color: var(--success);
+}
+
+.dark .file-item-select.error {
+    background: rgba(231, 76, 60, 0.15);
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.dark .multi-file-notice {
+    background: rgba(93, 173, 226, 0.15);
+    color: var(--accent);
+}
+
+.dark .result-item.success {
+    background: rgba(46, 204, 113, 0.15);
+    border-color: rgba(46, 204, 113, 0.35);
+}
+
+.dark .result-item.error {
+    background: rgba(231, 76, 60, 0.15);
+    border-color: rgba(231, 76, 60, 0.35);
 }
 </style>
 

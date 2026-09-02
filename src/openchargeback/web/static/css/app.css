@@ -487,6 +487,11 @@ tr:hover {
     border-color: #7dd3fc;
 }
 
+.alert-banner.danger {
+    background: #ffebee;
+    border-color: #ef9a9a;
+}
+
 /* Forms */
 .form-group {
     margin-bottom: 20px;
@@ -894,6 +899,11 @@ tr:hover {
 
 /* Dark Mode */
 .dark {
+    /* Tells the browser its own widgets are on a dark page too: select
+       popups, scrollbars, and focus rings.  Without it the modal's file
+       list scrolls with a bright grey bar and its dropdowns open white. */
+    color-scheme: dark;
+
     --primary: #1a2633;
     --primary-light: #243447;
     --accent: #5dade2;
@@ -986,6 +996,11 @@ tr:hover {
 .dark .alert-banner.info {
     background: rgba(93, 173, 226, 0.15);
     border-color: #5dade2;
+}
+
+.dark .alert-banner.danger {
+    background: rgba(231, 76, 60, 0.15);
+    border-color: var(--danger);
 }
 
 .dark .login-card {
