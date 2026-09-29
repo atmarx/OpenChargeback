@@ -50,7 +50,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     ports:
-      - "8000:8000"
+      - "${WEB_PORT:-8000}:3000"  # the container listens on 3000
     volumes:
       - ../instance:/app/instance
       - ../templates:/app/templates:ro
@@ -111,17 +111,23 @@ server {
 
 ### Health Checks
 
-Add a health check to your Docker Compose:
+The image and the shipped compose file already include one.  It runs *inside* the
+container, so it targets the container's port (3000, not the host's 8000), and it
+uses Python because the slim image has no `curl`:
 
 ```yaml
 services:
   openchargeback:
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3000/login')"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s
 ```
+
+`/health` also exists and returns `{"status": "ok"}` without rendering a page, if you'd
+rather probe that.  Checking `/login` is slightly stronger: it proves templates load.
 
 ### Resource Limits
 

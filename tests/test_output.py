@@ -175,6 +175,20 @@ class TestExportJournalCSV:
                 db=db,
             )
 
+    def test_export_refuses_unimplemented_format(self, populated_db, config, tmp_path):
+        """A format this path doesn't implement is refused, not silently
+        swapped for the default layout — and nothing is written."""
+        target = tmp_path / "gl.csv"
+        with pytest.raises(ValueError, match="export-package"):
+            export_journal_csv(
+                period="2025-01",
+                config=config,
+                db=populated_db,
+                format_name="gl",
+                output_path=target,
+            )
+        assert not target.exists()
+
     def test_export_excludes_flagged(self, db, config):
         """Flagged charges are excluded from export."""
         period = db.get_or_create_period("2025-02")

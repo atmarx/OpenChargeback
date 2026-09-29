@@ -33,7 +33,10 @@ One row per charge. Best for audit trails and detailed analysis.
 
 The CLI `export-journal` command produces a similar detail format, aggregated by
 PI / project / service (columns: BillingPeriod, PIEmail, ProjectID, FundOrg,
-ServiceName, Amount, ResourceCount).  The CLI only implements this one format.
+ServiceName, Amount, ResourceCount).  The CLI only implements this one format, and
+refuses any other `--format` rather than quietly writing this one.  For the balanced
+GL from a script, use `openchargeback export-package` — its `journal.csv` is the
+Custom Template (GL) export.
 
 ### Summary by PI/Project (web UI)
 
@@ -194,7 +197,7 @@ Total debits ($2,250) = Total credits ($2,250) ✓
 ### Via CLI
 
 ```bash
-# Default format (Standard Detail)
+# The CLI's only format: detail aggregated by PI / project / service
 openchargeback export-journal --period 2025-01
 
 # Custom output path

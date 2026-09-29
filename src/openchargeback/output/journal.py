@@ -24,15 +24,27 @@ def export_journal_csv(
         period: Billing period (YYYY-MM).
         config: Application configuration.
         db: Database connection.
-        format_name: Export format name (for future customization).
+        format_name: Export format. Only ``default`` exists here; the web UI's
+            standard/summary/gl/template formats are not implemented in this path.
         output_path: Output file path (optional, auto-generated if not provided).
 
     Returns:
         Path to exported CSV file.
 
     Raises:
-        ValueError: If billing period not found.
+        ValueError: If the format is unknown or the billing period is not found.
     """
+    # Refuse before touching anything. This path used to accept any name and
+    # quietly write the default layout, so `--format gl` handed accounting a
+    # per-service detail file under a GL request. A wrong-shaped journal that
+    # looks fine is worse than no journal.
+    if format_name != "default":
+        raise ValueError(
+            f"Unknown journal format {format_name!r}: the CLI writes only 'default'. "
+            "For the balanced GL, use `openchargeback export-package` (its journal.csv) "
+            "or the web UI's Journal Export page."
+        )
+
     # Get billing period
     billing_period = db.get_period(period)
     if not billing_period:
@@ -50,12 +62,7 @@ def export_journal_csv(
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_path = config.output.journal_dir / f"journal_{period}_{timestamp}.csv"
 
-    # Export based on format
-    if format_name == "default":
-        _export_default_format(output_path, period, pi_summaries)
-    else:
-        # Future: support custom formats
-        _export_default_format(output_path, period, pi_summaries)
+    _export_default_format(output_path, period, pi_summaries)
 
     return output_path
 

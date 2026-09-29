@@ -162,7 +162,37 @@ openchargeback export-journal --period 2025-01
 openchargeback export-journal --period 2025-01 --output ./custom-path.csv
 ```
 
+The CLI writes one format: detail aggregated by PI / project / service.  Any other
+`--format` is refused.  For the balanced GL, use [`export-package`](#export-package)
+— its `journal.csv` is the Custom Template (GL) export.
+
 See [Admin Guide: Journal Export](../admin-guide/journal-export.md) for details on journal formats.
+
+---
+
+### export-package
+
+Export the monthly close package: the journal, the statement PDFs exactly as sent,
+the original input files, the email log, and the audit trail, bundled as one file.
+
+```bash
+openchargeback export-package --period 2025-01
+openchargeback export-package -p 2025-01 -f pdf -o ./out
+```
+
+**Options:**
+- `--period`, `-p`: Billing period (YYYY-MM, required)
+- `--format`, `-f`: `zip` (default) or `pdf` (a PDF portfolio with the same contents)
+- `--output-dir`, `-o`: Directory to write into (default: current directory)
+- `--config`: Path to config file
+
+The package is deterministic: the same data produces the same bytes and the same
+sha256, and the first six characters of that hash go in the filename
+(`openchargeback-close-2025-01-3a1c3c.zip`). Timestamps inside it are pinned to
+the period's close time, so run it after `periods close`. It refuses to build if
+any statement PDF is missing. Each export is recorded in the audit log.
+
+See [Admin Guide: Billing Workflow](../admin-guide/billing-workflow.md#step-6-download-the-close-package) for what's inside.
 
 ---
 

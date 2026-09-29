@@ -142,10 +142,10 @@ The system supports multiple journal export formats to match institutional accou
 |--------|----------|
 | **Default** | One line per charge with full detail |
 | **Summary** | Aggregated by PI and project |
-| **GL (General Ledger)** | Debit/credit entries with parsed fund/org codes |
-| **Template** | Custom format using institution-specific Jinja2 template |
+| **GL (General Ledger)** | Simple double-entry: one debit per fund/org, one balancing clearing credit |
+| **Template** | Balanced, account-coded GL in your institution's import layout (Jinja2) — the `journal.csv` in the close package |
 
-Templates are customizable via Jinja2, allowing institutions to match their exact GL import format. Fund/org codes can be parsed into components (fund, org, account) using regex patterns.
+The Template format is the one built for an ERP import: fund/org codes are parsed into components (fund, org, account) using regex patterns, credits post to each service's own fund/org, and the exporter refuses to write an entry whose debits and credits don't match. The plain GL format does none of that parsing — it's a quick double-entry view, not an ERP feed.
 
 ## Data Integrity
 

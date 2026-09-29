@@ -223,7 +223,13 @@ def generate(
 @app.command("export-journal")
 def export_journal(
     period: Annotated[str, typer.Option("--period", "-p", help="Billing period (YYYY-MM)")],
-    format: Annotated[str, typer.Option("--format", "-f", help="Export format")] = "default",
+    format: Annotated[
+        str,
+        typer.Option(
+            "--format", "-f",
+            help="Export format (only 'default'; the balanced GL is in export-package)",
+        ),
+    ] = "default",
     output: Annotated[
         Path | None,
         typer.Option("--output", "-o", help="Output file path"),
@@ -245,6 +251,9 @@ def export_journal(
             output_path=output,
         )
         console.print(f"[green]Journal exported to: {output_path}[/green]")
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1) from e
     finally:
         db.close()
 
