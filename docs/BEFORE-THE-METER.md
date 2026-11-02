@@ -1,5 +1,9 @@
 # Before the Meter: Budget Guardrails Upstream of OpenChargeback
 
+> **Status: proposal.**  Only the register exists, and it's what this repository ships.
+> The gate, the governor, ERP funds checks, budget alerts, and writing actuals back to a
+> helpdesk ticket are all design, with no code here.  Read every "will" about them that way.
+
 ## How an account actually goes negative
 
 The Friday before spring break, Pell Wickstrand — a grad student in Dr. Yev
@@ -28,7 +32,8 @@ One boundary first, because it shapes everything after it.
 [OpenChargeback](EXECSUMMARY.md) is the **register**: it takes the usage that
 *did* happen, splits it to the right funds, invoices the right Principal
 Invoicees, and hands finance a balanced journal that reconciles to the cent.
-It is deliberately, permanently post-hoc. It does not approve spending,
+It is deliberately, permanently post-hoc. (Its review queue approves a charge's
+*attribution*, after the money was spent.) It does not approve spending,
 enforce budgets, or stop anyone — and it never will, because a register that
 also decides what you're allowed to buy is two systems wearing one audit
 trail.

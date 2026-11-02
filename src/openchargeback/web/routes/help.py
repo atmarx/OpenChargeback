@@ -39,12 +39,12 @@ Billing periods organize charges into monthly cycles (e.g., 2025-01).
 **Period Status:**
 - **Open** - Accepting new imports. Charges can be added and modified.
 - **Closed** - No new imports. Ready for review and statement generation.
-- **Finalized** - Locked. Statements have been sent.
+- **Finalized** - Locked permanently. Refused while charges are flagged or before statements are generated.
 
 **Period Actions:**
 - **Close Period** - Prevents new imports, allows statement generation
 - **Reopen Period** - Reopen a closed (not finalized) period with a reason
-- **Finalize Period** - Lock the period after statements are sent
+- **Finalize Period** - Lock the period after accounting confirms it has the close package
 
 **Audit Trail:**
 All period status changes are logged with who made the change and when.
@@ -124,9 +124,10 @@ Import FOCUS-format CSV files to add billing data.
 **Supported Format:**
 OpenChargeback uses the FinOps FOCUS format. Required columns:
 - `BilledCost` - Amount to bill
-- `ServiceName` - Service or resource type
-- `ResourceId` - Resource identifier
-- Tag columns for PI, project, and fund/org (configured in config.yaml)
+- `BillingPeriodStart` - Sets the billing period
+- `Tags` - JSON with the PI, project, and fund/org tags (names configured in config.yaml)
+
+`ServiceName` and `ResourceId` are optional but make statements far more useful.
 
 **Import Process:**
 1. Choose a data source (AWS, Azure, GCP, etc.)
@@ -136,7 +137,7 @@ OpenChargeback uses the FinOps FOCUS format. Required columns:
 > Opening a billing period manually before importing is optional.
 
 **Duplicate Handling:**
-Imports are tracked by filename and period. Re-importing the same file will skip duplicate rows.
+Rows are matched by resource, charge period, category, and SKU, not by filename. Re-importing unchanged rows skips them, whatever the file is called. A changed row updates in place, and if someone already reviewed it, it goes back to the review queue.
 """
     },
     "settings": {

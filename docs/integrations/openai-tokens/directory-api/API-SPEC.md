@@ -24,10 +24,11 @@ output, pinned by an automated test).
 
 ## General requirements (both endpoints)
 
-- **HTTPS, JSON, UTF-8.** Response `Content-Type: application/json`.
+- **HTTPS, JSON, UTF-8.** Send `Content-Type: application/json`.  The converter doesn't check the header, but a body that won't parse as JSON aborts.
 - **Auth:** a static bearer token. OpenChargeback sends
   `Authorization: Bearer <token>`, read from the `OCB_DIRECTORY_API_TOKEN`
-  environment variable at conversion time. If your gateway needs something
+  environment variable at conversion time.  With the variable unset it sends no
+  header, and your endpoint's 401 aborts the run.  If your gateway needs something
   fancier than a long-lived token, front it with something that doesn't —
   the billing client will not do OAuth dances.
 - **Full dumps, not per-user queries.** Resolution happens per user *inside*
@@ -38,7 +39,10 @@ output, pinned by an automated test).
   month. Mid-month reassignments are not pro-rated; finance re-homes anything
   that lands wrong. Don't build effective-dating for us.
 - **Failure aborts, nothing partial.** Any non-200, a timeout (30 s), or a
-  schema violation (e.g. missing `master_fund_org`) aborts the entire import.
+  schema violation aborts the entire conversion, before any row is written.  The
+  converter checks `schema_version`'s major version, `licenses` and `fund_orgs` being
+  arrays, and every field marked required or unique below.  Over HTTP these abort as
+  a raw traceback; it's ugly but nothing partial is written.
   We never bill a month against a half-answered directory.
 - **Forward compatibility:** unknown extra fields are ignored. Add fields
   freely; renaming or removing the ones below is a coordinated change (bump
@@ -73,7 +77,7 @@ output, pinned by an automated test).
 | Field | Required | Meaning |
 |-------|----------|---------|
 | `schema_version` | yes | `"1.0"` |
-| `as_of` | recommended | when the dump was cut (audit breadcrumb) |
+| `as_of` | recommended | when the dump was cut.  For your own audit trail: the converter doesn't read or copy it. |
 | `master_fund_org` | **yes, non-empty** | the catch-all fund/org. **Must** exist in endpoint 2 with ≥ 1 invoicee, or the import aborts — this is the code that guarantees no charge is ever orphaned |
 | `licenses[].email` | **yes, unique** | the seat's OpenAI email — **the join key** to the usage export |
 | `licenses[].username` | yes | the CMDB login on the license CI — keys the showback line back to the license timeline |

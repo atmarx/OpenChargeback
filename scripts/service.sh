@@ -15,6 +15,8 @@ NC='\033[0m' # No Color
 # Default values
 ENV="dev"
 ACTION=""
+# Local stack only, for both --env values.  The deployed instance runs the root
+# compose.yml through Woodpecker CI, and this script doesn't touch it.
 COMPOSE_FILE="docker/docker-compose.yml"
 PROJECT_NAME="openchargeback"
 

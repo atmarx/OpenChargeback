@@ -91,7 +91,7 @@ for PERIOD in "${PERIODS[@]}"; do
     done
 
     echo "  Approving charges (a clean, complete month)..."
-    openchargeback review approve -p "$PERIOD" -c "$CONFIG" > /dev/null || true
+    openchargeback review approve -p "$PERIOD" -c "$CONFIG" > /dev/null
 
     echo "  Generating PDF statements + emails..."
     openchargeback generate -p "$PERIOD" -c "$CONFIG" --send > /dev/null
@@ -167,4 +167,4 @@ echo "Sample outputs are in sample_data/outputs/"
 echo "  - pdfs/      : Statement PDFs for each PI/project"
 echo "  - journals/  : GL journal export CSVs"
 echo "  - emails/    : Email HTML files (dev mode output)"
-echo "  - packages/  : Forensic close packages — 2 months x {zip, pdf}"
+echo "  - packages/  : Forensic close packages — 3 months x {zip, pdf}"

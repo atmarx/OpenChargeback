@@ -213,7 +213,7 @@ The web dashboard provides:
 - **Email history** — Track all sent notifications with delivery status
 - **Built-in help** — Contextual documentation for each feature
 
-Authentication uses session-based login with bcrypt-hashed passwords. Users can be configured with three roles: **admin** (full access including user management), **reviewer** (can approve/reject flagged charges), or **viewer** (read-only access). Users can be defined in config for bootstrap/recovery, or managed through the database via the web interface.
+Authentication uses session-based login with bcrypt-hashed passwords. Users can be configured with three roles: **admin** (full access including user management), **reviewer** (can approve/reject flagged charges, export journals, and resend failed statement emails), or **viewer** (read-only access). Users can be defined in config for bootstrap/recovery, or managed through the database via the web interface.
 
 ## What It Requires
 

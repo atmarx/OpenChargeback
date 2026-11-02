@@ -97,7 +97,7 @@ web:
 | Role | Permissions |
 |------|-------------|
 | `admin` | Full access: import data, manage periods, generate/send statements, all operations |
-| `reviewer` | Review charges, export journals |
+| `reviewer` | Approve and reject flagged charges, export journals, resend failed statement emails |
 | `viewer` | Read-only access to all data |
 
 ### Permission Matrix
@@ -110,6 +110,7 @@ web:
 | Review charges | ✓ | ✓ | ✗ |
 | Generate statements | ✓ | ✗ | ✗ |
 | Send statements | ✓ | ✗ | ✗ |
+| Resend a failed statement email | ✓ | ✓ | ✗ |
 | Export journals | ✓ | ✓ | ✗ |
 | Close periods | ✓ | ✗ | ✗ |
 | Finalize periods | ✓ | ✗ | ✗ |

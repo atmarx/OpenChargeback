@@ -26,7 +26,8 @@ steps:
   # the real shipped sample data — two months, two wrappers — and checks that the
   # zip's entries and the pdf's embedded attachments are byte-identical (the
   # wrapper never changes a number) and that MANIFEST.txt honestly hashes every
-  # member. If it ever goes red, the "signed package" promise is broken — do not ship.
+  # member. If it ever goes red, the hashed-package promise is broken — do not ship.
+  # The hash is a checksum, not a signature: no key signs this package.
   - name: close-package-determinism
     image: python:3.12-slim
     commands:

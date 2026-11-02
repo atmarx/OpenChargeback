@@ -161,8 +161,8 @@ the `.csv` is what OpenChargeback **emits**. `fund_org` is the join key across a
 
 | Directory field | Typical CMDB / asset field |
 |-----------------|----------------------------|
-| `username` | the login / AD account on the license CI (the join key) |
-| `email` | the seat's OpenAI email |
+| `username` | the login / AD account on the license CI (keys the showback line, not the usage join) |
+| `email` | the seat's OpenAI email (the join key to the usage export) |
 | `fund_org` | the fund/org attribute on the license CI |
 | `role` | faculty / staff / lecturer / grad_student — informational |
 | `master_fund_org` | one global default the API returns when it doesn't recognize a user |

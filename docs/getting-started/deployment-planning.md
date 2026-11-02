@@ -29,7 +29,7 @@ Then, with your infosec office:
 
 ## 2. Roles & operations
 
-- **Who is admin / reviewer / viewer?** Name actual people. The [permission matrix](../security/authentication.md#roles-and-permissions) defines what each can do — admin manages users and finalizes periods, reviewer imports and approves and generates, viewer is read-only.
+- **Who is admin / reviewer / viewer?** Name actual people. The [permission matrix](../security/authentication.md#roles-and-permissions) defines what each can do — admin imports, generates and sends statements, closes and finalizes periods, and manages users; reviewer approves and rejects flagged charges, exports journals, and resends failed statement emails; viewer is read-only.
 - **Who runs the monthly close?** And who owns backups, and who holds the recovery account.
 - **What's your monthly calendar?** When import / review / statements / journal / close / finalize each happen. The [Billing Workflow](../admin-guide/billing-workflow.md) has a suggested cadence.
 

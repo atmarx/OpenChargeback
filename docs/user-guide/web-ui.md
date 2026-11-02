@@ -136,7 +136,7 @@ The sidebar provides quick access to all sections. The top bar shows:
 | Role | Permissions |
 |------|-------------|
 | **admin** | Full access: import data, manage periods, generate and send statements, manage users |
-| **reviewer** | Review charges, export journals |
+| **reviewer** | Approve and reject flagged charges, export journals, resend failed statement emails. Cannot import or generate. |
 | **viewer** | Read-only access |
 
 ---

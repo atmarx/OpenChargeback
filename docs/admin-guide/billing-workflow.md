@@ -6,16 +6,21 @@ This guide walks through the complete monthly billing cycle in OpenChargeback.
 
 ```
 ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌───────────────┐
-│  Import  │ → │  Review  │ → │ Generate │ → │  Close   │ → │ Close Package │
-│   Data   │   │ Charges  │   │Statements│   │  Period  │   │ → Accounting  │
+│  Import  │ → │  Close   │ → │  Review  │ → │ Generate │ → │ Close Package │
+│   Data   │   │  Period  │   │ Charges  │   │Statements│   │ → Accounting  │
 └──────────┘   └──────────┘   └──────────┘   └──────────┘   └───────────────┘
      ↓              ↓              ↓              ↓                  ↓
- Period Open   Approve/Reject   Send to PIs   Lock imports   Hashed forensic
-                                  + Journal                   archive (the deliverable)
+ Period Open   Lock imports   Approve/Reject  Send to PIs    Hashed forensic
+                                               + Journal      archive (the deliverable)
 ```
 
+The web UI only generates statements for a **closed** period, so close before you
+generate; the steps below are numbered by topic.  Review works in either state.  The CLI's
+`generate` doesn't check period status, which is why a scripted run can generate
+on an open month.  Reopening a closed period is allowed, and it needs a reason.
+
 The **close package** is the deliverable that ends the month: a single deterministic,
-hashed zip containing the original source files, the statements as sent, the journal
+hashed zip or PDF portfolio containing the original source files, the statements as sent, the journal
 export, the proof-of-send email log, and the audit trail. Research accounting keeps
 custody of it — which lets OpenChargeback step down from system-of-record to
 flight-data-recorder, dropping the audit liability. See [Step 6](#step-6-download-the-close-package).
@@ -75,11 +80,14 @@ Charges are flagged for manual review when they don't meet validation rules.
 
 | Reason | Description |
 |--------|-------------|
+| `missing_cost` | `BilledCost` is blank.  Approving it bills $0, so fix the source data unless $0 is right. |
+| `invalid_pi_email` | The `pi_email` tag isn't an email address (for example `unassigned`) |
+| `changed_after_review` | Re-import changed a charge someone already reviewed |
 | `missing_project` | No project identifier |
 | `missing_fund_org` | No fund/org code |
 | `invalid_fund_org` | Fund/org doesn't match required pattern |
 | `pattern_match:<pattern>` | Matches a flag pattern (e.g., GPU instance) |
-| `period_mismatch` | Charge date doesn't match import period |
+| `period_mismatch` | The row's `BillingPeriodStart` month doesn't match the period given at import |
 
 > **Note**: Rows with no PI email are **not** flagged — they are skipped
 > entirely and reported as an import error ("Missing pi_email tag").  Fix the
@@ -192,9 +200,10 @@ See [Journal Export](journal-export.md) for detailed format documentation.
 
 ## Step 5: Close the Period
 
-Closing prevents further imports while allowing reopening if needed. Close once
-charges are reviewed and statements are sent — it's the "pencils down" that
-freezes the month so the close package captures a stable snapshot.
+Closing prevents further imports while allowing reopening if needed.  In the web UI it
+comes before statement generation.  Review, regenerating statements, and emailing all
+still work while a period is closed, and each one changes the close package's hash, so
+download the package once those are done.  Only finalizing stops them.
 
 ```bash
 openchargeback periods close 2025-01
@@ -228,10 +237,11 @@ openchargeback export-package -p 2025-01 -f pdf -o ./out   # -f zip for the ZIP 
 | File | Contents |
 |------|----------|
 | `journal.csv` | The bulk journal entries (the ERP handoff) — same export as Step 4, bundled in. |
-| `statements/` | The final PDF statements, **exactly as emailed** to PIs (frozen, never re-rendered). |
-| `inputs/` | The original source files that generated the results, organized by source. |
-| `email-log.csv` | Proof of send: when each statement went out, to whom. |
-| `audit.csv` | The period lifecycle (opened/closed/finalized) plus every charge review action. |
+| `journal_summary.csv` | Human-readable rollup by PI, project and service.  A convenience view, not the ERP handoff. |
+| `statements/` | The stored statement PDFs, copied verbatim and never re-rendered by the package.  Regenerating before you finalize replaces them, so re-send if you do.  A recorded PDF that's missing from disk stops the build. |
+| `inputs/` | The original source files that generated the results, organized by source.  Rows with identical natural keys get `#2`, `#3` suffixes on their `sku_id` in the database only, never here. |
+| `email-log.csv` | Every send attempt linked to a statement: time, recipient, subject, status (including failures) and error. |
+| `audit.csv` | The period lifecycle (opened/closed/finalized) plus every charge review action, one row per charge for bulk actions. |
 | `README.txt` | A plain-language guide to the contents. |
 | `MANIFEST.txt` | The sha256 of every file above — the package's per-file signature. |
 
@@ -242,23 +252,31 @@ out — each one is byte-for-byte identical to the matching entry in the ZIP.
 ### Why it's hashed
 
 The package is **byte-deterministic** in both wrappers: the same canonical data produces
-the same bytes, and the same sha256, every time. The first 6 characters of that hash are
+the same bytes, and the same sha256, every time. The ZIP and the PDF are different files,
+so each has its own hash. That hash is of the finished file, manifest included, and it's a
+checksum: nothing is cryptographically signed, and the system doesn't record which hash
+went to accounting, so put it in your finalize note. Six hex characters identify a month's
+file by eye; compare the full hash when it matters. The first 6 characters of that hash are
 appended to the filename — e.g. `openchargeback-close-2025-01-a3f29c.zip` or
 `…-a3f29c.pdf` — so the bundle is content-addressable. Verify any file by re-hashing it
 against `MANIFEST.txt`; verify the whole bundle by the filename suffix (also returned in
-the `X-Package-SHA256` response header). A different hash means the data changed — that's
+the `X-Package-SHA256` response header on a web download, and printed by `export-package`).
+A different hash means the data changed — that's
 the point.
 
-> **Input retention:** Only source files imported *after* input retention was enabled
-> appear under `inputs/`. Months imported before then show an empty `inputs/` folder.
-> Retention is indefinite by default; `RETENTION_YEARS` is the planned rolloff hook.
+> **Input retention:** Every import is copied to `output.archive_dir`, with nothing to
+> enable.  Months imported before this feature shipped have an empty `inputs/` folder.
+> Files are kept indefinitely.  `RETENTION_YEARS` is a planned rolloff hook and doesn't
+> exist yet, so size the volume for growth.
 
 ---
 
 ## Step 7: Finalize the Period
 
 **Finalization is permanent.** Only finalize after research accounting confirms receipt
-of the close package.
+of the close package.  That confirmation is your job: the system doesn't track receipt.  It
+refuses to finalize while charges are still flagged.  The web UI also refuses before
+statements are generated; the CLI doesn't check that, so a script has to.
 
 ```bash
 openchargeback periods finalize 2025-01 --notes "Close package a3f29c sent to Banner 2025-02-05"
@@ -279,11 +297,11 @@ Finalized periods:
 |------|------------------|
 | Import data | 1st-3rd of following month |
 | Review charges | 3rd-5th of following month |
+| Close period | Before generating statements (web UI) |
 | Generate statements | 5th-7th of following month |
 | Send statements | 7th-10th of following month |
 | Export journal | After statements sent |
-| Close period | After journal exported |
-| Download close package | After close — hand to research accounting |
+| Download close package | After statements are sent and the journal exported — hand to research accounting |
 | Finalize period | After accounting confirms receipt of the package |
 
 ---

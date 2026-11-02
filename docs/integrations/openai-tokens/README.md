@@ -19,11 +19,10 @@ This integration provides:
 #    (Settings → Billing → Export Usage)
 
 # 2. Configure your environment
-cp pricing.json.example pricing.json
-cp projects.json.example projects.json
-cp subsidies.json subsidies.json  # Optional, for subsidy support
+# pricing.json, projects.json and subsidies.json ship in this folder as samples.
+# subsidies.json is optional.
 
-# 3. Edit configuration files (see below)
+# 3. Edit those files for your institution (see below)
 
 # 4. Run the converter
 python convert-openai-usage-to-focus-v2.py \
@@ -245,8 +244,9 @@ Add the user to `projects.json` under the appropriate project.
 
 ### `routed_to_master` lines in the showback (directory mode)
 
-The user has no license in the directory (or their license has no fund/org), so the
-charge landed on the `master_fund_org`. Have the helpdesk map the license in the CMDB;
+The user has no license in the directory, their license has no fund/org, or that fund/org
+is unknown to the registry or has no invoicees, so the charge landed on the
+`master_fund_org`. Have the helpdesk map the license in the CMDB;
 finance journals the already-billed month to the right fund.
 
 ### Subsidy not applying

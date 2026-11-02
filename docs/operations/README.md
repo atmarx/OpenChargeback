@@ -123,10 +123,10 @@ email:
 # Map your FOCUS CSV tag names to internal fields
 tag_mapping:
   pi_email: "pi_email"        # Required: PI's email address
-  project_id: "project"       # Project identifier
+  project_id: "project_id"    # Project identifier
   fund_org: "fund_org"        # Fund/org code for accounting
-  cost_center: "cost_center"  # Optional cost center
-  account_code: "account_code"  # Optional GL account code per charge
+  cost_center: "cost_center"  # Parsed but not stored on the charge or exported yet
+  account_code: "account_code"  # Optional GL account code, read from the raw tags at journal time
 
 output:
   pdf_dir: ./output/statements
@@ -158,7 +158,7 @@ review:
     - ".*gpu.*"           # Flag GPU instances for review
     - ".*training.*"      # Flag ML training jobs
   fund_org_patterns:
-    - "^\\d{6}-\\d{4}$"   # Valid fund/org format
+    - "^\\d{6}-\\d{4}$"   # Valid fund/org format. Anchor both ends: an unanchored pattern accepts any longer string
 
 # Known import sources (for web UI auto-detection and journal exports)
 imports:
@@ -191,17 +191,23 @@ imports:
 # Journal/GL export configuration
 journal:
   # Regex to parse fund_org into components (using named capture groups)
+  # Group order is up to you; only the names matter.
   # Example for "DEPT-PROJECT-2024" → orgn="DEPT", fund="PROJECT-2024"
+  # A value that doesn't match lands whole in the fund column with orgn blank.
   fund_org_regex: "^(?P<orgn>[^-]+)-(?P<fund>.+)$"
 
-  # Account code validation (optional, leave empty to skip)
-  account_code_regex: "^\\d{5}$"
+  # Reserved. Nothing validates account codes against this yet.
+  account_code_regex: ""
 
   # Jinja2 template for custom GL format (in templates/ directory)
   template: journal_gl.csv
 
   # Default account code if not on charge or source
   default_account: "54000"
+
+  # Credit target for a source with no fund_org. Empty means a visible
+  # CLEARING-<source> placeholder, which finance has to re-home.
+  clearing_fund_org: ""
 
   # Description templates for journal entries
   debit_description: "{source} {period} Research Computing Charges"
@@ -210,7 +216,7 @@ journal:
 
 ### Import Auto-Detection
 
-When uploading files via the web interface, OpenChargeback auto-detects the source and billing period from filenames.
+When uploading files via the web interface, the upload form pre-fills the source and billing period from the filename, and you can override both.  The ingester itself takes the source you submit and reads each row's period from `BillingPeriodStart`, so the rows win over the filename.  The CLI does no filename detection.
 
 **Source Detection**: Filenames are matched against the `pattern` values in `known_sources`. Patterns are matched case-insensitively and checked longest-first for specificity.
 
@@ -293,11 +299,14 @@ openchargeback ingest ./billing.csv --source aws --dry-run
 ```
 
 **Flagging behavior**: Charges are automatically flagged for review if:
+- `BilledCost` is blank (flagged rather than billed as $0)
+- `pi_email` isn't an email address, such as the OpenAI converter's `unassigned`
 - Period doesn't match `--period` argument (if provided)
-- Missing required `pi_email` tag
 - Missing `project_id` or `fund_org` tags
-- Matches a configured `flag_patterns` regex
-- Fund/org doesn't match any `fund_org_patterns` regex
+- `ServiceName`, `ResourceId` or `ResourceName` matches a configured `flag_patterns` regex
+- Fund/org doesn't match any `fund_org_patterns` regex (skipped when none are configured)
+
+A row with **no** `pi_email` tag is not flagged.  It's rejected as an import error and never becomes a charge, so fix the source data and re-import it.
 
 > **Note:** Imports are rejected for finalized periods. Finalized periods are locked and cannot accept new data. See [Periods](#periods) for status details.
 
@@ -373,7 +382,7 @@ openchargeback generate --period 2025-01
 openchargeback generate --period 2025-01 --send
 ```
 
-**Note**: Charges flagged for review are excluded from statements.
+**Note**: Charges flagged for review are excluded from statements, from the CLI journal, and from the close package.  The web UI's Journal Export page has an opt-in "include flagged" box for ad-hoc exports.  Rejected charges are excluded everywhere.
 
 ### Export Journal
 
@@ -408,10 +417,10 @@ The web interface provides a dashboard for managing billing periods, reviewing c
 - **Review Queue**: Approve or reject flagged charges with bulk actions
 - **Statements**: Generate PDFs and send emails to PIs
 - **Journal Export**: Export accounting data in multiple formats:
-  - Standard Detail (one row per charge)
+  - Standard Detail (one row per charge; the CLI's `export-journal` is a different layout, grouped by PI, project and service)
   - Summary by PI/Project (aggregated)
-  - General Ledger (debit/credit to clearing account)
-  - Custom Template (debit/credit per source using Jinja2 template)
+  - General Ledger (balanced debit/credit lines)
+  - Custom Template (debit/credit per source using Jinja2 template, and the `journal.csv` in the close package)
 - **Imports**: Upload FOCUS CSV files via drag-and-drop
 - **Settings**: Configure review patterns and view system info
 
@@ -442,6 +451,8 @@ This tool expects CSV files in [FOCUS (FinOps Open Cost & Usage Specification)](
 | `BilledCost` | The actual billed cost |
 | `Tags` | JSON object containing PI attribution tags |
 
+A file missing any of these columns is rejected whole, with no rows imported.
+
 ### Optional Columns
 
 | Column | Description |
@@ -470,8 +481,10 @@ This is useful for showing PIs the "true cost" of subsidized services (e.g., HPC
 PI and project attribution is extracted from the `Tags` column. Example:
 
 ```json
-{"pi_email": "smith@example.edu", "project": "genomics-1", "fund_org": "12345"}
+{"pi_email": "smith@example.edu", "project_id": "genomics-1", "fund_org": "123456-1234"}
 ```
+
+The tag only says who pays.  Nothing checks that the fund/org actually belongs to that PI.
 
 ---
 
@@ -505,7 +518,10 @@ Journal templates are used for the "Custom Template (GL)" export format. They re
 |----------|-------------|
 | `entries` | List of JournalEntry objects |
 | `period` | Billing period string (e.g., "2025-01") |
-| `config` | Full application config |
+| `journal` | The `journal:` config block |
+| `organization_name` | `email.from_name`, or "Research Computing" |
+
+Templates don't receive the full config, because it holds the SMTP password and session key.  A template that still references `config` renders blanks rather than failing.
 
 **JournalEntry fields:**
 
@@ -515,14 +531,15 @@ Journal templates are used for the "Custom Template (GL)" export format. They re
 | `fund` | Parsed fund component (from regex) |
 | `orgn` | Parsed org component (from regex) |
 | `account` | GL account code |
-| `amount` | Entry amount (always positive) |
+| `amount` | Entry amount.  Negative when a group nets to a credit, such as a refund. |
 | `is_debit` | True for debit entries |
 | `is_credit` | True for credit entries |
 | `description` | Entry description |
 | `source_name` | Data source (e.g., "AWS", "HPC") |
 | `period` | Billing period |
-| `pi_email` | PI email (debit entries only) |
-| `project_id` | Project ID (debit entries only) |
+| `pi_email` | PI email (debit entries only).  Blank when the debit covers more than one PI. |
+| `project_id` | Project ID (debit entries only).  Blank when the debit covers more than one project. |
+| `reference_id` | Reserved.  Always blank today. |
 | `program`, `activity`, `location` | Optional GL fields (default empty) |
 
 **Example journal template (`journal_gl.csv`):**
@@ -540,8 +557,10 @@ Fund,Orgn,Account,Program,Activity,Location,Debit,Credit,Description,Reference I
 **How debit/credit entries work:**
 
 For each billing period, the journal export creates:
-1. **Debit entries**: One per unique (PI fund_org, source) combination, charging the PI's fund
+1. **Debit entries**: One per unique (PI fund_org, source, account code) combination, charging the PI's fund.  A charge with no `fund_org` that gets approved anyway debits the literal fund `UNKNOWN`.
 2. **Credit entries**: One per source, crediting the source's configured fund_org — or, when a source has no `fund_org`, a `clearing_fund_org` (falling back to a visible `CLEARING-<source>` placeholder) so the credit is never dropped
+
+Lines that net to $0.00 are left out, since some ERPs reject them.  The account comes from the charge's tag, then the source's `account_code`, then `default_account`.  Rows that share a PI, project, fund and source count as one money atom and take the first account tag seen, so don't split one project's costs across accounts inside a source.
 
 This creates balanced double-entry accounting where charges to PIs are offset by credits to the service provider's fund. The export asserts debits equal credits before returning — an unbalanced journal is a hard error, not a shipped file.
 
