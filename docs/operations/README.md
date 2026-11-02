@@ -127,6 +127,8 @@ tag_mapping:
   fund_org: "fund_org"        # Fund/org code for accounting
   cost_center: "cost_center"  # Parsed but not stored on the charge or exported yet
   account_code: "account_code"  # Optional GL account code, read from the raw tags at journal time
+  reference_1: ""             # Optional: tag to store with the charge, such as a grant number
+  reference_2: ""             # Optional: another, such as a request ID. Not in the GL export.
 
 output:
   pdf_dir: ./output/statements

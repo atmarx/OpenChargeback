@@ -8,7 +8,11 @@ from openchargeback.config import (
     JournalConfig,
     KnownSourceConfig,
 )
-from openchargeback.output.journal_template import build_journal_entries, get_source_config
+from openchargeback.output.journal_template import (
+    build_journal_entries,
+    get_source_config,
+    render_journal_template,
+)
 
 
 def charge(pi, project, cost, account=None):
@@ -50,3 +54,13 @@ def test_source_found_by_display_name_or_pattern():
     assert get_source_config("IT Storage", config) is source
     assert get_source_config("it_storage", config) is source
     assert get_source_config("elsewhere", config) is None
+
+
+def test_gl_csv_quotes_commas_and_keeps_negative_amounts_numeric(tmp_path):
+    (tmp_path / "gl.csv").write_text(
+        '{% for e in entries %}{{ e.fund }},{{ "%.2f"|format(e.amount) }}\n{% endfor %}'
+    )
+    entry = SimpleNamespace(fund="A,1", amount=-5.0)
+    guarded = SimpleNamespace(fund="=SUM(A1)", amount=1.0)
+    out = render_journal_template([entry, guarded], "gl.csv", tmp_path)
+    assert out.splitlines() == ['"A,1",-5.00', "'=SUM(A1),1.00"]

@@ -131,7 +131,7 @@ imports:
     pattern: hpc
     fund_org: ""
     account_code: ""
-  - name: openai-tokens    # Must equal the ingest source name for journal credits
+  - name: openai-tokens    # Journal credits match on this name or the pattern
     pattern: openai        # ChatGPT EDU / OpenAI API usage
     fund_org: "110900-10000"   # Central IT — the fund that bought the credit pool
     account_code: "54500"

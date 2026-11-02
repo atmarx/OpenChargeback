@@ -1,5 +1,7 @@
 # Azure DevOps Pipeline for OpenChargeback
-# Runs tests, security scans, and generates SBOM
+# Runs tests, security scans, and generates SBOM.  It's for institutions hosting
+# on Azure DevOps and doesn't gate or deploy anything.  .woodpecker.yml is the
+# pipeline that deploys the dev instance.
 
 trigger:
   branches:

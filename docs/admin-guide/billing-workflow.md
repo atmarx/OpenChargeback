@@ -240,8 +240,8 @@ openchargeback export-package -p 2025-01 -f pdf -o ./out   # -f zip for the ZIP 
 | `journal_summary.csv` | Human-readable rollup by PI, project and service.  A convenience view, not the ERP handoff. |
 | `statements/` | The stored statement PDFs, copied verbatim and never re-rendered by the package.  Regenerating before you finalize replaces them, so re-send if you do.  A recorded PDF that's missing from disk stops the build. |
 | `inputs/` | The original source files that generated the results, organized by source.  Rows with identical natural keys get `#2`, `#3` suffixes on their `sku_id` in the database only, never here. |
-| `email-log.csv` | Every send attempt linked to a statement: time, recipient, subject, status (including failures) and error. |
-| `audit.csv` | The period lifecycle (opened/closed/finalized) plus every charge review action, one row per charge for bulk actions. |
+| `email-log.csv` | Every send attempt linked to a statement that still exists: time, recipient, subject, status (including failures) and error.  Regenerating can remove a statement whose charges were all rejected, and its send records leave the package with it. |
+| `audit.csv` | The period lifecycle plus every review decision a person made, one row per charge for bulk actions.  Limits today: the period row holds only the latest close and reopen, and a re-import that re-flags a reviewed charge adds no row. |
 | `README.txt` | A plain-language guide to the contents. |
 | `MANIFEST.txt` | The sha256 of every file above — the package's per-file signature. |
 

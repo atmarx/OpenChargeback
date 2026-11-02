@@ -13,6 +13,7 @@ services:
     environment:
       - CONFIG_PATH=/app/instance/config.yaml
       - WEB_SECRET_KEY=${WEB_SECRET_KEY:-}  # App validates at startup; .env on host provides the value
+      # Not passed: SMTP_USER, SMTP_PASSWORD.  A real SMTP setup needs them added here.
     volumes:
       # Mount instance directory to match local paths (instance/billing.db, etc.)
       - ./instance:/app/instance

@@ -79,7 +79,11 @@ The review queue shows charges that need manual approval before finalizing a per
 **Why Charges Get Flagged:**
 - Match a configured flag pattern (e.g., GPU instances)
 - Fund/org code doesn't match validation patterns
-- Unusual spending patterns
+- Missing project, fund/org, or cost, or a PI email that isn't an address
+- The row's billing month differs from the period given at import
+- A re-import changed a charge that was already reviewed
+
+Flagging is rule-based. Nothing here detects spending anomalies.
 
 **Review Actions:**
 - **Approve** - Mark a charge as reviewed and acceptable
@@ -87,7 +91,7 @@ The review queue shows charges that need manual approval before finalizing a per
 - **Approve All** - Bulk approve all flagged charges
 
 **Best Practices:**
-- Review flagged charges before closing a period
+- Review flagged charges before generating statements. They're left out of statements until approved, and a period can't be finalized while any remain.
 - Check that PI emails and fund/org codes are correct
 - Investigate unusually high charges
 """

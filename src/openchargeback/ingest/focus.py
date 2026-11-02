@@ -76,6 +76,15 @@ def extract_period_from_date(date_str: str) -> str:
     return ""
 
 
+def _is_json(text: str) -> bool:
+    """True when ``text`` parses as JSON."""
+    try:
+        json.loads(text)
+    except json.JSONDecodeError:
+        return False
+    return True
+
+
 def parse_tags(tags_value: str | dict[str, Any] | None, tag_mapping: dict[str, str]) -> dict[str, Any]:
     """Parse tags from FOCUS file.
 
@@ -401,6 +410,9 @@ class FocusIngester(BaseIngester):
             tags_raw = row.get("tags")
             if pd.isna(tags_raw):
                 tags_raw = None
+            if isinstance(tags_raw, str) and not _is_json(tags_raw):
+                result.add_error(f"Line {line_num}: Tags is not valid JSON")
+                continue
             tags = parse_tags(tags_raw, tag_mapping)
             normalize_tag_values(tags, fund_org_patterns)
 

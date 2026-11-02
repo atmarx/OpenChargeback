@@ -15,6 +15,7 @@ from jinja2 import (
 
 from ..config import Config, KnownSourceConfig
 from ..money import NO_PROJECT, build_atoms
+from .csv_safe import csv_safe
 
 # The GL template ships inside the package so it is always present in the wheel
 # and the Docker image. The repo-root ``templates/`` dir is NOT packaged (the
@@ -330,6 +331,25 @@ def assert_journal_balanced(entries: list[JournalEntry]) -> None:
         )
 
 
+_PLAIN_NUMBER = re.compile(r"-?\d+(\.\d+)?")
+
+
+def _csv_cell(value: Any) -> Any:
+    """Make one rendered value safe to sit in a CSV cell.
+
+    A fund/org or description comes from tags that people type, and the
+    template just joins values with commas: one comma would shift every later
+    column in the ERP's import.  Formula-guard text as the other CSVs do, but
+    leave plain numbers alone, since a negative amount is not a formula.
+    """
+    if not isinstance(value, str) or _PLAIN_NUMBER.fullmatch(value):
+        return value
+    guarded = csv_safe(value)
+    if any(c in guarded for c in ',"\r\n'):
+        return '"' + guarded.replace('"', '""') + '"'
+    return guarded
+
+
 def render_journal_template(
     entries: list[JournalEntry],
     template_name: str,
@@ -357,6 +377,7 @@ def render_journal_template(
         # still reaches for the old `config`, which is deliberately no longer
         # exposed) renders as empty rather than crashing the month-end export.
         undefined=ChainableUndefined,
+        finalize=_csv_cell if template_name.endswith(".csv") else None,
     )
 
     # Add custom filters

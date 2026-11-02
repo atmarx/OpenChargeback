@@ -291,8 +291,7 @@ class TestPeriodLifecycleGuards:
         db.update_period_status("2025-01", "closed", performed_by="andrew")
         db.update_period_status("2025-01", "finalized", performed_by="andrew")
 
-        # Force the flag back on via direct SQL to simulate a stale queue row,
-        # then verify the mutation paths refuse.
+        # Every mutation path refuses, whether or not the charge is still flagged.
         with pytest.raises(PeriodLockedError):
             db.reject_charge(flagged[0].id, performed_by="andrew")
         with pytest.raises(PeriodLockedError):
@@ -337,3 +336,8 @@ class TestSweepFindings:
         result = ingest_csv(tmp_path, config, db, csv, name="again.csv")
         assert "Finalized periods are permanent" in result.errors[0]
         assert "Reopen" not in result.errors[0]
+
+    def test_malformed_tags_are_named_as_the_problem(self, tmp_path, config, db):
+        csv = "BillingPeriodStart,BilledCost,Tags\n2025-01-01,10.00,{not json\n"
+        result = ingest_csv(tmp_path, config, db, csv)
+        assert result.errors == ["Line 2: Tags is not valid JSON"]
