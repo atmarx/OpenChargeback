@@ -56,7 +56,7 @@ class TagMappingConfig(BaseModel):
     """Mapping of FOCUS tag names to internal field names."""
 
     pi_email: str = "pi_email"
-    project_id: str = "project"
+    project_id: str = "project_id"
     fund_org: str = "fund_org"
     cost_center: str = "cost_center"
     account_code: str = "account_code"  # Optional account code from charge tags

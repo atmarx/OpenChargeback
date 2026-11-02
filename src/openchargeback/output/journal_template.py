@@ -113,7 +113,11 @@ def parse_fund_org(fund_org: str, regex_pattern: str) -> dict[str, str]:
 
 
 def get_source_config(source_name: str, config: Config) -> KnownSourceConfig | None:
-    """Get the source configuration by name.
+    """Get the source configuration by display name or filename pattern.
+
+    Sources are often ingested under their pattern (``-s it_storage``) rather
+    than their display name ("IT Storage").  Both have to find the same entry,
+    or the credit lands on a CLEARING placeholder instead of the configured fund.
 
     Args:
         source_name: Name of the source (e.g., "AWS", "HPC")
@@ -123,7 +127,7 @@ def get_source_config(source_name: str, config: Config) -> KnownSourceConfig | N
         KnownSourceConfig or None if not found.
     """
     for source in config.imports.known_sources:
-        if source.name.lower() == source_name.lower():
+        if source_name.lower() in (source.name.lower(), source.pattern.lower()):
             return source
     return None
 
@@ -136,9 +140,9 @@ def build_journal_entries(
 ) -> list[JournalEntry]:
     """Build journal entries (debit/credit pairs) from charges.
 
-    For each unique (fund_org, source) combination, creates:
-    - One debit entry (charge to the PI's fund_org)
-    - One credit entry (credit to the source's fund_org)
+    Creates one debit per (PI fund_org, source, account) and one credit per
+    source.  A debit shared by several PIs or projects names none of them:
+    its pi_email/project_id are blank rather than whichever came first.
 
     Args:
         charges: List of Charge objects
@@ -163,43 +167,47 @@ def build_journal_entries(
     # by construction.
     atoms = build_atoms(charges, account_code_tag=config.tag_mapping.account_code)
 
-    aggregated: dict[tuple[str, str], dict[str, Any]] = {}
+    aggregated: dict[tuple[str, str, str], dict[str, Any]] = {}
     for atom in atoms:
         source_name = source_map.get(atom.key.source_id) or "Unknown"
         pi_fund_org = atom.key.fund_org or "UNKNOWN"
+        project_id = "" if atom.key.project_id == NO_PROJECT else atom.key.project_id
 
-        key = (pi_fund_org, source_name)
+        # Account code: charge tag -> source default -> global default.  It is
+        # part of the debit's key so two account codes on one fund never merge
+        # into whichever was seen first.  Grouping atoms more finely moves no
+        # cents: each atom still lands in exactly one debit.
+        account = atom.account_code
+        if not account:
+            source_config = get_source_config(source_name, config)
+            account = source_config.account_code if source_config else ""
+        account = account or journal_config.default_account or ""
+
+        key = (pi_fund_org, source_name, account)
         if key not in aggregated:
             aggregated[key] = {
                 "amount": Decimal("0"),
                 "pi_email": atom.key.pi_email,
-                "project_id": "" if atom.key.project_id == NO_PROJECT else atom.key.project_id,
+                "project_id": project_id,
                 "source_name": source_name,
                 "pi_fund_org": pi_fund_org,
-                "account_code": None,
+                "account": account,
             }
-
-        aggregated[key]["amount"] += atom.billed
-        if atom.account_code and not aggregated[key]["account_code"]:
-            aggregated[key]["account_code"] = atom.account_code
+        group = aggregated[key]
+        group["amount"] += atom.billed
+        if group["pi_email"] != atom.key.pi_email:
+            group["pi_email"] = ""
+        if group["project_id"] != project_id:
+            group["project_id"] = ""
 
     entries = []
 
     # Build debit entries (one per aggregated group)
-    for (pi_fund_org, source_name), data in aggregated.items():
+    for (pi_fund_org, source_name, account), data in aggregated.items():
         # Parse the PI's fund_org
         parsed = parse_fund_org(pi_fund_org, fund_org_regex)
         fund = parsed.get("fund", pi_fund_org)
         orgn = parsed.get("orgn", "")
-
-        # Determine account code: charge tag -> source default -> global default
-        account = data["account_code"]
-        if not account:
-            source_config = get_source_config(source_name, config)
-            if source_config and source_config.account_code:
-                account = source_config.account_code
-        if not account:
-            account = journal_config.default_account
 
         # Build description
         description = journal_config.debit_description.format(
@@ -214,7 +222,7 @@ def build_journal_entries(
             fund_org=pi_fund_org,
             fund=fund,
             orgn=orgn,
-            account=account or "",
+            account=account,
             amount=float(data["amount"]),
             is_debit=True,
             is_credit=False,
@@ -230,7 +238,7 @@ def build_journal_entries(
     # the same exact-cents debit amounts, so each source's credit equals its
     # debit lines to the penny.
     source_totals: dict[str, Decimal] = {}
-    for (_pi_fund_org, source_name), data in aggregated.items():
+    for (_pi_fund_org, source_name, _account), data in aggregated.items():
         if source_name not in source_totals:
             source_totals[source_name] = Decimal("0")
         source_totals[source_name] += data["amount"]

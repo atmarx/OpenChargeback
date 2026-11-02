@@ -95,6 +95,54 @@ def load_json_source(source: str) -> dict:
         return json.load(f)
 
 
+SUPPORTED_SCHEMA_MAJOR = "1"
+
+
+def _schema_records(doc: dict, doc_name: str, array: str) -> list[dict]:
+    """The checks both lookups share: a known schema version and a real array."""
+    version = str(doc.get("schema_version", ""))
+    if version.split(".")[0] != SUPPORTED_SCHEMA_MAJOR:
+        raise ValueError(
+            f"{doc_name} schema_version is {version or 'missing'}; "
+            f"this converter reads {SUPPORTED_SCHEMA_MAJOR}.x"
+        )
+    records = doc.get(array)
+    if not isinstance(records, list):
+        raise ValueError(f"{doc_name} has no {array} array")
+    return records
+
+
+def validate_directory_documents(directory_cfg: dict, fund_orgs_cfg: dict) -> None:
+    """
+    Enforce API-SPEC.md before any lookup runs. A half-right directory would
+    bill a whole month wrong, so every violation aborts the conversion.
+    """
+    seen_emails: set[str] = set()
+    for lic in _schema_records(directory_cfg, "directory", "licenses"):
+        email = lic.get("email")
+        if not email:
+            raise ValueError(f"license record has no email: {lic}")
+        if email in seen_emails:
+            raise ValueError(f"directory lists email {email} more than once")
+        seen_emails.add(email)
+        if not lic.get("username"):
+            raise ValueError(f"license for {email} has no username")
+
+    seen_funds: set[str] = set()
+    for fund in _schema_records(fund_orgs_cfg, "fund registry", "fund_orgs"):
+        code = fund.get("fund_org")
+        if not code:
+            raise ValueError(f"fund registry record has no fund_org: {fund}")
+        if code in seen_funds:
+            raise ValueError(f"fund registry lists fund/org {code} more than once")
+        seen_funds.add(code)
+        if not isinstance(fund.get("principal_invoicees", []), list):
+            raise ValueError(f"fund/org {code} principal_invoicees is not a list")
+        for invoicee in fund.get("principal_invoicees", []):
+            if not invoicee.get("email"):
+                raise ValueError(f"fund/org {code} has an invoicee with no email")
+
+
 class DirectoryResolver:
     """
     Attribution via the two directory-API lookups instead of projects.json:
@@ -117,6 +165,7 @@ class DirectoryResolver:
                 "directory has no master_fund_org — the license lookup must never "
                 "answer empty, so a catch-all fund/org is required"
             )
+        validate_directory_documents(directory_cfg, fund_orgs_cfg)
         self.master_fund_org = master
         self.licenses_by_email = {
             lic["email"]: lic for lic in directory_cfg.get("licenses", [])
@@ -156,7 +205,7 @@ class DirectoryResolver:
             routed = True
             base_warning = f"no license found for user {email}"
         else:
-            username = lic.get("username") or email.split("@", 1)[0]
+            username = lic["username"]
             wanted = lic.get("fund_org") or ""
             if wanted:
                 routed = False
@@ -381,7 +430,7 @@ def write_showback_csv(path: Path, showback: dict) -> int:
         "username", "email", "period", "service",
         "credits", "amount_usd", "fund_org", "status",
     ]
-    rows = sorted(showback.values(), key=lambda r: (r["period"], r["username"]))
+    rows = sorted(showback.values(), key=lambda r: (r["period"], r["username"], r["email"]))
     with open(path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()

@@ -93,8 +93,7 @@ async def resend_email(
     config = request.app.state.config
 
     # Get the original email log entry
-    email_logs = db.get_email_logs(limit=1000)
-    email_log = next((e for e in email_logs if e.id == email_id), None)
+    email_log = db.get_email_log_by_id(email_id)
 
     if not email_log:
         add_flash_message(request, "error", "Email log not found.")

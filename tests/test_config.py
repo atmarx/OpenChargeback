@@ -137,7 +137,7 @@ class TestTagMappingConfig:
         """Default tag names are set."""
         config = TagMappingConfig()
         assert config.pi_email == "pi_email"
-        assert config.project_id == "project"
+        assert config.project_id == "project_id"
         assert config.fund_org == "fund_org"
         assert config.cost_center == "cost_center"
 

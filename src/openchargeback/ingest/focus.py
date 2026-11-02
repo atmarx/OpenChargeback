@@ -10,7 +10,13 @@ from typing import Any
 import pandas as pd
 
 from ..config import Config
-from ..db.repository import Charge, Database, Import, PeriodLockedError
+from ..db.repository import (
+    Charge,
+    Database,
+    Import,
+    PeriodLockedError,
+    period_locked_remedy,
+)
 from .base import BaseIngester, IngestResult
 
 # FOCUS specification column names
@@ -327,10 +333,13 @@ class FocusIngester(BaseIngester):
         # A file missing the cost or period column would otherwise import every
         # row at $0 (or fail row-by-row) with no headline error — the "mail
         # every PI a $0 statement" trap.  Require the load-bearing columns up
-        # front and reject the whole file loudly if either is absent.
+        # front and reject the whole file loudly if any is absent.  Without Tags
+        # every row would otherwise fail one at a time as "Missing pi_email tag",
+        # which hides the one thing actually wrong with the file.
         required_columns = {
             "billed_cost": "BilledCost",
             "billing_period_start": "BillingPeriodStart",
+            "tags": "Tags",
         }
         missing_columns = [
             focus_col
@@ -448,6 +457,13 @@ class FocusIngester(BaseIngester):
                 needs_review = True
                 review_reason = "missing_cost"
 
+            # A pi_email that isn't an address can't be emailed or invoiced.  The
+            # OpenAI flat-mode converter writes the literal "unassigned" for an
+            # unmapped user; hold such rows for a person instead of billing them.
+            if "@" not in pi_email:
+                needs_review = True
+                review_reason = review_reason or "invalid_pi_email"
+
             # Check period mismatch
             if expected_period and period != expected_period:
                 needs_review = True
@@ -544,8 +560,8 @@ class FocusIngester(BaseIngester):
                 if billing_period.status != "open":
                     result.add_error(
                         f"Period {period} is {billing_period.status}: "
-                        f"{len(charges)} row(s) not imported. Reopen the "
-                        "period to import corrections."
+                        f"{len(charges)} row(s) not imported. "
+                        + period_locked_remedy(billing_period.status)
                     )
                     result.total_rows -= len(charges)
                     result.total_cost -= sum(c.billed_cost for c in charges)

@@ -49,11 +49,11 @@ class TestBoundedErrors:
 
     def test_the_limit_comes_from_config(self, tmp_path: Path, temp_db):
         # Every row is missing BillingPeriodStart, so every row errors.
-        rows = "\n".join("," * 4 + "1.00" for _ in range(50))
+        rows = "\n".join("," * 4 + "1.00," for _ in range(50))
         csv_file = tmp_path / "bad.csv"
         csv_file.write_text(
             "BillingPeriodStart,BillingPeriodEnd,ChargePeriodStart,"
-            "ResourceId,BilledCost\n" + rows + "\n"
+            "ResourceId,BilledCost,Tags\n" + rows + "\n"
         )
 
         config = Config()

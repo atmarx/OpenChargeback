@@ -25,6 +25,16 @@ from .tables import (
 )
 
 
+def period_locked_remedy(status: str) -> str:
+    """What an operator can do about a period refusing new charges."""
+    if status == "finalized":
+        return (
+            "Finalized periods are permanent and cannot be reopened; "
+            "record the correction in an open period."
+        )
+    return "Reopen the period to import corrections."
+
+
 class PeriodLockedError(Exception):
     """Raised when a write targets a closed or finalized billing period.
 
@@ -610,8 +620,8 @@ class Database:
             if period and period.status != "open":
                 raise PeriodLockedError(
                     f"Billing period {period.period} is {period.status}; "
-                    "new or modified charges are not accepted. Reopen the "
-                    "period to import corrections."
+                    "new or modified charges are not accepted. "
+                    + period_locked_remedy(period.status)
                 )
 
         # Both statements are built once and executed with parameters.  Built
@@ -1262,6 +1272,16 @@ class Database:
                 row_dict["sent_at"] = _format_datetime(row_dict["sent_at"])
                 result.append(EmailLog(**row_dict))
             return result
+
+    def get_email_log_by_id(self, email_id: int) -> EmailLog | None:
+        """Get one email log by ID, however old it is."""
+        with self.engine.connect() as conn:
+            row = conn.execute(select(email_logs).where(email_logs.c.id == email_id)).fetchone()
+        if row is None:
+            return None
+        row_dict = _row_to_dict(row)
+        row_dict["sent_at"] = _format_datetime(row_dict["sent_at"])
+        return EmailLog(**row_dict)
 
     def get_email_logs_for_period(self, billing_period_id: int) -> list[EmailLog]:
         """Get email logs for one period, linked via statement_id.

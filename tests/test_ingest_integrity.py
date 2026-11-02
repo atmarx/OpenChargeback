@@ -299,3 +299,41 @@ class TestPeriodLifecycleGuards:
             db.approve_charge(flagged[0].id, performed_by="andrew")
         with pytest.raises(PeriodLockedError):
             db.approve_all_charges(period.id, performed_by="andrew")
+
+
+class TestSweepFindings:
+    """Behavior the review sweeps asked about and the docs now promise."""
+
+    def test_file_without_tags_column_is_rejected_whole(self, tmp_path, config, db):
+        csv = "BillingPeriodStart,BilledCost\n2025-01-01,10.00\n"
+        result = ingest_csv(tmp_path, config, db, csv)
+        assert result.errors == ["Missing required column(s): Tags. No rows imported."]
+        assert db.get_period("2025-01") is None
+
+    def test_pi_email_that_is_not_an_address_is_held_for_review(self, tmp_path, config, db):
+        csv = (
+            "BillingPeriodStart,BilledCost,Tags\n"
+            '2025-01-01,10.00,"{""pi_email"": ""unassigned"", ""project"": ""p"", '
+            '""fund_org"": ""unassigned""}"\n'
+        )
+        ingest_csv(tmp_path, config, db, csv)
+        flagged = db.get_flagged_charges(db.get_period("2025-01").id)
+        assert [c.review_reason for c in flagged] == ["invalid_pi_email"]
+
+    def test_finalized_period_error_does_not_advise_reopening(self, tmp_path, config, db):
+        csv = (
+            "BillingPeriodStart,BilledCost,Tags\n"
+            '2025-01-01,10.00,"{""pi_email"": ""a@x.edu"", ""project"": ""p"", '
+            '""fund_org"": ""f""}"\n'
+        )
+        ingest_csv(tmp_path, config, db, csv)
+        db.engine.dispose()
+        from sqlalchemy import update
+
+        from openchargeback.db.tables import billing_periods
+
+        with db.engine.begin() as conn:
+            conn.execute(update(billing_periods).values(status="finalized"))
+        result = ingest_csv(tmp_path, config, db, csv, name="again.csv")
+        assert "Finalized periods are permanent" in result.errors[0]
+        assert "Reopen" not in result.errors[0]

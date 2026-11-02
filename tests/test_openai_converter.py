@@ -120,11 +120,11 @@ class TestDirectoryResolver:
     def test_license_without_fund_org_routes_to_master(self):
         resolver = conv.DirectoryResolver(
             {
-                "master_fund_org": "M-1",
+                "schema_version": "1.0", "master_fund_org": "M-1",
                 "licenses": [{"username": "u", "email": "u@x.edu"}],
             },
             {
-                "fund_orgs": [
+                "schema_version": "1.0", "fund_orgs": [
                     {"fund_org": "M-1", "principal_invoicees": [{"email": "boss@x.edu"}]}
                 ]
             },
@@ -138,13 +138,13 @@ class TestDirectoryResolver:
     def test_fund_missing_from_registry_routes_to_master(self):
         resolver = conv.DirectoryResolver(
             {
-                "master_fund_org": "M-1",
+                "schema_version": "1.0", "master_fund_org": "M-1",
                 "licenses": [
                     {"username": "u", "email": "u@x.edu", "fund_org": "GHOST-1"}
                 ],
             },
             {
-                "fund_orgs": [
+                "schema_version": "1.0", "fund_orgs": [
                     {"fund_org": "M-1", "principal_invoicees": [{"email": "boss@x.edu"}]}
                 ]
             },
@@ -157,13 +157,13 @@ class TestDirectoryResolver:
     def test_fund_with_no_invoicees_routes_to_master(self):
         resolver = conv.DirectoryResolver(
             {
-                "master_fund_org": "M-1",
+                "schema_version": "1.0", "master_fund_org": "M-1",
                 "licenses": [
                     {"username": "u", "email": "u@x.edu", "fund_org": "EMPTY-1"}
                 ],
             },
             {
-                "fund_orgs": [
+                "schema_version": "1.0", "fund_orgs": [
                     {"fund_org": "M-1", "principal_invoicees": [{"email": "boss@x.edu"}]},
                     {"fund_org": "EMPTY-1", "principal_invoicees": []},
                 ]
@@ -179,13 +179,13 @@ class TestDirectoryResolver:
         # license that deliberately points at the master fund is a normal charge.
         resolver = conv.DirectoryResolver(
             {
-                "master_fund_org": "M-1",
+                "schema_version": "1.0", "master_fund_org": "M-1",
                 "licenses": [
                     {"username": "u", "email": "u@x.edu", "fund_org": "M-1"}
                 ],
             },
             {
-                "fund_orgs": [
+                "schema_version": "1.0", "fund_orgs": [
                     {"fund_org": "M-1", "principal_invoicees": [{"email": "boss@x.edu"}]}
                 ]
             },
@@ -195,21 +195,70 @@ class TestDirectoryResolver:
         assert att.routed_to_master is False
         assert att.warning is None
 
+    @pytest.mark.parametrize(
+        ("directory", "funds", "message"),
+        [
+            ({"master_fund_org": "M"}, {}, "schema_version is missing"),
+            ({"schema_version": "2.0", "master_fund_org": "M"}, {}, "schema_version is 2.0"),
+            ({"schema_version": "1.0", "master_fund_org": "M"}, {}, "no licenses array"),
+            (
+                {
+                    "schema_version": "1.0",
+                    "master_fund_org": "M",
+                    "licenses": [
+                        {"email": "a@x", "username": "a"},
+                        {"email": "a@x", "username": "b"},
+                    ],
+                },
+                {},
+                "email a@x more than once",
+            ),
+            (
+                {
+                    "schema_version": "1.0",
+                    "master_fund_org": "M",
+                    "licenses": [{"email": "a@x"}],
+                },
+                {},
+                "license for a@x has no username",
+            ),
+            (
+                {"schema_version": "1.0", "master_fund_org": "M", "licenses": []},
+                {
+                    "schema_version": "1.0",
+                    "fund_orgs": [{"fund_org": "M"}, {"fund_org": "M"}],
+                },
+                "fund/org M more than once",
+            ),
+            (
+                {"schema_version": "1.0", "master_fund_org": "M", "licenses": []},
+                {
+                    "schema_version": "1.0",
+                    "fund_orgs": [{"fund_org": "M", "principal_invoicees": [{"name": "x"}]}],
+                },
+                "invoicee with no email",
+            ),
+        ],
+    )
+    def test_spec_violations_abort(self, directory, funds, message):
+        with pytest.raises(ValueError, match=message):
+            conv.DirectoryResolver(directory, funds)
+
     def test_missing_master_fund_org_is_fatal(self):
         with pytest.raises(ValueError, match="master_fund_org"):
-            conv.DirectoryResolver({"licenses": []}, {"fund_orgs": []})
+            conv.DirectoryResolver({"licenses": []}, {"schema_version": "1.0", "fund_orgs": []})
 
     def test_master_fund_absent_from_registry_is_fatal(self):
         with pytest.raises(ValueError, match="master fund/org M-1"):
             conv.DirectoryResolver(
-                {"master_fund_org": "M-1", "licenses": []}, {"fund_orgs": []}
+                {"schema_version": "1.0", "master_fund_org": "M-1", "licenses": []}, {"schema_version": "1.0", "fund_orgs": []}
             )
 
     def test_master_fund_without_invoicees_is_fatal(self):
         with pytest.raises(ValueError, match="principal invoicee"):
             conv.DirectoryResolver(
-                {"master_fund_org": "M-1", "licenses": []},
-                {"fund_orgs": [{"fund_org": "M-1", "principal_invoicees": []}]},
+                {"schema_version": "1.0", "master_fund_org": "M-1", "licenses": []},
+                {"schema_version": "1.0", "fund_orgs": [{"fund_org": "M-1", "principal_invoicees": []}]},
             )
 
 
