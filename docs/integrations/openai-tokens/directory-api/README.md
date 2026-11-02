@@ -45,7 +45,7 @@ who pays. **Users are never invoiced by OpenChargeback. Only Principal Invoicees
   │  OpenChargeback import (in the converter)                 │
   │                                                            │
   │   for each user in the export:                            │
-  │     (1) username ─► fund_org      ── directory API        │  ◄── helpdesk / CMDB
+  │     (1) email ─► fund_org         ── directory API        │  ◄── helpdesk / CMDB
   │         (miss ─► master_fund_org — never empty)           │
   │     (2) fund_org ─► invoicee(s)   ── fund API             │  ◄── research finance
   │                                                            │
@@ -100,7 +100,7 @@ CMDB. Dr. Mirk Nonanda's systems group (gift fund) and Dr. Myrna Selwick's chemi
 ## The master fund/org — one hop, in the API
 
 A charge must always land on a real code. So the license API never answers empty: any
-username it doesn't recognize resolves to the configured **`master_fund_org`**
+seat email it doesn't recognize resolves to the configured **`master_fund_org`**
 (`110000-10000` in the example, held by Research Finance — Pomeline Natterjack). In the
 sample month, Nix Prothero used ChatGPT but isn't in the directory yet; his usage lands
 on the master fund, flagged `routed_to_master` on his showback line (with no license to
