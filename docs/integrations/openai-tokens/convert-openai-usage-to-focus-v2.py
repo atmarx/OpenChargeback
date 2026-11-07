@@ -19,6 +19,9 @@ contract (lookup shapes, master-fund fallback, showback columns) lives in
 directory-api/README.md.
 
 State is maintained in subsidy_state.json to track running totals across runs.
+Each total also records which usage months it was spent on, so converting the
+same month twice aborts instead of spending the cap twice; --rerun replaces a
+month's prior contribution (a corrected export, a fixed mapping).
 """
 
 import argparse
@@ -276,18 +279,27 @@ class SubsidyState:
                     "provost_ai_initiative": {
                         "used": 480.00,
                         "subsidized": 480.00,
-                        "remaining": 20.00
+                        "remaining": 20.00,
+                        "months": {
+                            "2025-12": {"used": 300.00, "subsidized": 300.00},
+                            "2026-01": {"used": 180.00, "subsidized": 180.00}
+                        }
                     }
                 }
             }
         },
         "last_updated": "2026-01-15T10:30:00"
     }
+
+    "months" is the ledger behind the totals: which usage months have already
+    been spent against the cap. It is what lets a second conversion of the same
+    month be refused (or, with --rerun, replaced) instead of double-counted.
     """
 
     def __init__(self, state_file: Path):
         self.state_file = state_file
         self.data = self._load()
+        self._over_cap_warned: set[tuple[str, str, str]] = set()
 
     def _load(self) -> dict:
         if self.state_file.exists():
@@ -300,23 +312,59 @@ class SubsidyState:
         with open(self.state_file, "w") as f:
             json.dump(self.data, f, indent=2)
 
-    def get_subsidy_remaining(
-        self,
-        project_id: str,
-        period_key: str,
-        subsidy_name: str,
-        cap_amount: float
-    ) -> float:
-        """Get remaining subsidy amount for a project in a period."""
-        projects = self.data.setdefault("projects", {})
-        project = projects.setdefault(project_id, {})
-        period = project.setdefault(period_key, {})
-        subsidy = period.setdefault(subsidy_name, {
-            "used": 0.0,
-            "subsidized": 0.0,
-            "remaining": cap_amount
-        })
-        return subsidy["remaining"]
+    def _entries(self):
+        """Yield every (project_id, period_key, subsidy_name, entry) in state."""
+        for project_id, periods in self.data.get("projects", {}).items():
+            for period_key, subs in periods.items():
+                for subsidy_name, entry in subs.items():
+                    yield project_id, period_key, subsidy_name, entry
+
+    def applied_months(self) -> set[str]:
+        """Every usage month (YYYY-MM) already spent against some cap."""
+        return {m for *_, entry in self._entries() for m in entry.get("months", {})}
+
+    def prepare_run(self, input_months: set[str], rerun: bool) -> None:
+        """
+        Refuse to spend a cap twice on the same usage month.
+
+        Without rerun, a month already in the ledger aborts the run: converting
+        it again would bill the PI for usage the subsidy already covered. With
+        rerun, that month's prior contribution is withdrawn from every entry
+        first — including funds the corrected run no longer charges — so the
+        run replaces it rather than adding to it.
+        """
+        legacy = sum(
+            1 for *_, entry in self._entries()
+            if "months" not in entry and entry.get("used", 0) > 0
+        )
+        if legacy:
+            print(
+                f"WARNING: {legacy} subsidy total(s) in {self.state_file} predate "
+                "per-month tracking; a month converted before this version can't "
+                "be recognized if it is converted again"
+            )
+
+        already = sorted(input_months & self.applied_months())
+        if not already:
+            return
+        if not rerun:
+            raise SystemExit(
+                f"ERROR: {self.state_file} has already spent subsidy on usage from "
+                f"{', '.join(already)}. Converting it again would spend the cap "
+                "twice and bill the difference to the PI. If this is a corrected "
+                "export or a fixed mapping for the same month, pass --rerun to "
+                "replace that month's subsidy usage."
+            )
+        for *_, entry in self._entries():
+            months = entry.get("months", {})
+            for month in already:
+                prior = months.pop(month, None)
+                if prior is None:
+                    continue
+                entry["used"] = round(entry["used"] - prior["used"], 2)
+                entry["subsidized"] = round(entry["subsidized"] - prior["subsidized"], 2)
+                entry["remaining"] = round(entry["remaining"] + prior["subsidized"], 2)
+        print(f"INFO: --rerun: replacing prior subsidy usage for {', '.join(already)}")
 
     def apply_subsidy(
         self,
@@ -324,24 +372,50 @@ class SubsidyState:
         period_key: str,
         subsidy_name: str,
         amount: float,
-        cap_amount: float
+        cap_amount: float,
+        month: str,
     ) -> float:
         """
         Apply subsidy to an amount, updating state.
 
-        Returns the subsidized amount (may be less than requested if cap hit).
+        Returns the subsidized amount: never more than the cap has left, and
+        never less than zero. What's left is computed from the cap as it stands
+        now, so a cap lowered below what was already granted grants nothing
+        more; it does not claw the difference back out of the next charge.
         """
-        remaining = self.get_subsidy_remaining(
-            project_id, period_key, subsidy_name, cap_amount
+        subsidy = (
+            self.data.setdefault("projects", {})
+            .setdefault(project_id, {})
+            .setdefault(period_key, {})
+            .setdefault(subsidy_name, {
+                "used": 0.0,
+                "subsidized": 0.0,
+                "remaining": cap_amount,
+            })
         )
 
-        subsidized = round(min(amount, remaining), 2)
+        key = (project_id, period_key, subsidy_name)
+        if subsidy["subsidized"] > cap_amount and key not in self._over_cap_warned:
+            self._over_cap_warned.add(key)
+            print(
+                f"WARNING: {project_id} ({period_key}, {subsidy_name}) was already "
+                f"granted ${subsidy['subsidized']:.2f}, over the current "
+                f"${cap_amount:.2f} cap; no further subsidy, and nothing is "
+                "taken back"
+            )
 
-        # Update state
-        subsidy = self.data["projects"][project_id][period_key][subsidy_name]
-        subsidy["used"] += amount
-        subsidy["subsidized"] += subsidized
-        subsidy["remaining"] = cap_amount - subsidy["subsidized"]
+        available = max(0.0, cap_amount - subsidy["subsidized"])
+        subsidized = round(min(amount, available), 2)
+
+        subsidy["used"] = round(subsidy["used"] + amount, 2)
+        subsidy["subsidized"] = round(subsidy["subsidized"] + subsidized, 2)
+        subsidy["remaining"] = round(max(0.0, cap_amount - subsidy["subsidized"]), 2)
+
+        ledger = subsidy.setdefault("months", {}).setdefault(
+            month, {"used": 0.0, "subsidized": 0.0}
+        )
+        ledger["used"] = round(ledger["used"] + amount, 2)
+        ledger["subsidized"] = round(ledger["subsidized"] + subsidized, 2)
 
         return subsidized
 
@@ -396,7 +470,8 @@ def apply_subsidy_rules(
         period_key=period_key,
         subsidy_name=applicable_subsidy.name,
         amount=cost,
-        cap_amount=applicable_subsidy.cap_amount
+        cap_amount=applicable_subsidy.cap_amount,
+        month=charge_date.strftime("%Y-%m"),
     )
 
     billable_amount = round(cost - subsidized_amount, 2)
@@ -512,6 +587,11 @@ def main():
     parser.add_argument("--state", default="subsidy_state.json", help="Path to state file")
     parser.add_argument("--dry-run", action="store_true", help="Don't update state file")
     parser.add_argument(
+        "--rerun", action="store_true",
+        help="Replace the subsidy already spent on this input's month(s) instead "
+             "of refusing to convert them again (a corrected export or mapping)"
+    )
+    parser.add_argument(
         "--directory",
         help="Directory lookup (license -> fund/org): file path or http(s) URL. "
              "Enables directory-API mode; projects.json is not used. "
@@ -613,8 +693,12 @@ def main():
     else:
         print("INFO: No subsidies.json found, proceeding without subsidies")
 
-    # Load state
+    # Load state — and refuse to spend a cap twice on a month already applied
     state = SubsidyState(Path(args.state))
+    if subsidies:
+        state.prepare_run(
+            {m.strftime("%Y-%m") for m in year_months}, rerun=args.rerun
+        )
 
     # -----------------------------
     # Process usage rows

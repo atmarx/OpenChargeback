@@ -541,6 +541,142 @@ class TestContractExampleIsReal:
 
 
 # -----------------------------
+# Subsidy state across runs — a cap is spent once per usage month
+# -----------------------------
+def _write_cap(tmp_path: Path, cap: float) -> Path:
+    path = tmp_path / "subsidies.json"
+    path.write_text(json.dumps({
+        "subsidies": [{
+            "name": "provost_ai_initiative",
+            "description": f"Provost covers first ${cap:.0f}/fund/fiscal year",
+            "fund_org": "130050-10000",
+            "type": "per_project_cap",
+            "cap_amount": cap,
+            "period": "fiscal_year",
+            "fiscal_year_start": "07-01",
+            "applies_to_services": ["OpenAI"],
+            "enabled": True,
+        }]
+    }))
+    return path
+
+
+class TestSubsidyStateAcrossRuns:
+    FUND = "210431-11045"
+
+    def convert(self, monkeypatch, tmp_path, usage: Path, *extra: str):
+        run_converter(monkeypatch, tmp_path, [
+            "--input", str(usage),
+            "--output", str(tmp_path / "out.csv"),
+            "--pricing", str(OPENAI_DIR / "pricing.json"),
+            "--directory", str(DIRAPI / "directory.example.json"),
+            "--fund-orgs", str(DIRAPI / "fund-orgs.example.json"),
+            "--subsidies", str(tmp_path / "subsidies.json"),
+            "--state", str(tmp_path / "state.json"),
+            *extra,
+        ])
+        focus = pd.read_csv(tmp_path / "out.csv")
+        kind = focus["Tags"].map(lambda t: json.loads(t)["charge_type"])
+        usage_rows, subsidy_rows = focus[kind == "usage"], focus[kind == "subsidy"]
+        return (
+            usage_rows["ListCost"].sum(),
+            usage_rows["BilledCost"].sum(),
+            subsidy_rows["BilledCost"].sum(),
+        )
+
+    def entry(self, tmp_path):
+        state = json.loads((tmp_path / "state.json").read_text())
+        return state["projects"][self.FUND]["FY2026"]["provost_ai_initiative"]
+
+    @pytest.fixture()
+    def january(self, tmp_path):
+        _write_cap(tmp_path, 100.00)
+        usage = tmp_path / "jan.csv"
+        write_usage_csv(usage, [
+            ("2026-01-09", "yev.transom@northwinds.edu", 1200),      # $60
+            ("2026-01-10", "pell.wickstrand@northwinds.edu", 3400),  # $170
+        ])
+        return usage
+
+    def test_converting_a_month_twice_is_refused(self, monkeypatch, tmp_path, january):
+        assert self.convert(monkeypatch, tmp_path, january) == (230.00, 130.00, 100.00)
+        before = (tmp_path / "state.json").read_text()
+        with pytest.raises(SystemExit, match="2026-01.*--rerun"):
+            self.convert(monkeypatch, tmp_path, january)
+        # The refusal spends nothing
+        assert (tmp_path / "state.json").read_text() == before
+
+    def test_dry_run_is_refused_too(self, monkeypatch, tmp_path, january):
+        self.convert(monkeypatch, tmp_path, january)
+        # A preview of a double-spend would show the PI the wrong bill
+        with pytest.raises(SystemExit, match="--rerun"):
+            self.convert(monkeypatch, tmp_path, january, "--dry-run")
+
+    def test_rerun_replaces_the_month_instead_of_adding_to_it(
+        self, monkeypatch, tmp_path, january
+    ):
+        self.convert(monkeypatch, tmp_path, january)
+        # Before the ledger, this second run billed the PI $230: the first run
+        # had already spent the cap on the same usage.
+        assert self.convert(monkeypatch, tmp_path, january, "--rerun") == (
+            230.00, 130.00, 100.00,
+        )
+        entry = self.entry(tmp_path)
+        assert entry["used"] == pytest.approx(230.00)
+        assert entry["subsidized"] == pytest.approx(100.00)
+        assert entry["months"] == {"2026-01": {"used": 230.00, "subsidized": 100.00}}
+
+    def test_rerun_withdraws_from_a_fund_the_correction_no_longer_charges(
+        self, monkeypatch, tmp_path, january
+    ):
+        self.convert(monkeypatch, tmp_path, january)
+        # The corrected January export: Wickstrand's usage was someone else's
+        corrected = tmp_path / "jan-corrected.csv"
+        write_usage_csv(corrected, [
+            ("2026-01-09", "yev.transom@northwinds.edu", 1200),  # $60
+            ("2026-01-10", "nobody.known@northwinds.edu", 3400),  # master fund
+        ])
+        self.convert(monkeypatch, tmp_path, corrected, "--rerun")
+        entry = self.entry(tmp_path)
+        assert entry["used"] == pytest.approx(60.00)
+        assert entry["subsidized"] == pytest.approx(60.00)
+
+    def test_next_month_still_converts(self, monkeypatch, tmp_path, january):
+        self.convert(monkeypatch, tmp_path, january)
+        february = tmp_path / "feb.csv"
+        write_usage_csv(february, [("2026-02-03", "yev.transom@northwinds.edu", 400)])
+        # Cap is spent: the PI pays all $20, and nothing was refused
+        assert self.convert(monkeypatch, tmp_path, february) == (20.00, 20.00, 0.00)
+        assert set(self.entry(tmp_path)["months"]) == {"2026-01", "2026-02"}
+
+    def test_a_lowered_cap_never_bills_more_than_list(
+        self, monkeypatch, tmp_path, january
+    ):
+        self.convert(monkeypatch, tmp_path, january)  # $100 granted
+        _write_cap(tmp_path, 40.00)                   # cap cut below that
+        february = tmp_path / "feb.csv"
+        write_usage_csv(february, [
+            ("2026-02-03", "yev.transom@northwinds.edu", 400),  # $20
+            ("2026-02-04", "yev.transom@northwinds.edu", 400),  # $20
+        ])
+        # Before the clamp: list $40, PI billed $100. The second row got a
+        # -$60 "subsidy" that was credited to no one.
+        assert self.convert(monkeypatch, tmp_path, february) == (40.00, 40.00, 0.00)
+        entry = self.entry(tmp_path)
+        assert entry["subsidized"] == pytest.approx(100.00)  # nothing clawed back
+        assert entry["remaining"] == pytest.approx(0.00)
+
+    def test_a_raised_cap_is_available_on_the_first_charge(
+        self, monkeypatch, tmp_path, january
+    ):
+        self.convert(monkeypatch, tmp_path, january)  # $100 granted, $0 stored left
+        _write_cap(tmp_path, 150.00)
+        february = tmp_path / "feb.csv"
+        write_usage_csv(february, [("2026-02-03", "yev.transom@northwinds.edu", 400)])
+        assert self.convert(monkeypatch, tmp_path, february) == (20.00, 0.00, 20.00)
+
+
+# -----------------------------
 # Flat projects.json mode — the original path, untouched
 # -----------------------------
 class TestProjectsModeUnchanged:

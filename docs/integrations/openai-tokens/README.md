@@ -161,6 +161,7 @@ Options:
   --subsidies FILE  Subsidy rules (default: subsidies.json)
   --state FILE      State file for tracking (default: subsidy_state.json)
   --dry-run         Don't update state file
+  --rerun           Replace a month already converted (corrected export or mapping)
   --directory SRC   Directory lookup, path or http(s) URL (enables directory mode)
   --fund-orgs SRC   Fund/org registry, path or http(s) URL (required with --directory)
   --showback FILE   Showback CSV path (default: user-usage-feedback_<YYYY-MM>.csv)
@@ -178,7 +179,11 @@ The v2 script maintains state in `subsidy_state.json` to track subsidy usage acr
         "provost_ai_initiative": {
           "used": 480.00,
           "subsidized": 480.00,
-          "remaining": 20.00
+          "remaining": 20.00,
+          "months": {
+            "2025-12": {"used": 300.00, "subsidized": 300.00},
+            "2026-01": {"used": 180.00, "subsidized": 180.00}
+          }
         }
       }
     }
@@ -186,7 +191,22 @@ The v2 script maintains state in `subsidy_state.json` to track subsidy usage acr
 }
 ```
 
-Use `--dry-run` to test without updating state.
+`months` records which usage months each total was spent on.  Converting a
+month that's already there **aborts**, because a second run would spend the cap
+again and bill the PI for usage the subsidy already covered.  If the export or
+the mapping was wrong, convert the corrected file with `--rerun`.  That withdraws
+the month's earlier contribution from every fund, including one the correction
+no longer charges, and applies the new one in its place.  `--dry-run` previews
+without saving, and refuses the same way.
+
+Caps are read fresh from `subsidies.json` on every charge.  A raised cap is
+available right away.  A cap lowered below what a fund has already been granted
+grants nothing more, and nothing is taken back.  The converter warns once per
+fund, and any clawback is a journal entry for finance, not a converter decision.
+
+A state file written before per-month tracking has totals but no `months`.  The
+converter warns that it can't recognize those earlier months if they're
+converted again.
 
 ## OpenChargeback Configuration
 
@@ -258,3 +278,4 @@ finance journals the already-billed month to the right fund.
 ### State file issues
 
 Delete `subsidy_state.json` to reset tracking (use with caution - may cause re-subsidization).
+To redo one month, don't delete anything: convert the corrected export with `--rerun`.
